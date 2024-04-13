@@ -8,6 +8,8 @@
 
 { pkgs ? import <nixpkgs> { },
   old ? import <old> { },
+  staging ? import <staging> { },
+  unstable ? import <unstable> { },
 }:
 
 let
@@ -53,6 +55,10 @@ let
   });
   cmake_static = pkgs.pkgsStatic.cmakeMinimal.overrideAttrs (oldAttrs: rec {
     doCheck = false;
+  });
+  ruff_static = pkgs.pkgsStatic.ruff.overrideAttrs (oldAttrs: rec {
+    doCheck = false;
+    doInstallCheck = false;
   });
   git_static = pkgs.pkgsStatic.git.overrideAttrs (oldAttrs: rec {
     # buildInputs = builtins.filter (dep: dep != pkgs.curl)(oldAttrs.buildInputs) ++ [
@@ -181,6 +187,7 @@ in
   inherit git_static;
   inherit protobuf_3_8_0_static;
   inherit protobuf_3_9_2_static;
+  inherit ruff_static;
 
   rsync_static = pkgs.pkgsStatic.rsync.override {
     enableXXHash = false;
