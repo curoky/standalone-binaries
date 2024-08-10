@@ -1,4 +1,4 @@
-{ lib, stdenv, fetchurl, writeText, git, nghttp2, libpsl}:
+{ lib, stdenv, fetchurl, writeText, git, nghttp2, libpsl, c-ares}:
 
 let
   wrapperScript = writeText "wrapper.sh" ''
@@ -30,10 +30,13 @@ in
   nlsSupport = false;
   perlSupport = false;
 }).overrideAttrs (oldAttrs: rec {
-  buildInputs = oldAttrs.buildInputs ++ [ nghttp2 libpsl ];
+  buildInputs = oldAttrs.buildInputs ++ [ nghttp2 libpsl c-ares ];
 
-  env.NIX_LDFLAGS = oldAttrs.env.NIX_LDFLAGS 
-    + " -lnghttp2 -lnghttp3 -lcares -lngtcp2 -lngtcp2_crypto_ossl -lpsl -lssl -lcrypto -lssh2 -lidn2 -lzstd -lz -lunistring";
+  #doCheck = false;
+  #doInstallCheck = false;
+
+  env.NIX_LDFLAGS = oldAttrs.env.NIX_LDFLAGS
+    + " -static -lnghttp2 -lnghttp3 -lcares -lngtcp2 -lngtcp2_crypto_ossl -lpsl -lssl -lcrypto -lssh2 -lidn2 -lzstd -lz -lunistring";
 
   patchPhase = ''
     find . -path './t/t[0-9][0-9][0-9][0-9]' -prune -o -type f -name '*.[ch]' -exec sed -i 's/\<error\>(/git_error(/g' {} +
@@ -43,6 +46,9 @@ in
   '';
 
   postInstall = (oldAttrs.postInstall or "") + ''
+    #cp config.log $out/share/git
+    #sed -i "s|/nix/store/[a-z0-9]\{32\}-|/nix/store/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-|g" $out/share/git/config.log
+
     mv $out/bin/git $out/bin/_git
     cp ${wrapperScript} $out/bin/git
     chmod +x $out/bin/git
