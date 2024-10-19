@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -xeuo pipefail
+
+script_path="$(readlink -f "$0")"
+root=$(cd "$(dirname "$script_path")" && pwd)
+
+export CONTAINERS_CONF=$root/../conf/containers.conf
+export CONTAINERS_STORAGE_CONF=$root/../conf/storage.conf
+export CONTAINERS_REGISTRIES_CONF=$root/../conf/registries.conf
+export CONTAINERS_POLICY_JSON=$root/../conf/policy.json
+
+# or --tmpdir=path
+# export TMPDIR=$root/tmpdir
+
+# export PATH=$PATH:$root
+
+# --imagestore=$root/storage \
+# --runroot=$root/runroot \
+# --network-cmd-path=$root/bin \
+# --log-level=debug \
+
+# export HTTP_PROXY=http://127.0.0.1:7890
+# export HTTPS_PROXY=http://127.0.0.1:7890
+
+mkdir -p /opt/podmanx/data/tmpdir
+exec -a "$0" "$root/_podman" \
+  --out=$root/../podman.log \
+  system service --time=0 unix:///tmp/podmanxd.sock \
+  "$@"
