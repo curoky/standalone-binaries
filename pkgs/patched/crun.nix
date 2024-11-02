@@ -16,24 +16,28 @@
   crun,
 }:
 
-crun.overrideAttrs (oldAttrs: rec {
-  propagatedBuildInputs = [ ];
-  buildInputs = [
-    # criu
-    libcap
-    libseccomp
-    # gperf
-    yajl
-    argp-standalone
-  ];
-  env = {
-    NIX_LDFLAGS = "";
-  };
-  configureFlags = [
-    "--disable-systemd"
-    "--enable-embedded-yajl"
-    "--without-python-bindings"
-  ];
+(crun.override {
+  withLibkrun = false;
+  withLibkrunSEV = false;
+}).overrideAttrs
+  (oldAttrs: rec {
+    propagatedBuildInputs = [ ];
+    buildInputs = [
+      # criu
+      libcap
+      libseccomp
+      # gperf
+      yajl
+      argp-standalone
+    ];
+    env = {
+      NIX_LDFLAGS = "";
+    };
+    configureFlags = [
+      "--disable-systemd"
+      "--enable-embedded-yajl"
+      "--without-python-bindings"
+    ];
 
-  doCheck = false;
-})
+    doCheck = false;
+  })
