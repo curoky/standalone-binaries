@@ -70,6 +70,7 @@
   scc = { };
   shfmt = { };
   runc = { };
+  uv = { };
 
   # llvm pkgs
   lld_18 = { };

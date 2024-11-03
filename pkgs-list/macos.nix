@@ -10,4 +10,7 @@
   shellcheck = {
     version = "25.11";
   };
+  uv = {
+    version = "26.05";
+  };
 }
