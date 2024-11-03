@@ -104,11 +104,11 @@
   };
   "nerd-fonts.fira-code" = {
     isStatic = false;
-    alias = "nerd-fonts.fira-code";
+    alias = "nerd-fonts-fira-code";
   };
   "nerd-fonts.ubuntu-mono" = {
     isStatic = false;
-    alias = "nerd-fonts.ubuntu-mono";
+    alias = "nerd-fonts-ubuntu-mono";
   };
 
   # rust pkgs
