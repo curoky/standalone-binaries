@@ -146,6 +146,7 @@
             cmake_4_1_2 = defaultPkgsStatic.callPackage ./pkgs/patched/cmake_4_1_2.nix { };
             git = defaultPkgsStatic.callPackage ./pkgs/patched/git.nix { };
             zellij = Pkgs2605Static.callPackage ./pkgs/patched/zellij.nix { };
+            s6-linux-init = defaultPkgsStatic.callPackage ./pkgs/patched/s6-linux-init.nix { };
 
             # podman
             gpgme = defaultPkgsStatic.callPackage ./pkgs/patched/gpgme.nix { };
