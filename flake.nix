@@ -151,7 +151,7 @@
               inherit execline;
             };
             s6-rc = defaultPkgsStatic.callPackage ./pkgs/patched/s6-rc.nix {
-              inherit s6;
+              inherit s6 execline;
             };
             s6-linux-init = defaultPkgsStatic.callPackage ./pkgs/patched/s6-linux-init.nix {
               inherit s6;

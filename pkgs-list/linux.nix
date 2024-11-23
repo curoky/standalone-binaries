@@ -45,9 +45,9 @@
     output = [ "bin" ];
   };
   skalibs = { };
-  execline = {
-    output = [ "bin" ];
-  };
+  # execline = {
+  #   output = [ "bin" ];
+  # };
 
   # go pkgs
   bazelisk = { };
