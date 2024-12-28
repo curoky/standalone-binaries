@@ -150,11 +150,6 @@
   yazi-unwrapped = {
     alias = "yazi";
   };
-  smartmontools = {
-    "aarch64-darwin" = {
-      isStatic = false;
-    };
-  };
 
   ## ---- linux only -------------------------------------------------------
   cronie = {

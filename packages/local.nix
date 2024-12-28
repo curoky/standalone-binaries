@@ -79,6 +79,21 @@ in
     vim-plugins = pkgs.callPackage ./vim-plugins { };
     zsh-plugins = pkgsStatic.callPackage ./zsh-plugins { };
     music-decrypto = pkgs.callPackage ./music-decrypto { };
+
+    perl = pkgs.callPackage ./perl {
+      perlStatic = pkgsStatic.perl;
+      libxcryptStatic = pkgsStatic.libxcrypt;
+    };
+    # cloc is a perl script; its wrapper runs against the sibling `perl` package
+    # at deploy time (falling back to a system perl), so it ships cross-platform
+    # alongside perl above. On darwin the fully-static perl/perlPackages it pulls
+    # in as build inputs fail to build, and cloc needs no static linking anyway,
+    # so build it from the native pkgs there; Linux keeps the static set.
+    cloc =
+      if pkgs.stdenv.hostPlatform.isDarwin then
+        pkgs.callPackage ./cloc { }
+      else
+        pkgsStatic.callPackage ./cloc { };
   };
 
   # Linux-only local packages (patched tooling, container stack, multiple
@@ -134,9 +149,6 @@ in
     wget = pkgsStatic.callPackage ./wget { };
     parallel = pkgsStatic.callPackage ./parallel { };
     miniserve = pkgsStatic.callPackage ./miniserve { };
-
-    perl = pkgsStatic.callPackage ./perl { };
-    cloc = pkgsStatic.callPackage ./cloc { };
 
     # Node.js stack: a standalone fully-static (musl) Node.js 24 runtime plus a
     # set of Node CLI tools that run on it. The runtime is shipped as its own
