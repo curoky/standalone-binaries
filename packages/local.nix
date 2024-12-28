@@ -127,6 +127,8 @@ in
     python311 = pkgsStatic.callPackage ./python/311 { };
     python312 = pkgsStatic.callPackage ./python/312 { };
     python313 = pkgsStatic.callPackage ./python/313 { };
+    python314 = pkgsStatic.callPackage ./python/314 { };
+    python315 = pkgsStatic.callPackage ./python/315 { };
 
     openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
     wget = pkgsStatic.callPackage ./wget { };
@@ -156,6 +158,7 @@ in
     # wrapper derivations add an installCheck that runs the shipped JS under
     # `nodejs-slim24` to confirm the tool actually works on the static runtime.
     nodejs-slim24 = pkgsStatic.callPackage ./nodejs/24 { };
+    nodejs-slim26 = pkgsStatic.callPackage ./nodejs/26 { };
     pnpm = pkgsStatic.callPackage ./pnpm {
       pnpm = pkgs.pnpm.override { nodejs-slim = nodejs-slim24; };
     };
