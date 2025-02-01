@@ -90,6 +90,11 @@ in
     # perl/perlPackages it would pull in fail to build on darwin), so build it
     # from the native pkgs on both platforms.
     cloc = pkgs.callPackage ./cloc { };
+    # parallel is a perl script (plus bundled perl helper scripts); like cloc it
+    # wraps each command to run under the sibling `perl` package at deploy time
+    # (falling back to a system perl), so it ships cross-platform from native
+    # pkgs on both platforms.
+    parallel = pkgs.callPackage ./parallel { };
   };
 
   # Linux-only local packages (patched tooling, container stack, multiple
@@ -143,7 +148,6 @@ in
 
     openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
     wget = pkgsStatic.callPackage ./wget { };
-    parallel = pkgsStatic.callPackage ./parallel { };
     miniserve = pkgsStatic.callPackage ./miniserve { };
 
     # Node.js stack: a standalone fully-static (musl) Node.js 24 runtime plus a
