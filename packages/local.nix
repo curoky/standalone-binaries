@@ -208,13 +208,18 @@ in
     # the same deploy dir name so consumers reference it identically.
     nodejs-slim26 = pkgs.callPackage ./nodejs/26/darwin.nix { };
 
-    # macOS wget: built from native pkgs.wget with each non-system dynamic
-    # dependency swapped for its pkgsStatic archive, so only /usr/lib system
-    # libs stay dynamic (the Linux wget is fully static via pkgsStatic — see
-    # ./wget/default.nix vs ./wget/darwin.nix).
-    wget = pkgs.callPackage ./wget/darwin.nix {
-      inherit pkgsStatic;
+    # macOS wget: take the fully-static `pkgsStatic.wget` (same set as Linux) and
+    # only override its build-time perl to the native one — the darwin static
+    # perl fails to build (see ./wget/darwin-static.nix). The resulting binary
+    # links every nix dep statically, leaving only /usr/lib system libs dynamic.
+    wget = pkgsStatic.callPackage ./wget/darwin-static.nix {
+      inherit (pkgs) perlPackages;
     };
+    # Alternative (kept, not active): build native pkgs.wget and swap each
+    # non-system dep for its pkgsStatic archive (see ./wget/darwin.nix).
+    # wget = pkgs.callPackage ./wget/darwin.nix {
+    #   inherit pkgsStatic;
+    # };
 
     # macOS krb5: fully static via pkgsStatic, with two upstream darwin
     # static-link defects patched (USE_CCAPI_MACOS / mit_des_zeroblock — see
