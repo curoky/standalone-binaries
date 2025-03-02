@@ -221,6 +221,14 @@ in
     #   inherit pkgsStatic;
     # };
 
+    # macOS ffmpeg (headless): partial-static via pkgsStatic — every nix dep
+    # linked statically, only /usr/lib + system frameworks stay dynamic (DESIGN.md
+    # darwin strategy 2). See ./ffmpeg/darwin.nix for the disabled features and
+    # their root causes (meson arm64 cross-file bug, openmp/llvm-static libatomic,
+    # liboapv dylib-only, network/TLS static configure link failures) and the
+    # x265 static-link fixes (kept: 8-bit HEVC encode).
+    ffmpeg = pkgsStatic.callPackage ./ffmpeg/darwin.nix { };
+
     # macOS krb5: fully static via pkgsStatic, with two upstream darwin
     # static-link defects patched (USE_CCAPI_MACOS / mit_des_zeroblock — see
     # ./krb5/darwin.nix). On Linux krb5 comes straight from the manifest.
