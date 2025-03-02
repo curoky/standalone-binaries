@@ -1,6 +1,6 @@
 # markdownlint-cli2 (on static node)
 #
-# markdownlint-cli2 running on our fully-static (musl) `nodejs-slim24` package,
+# markdownlint-cli2 running on our fully-static (musl) `nodejs-slim26` package,
 # instead of being `nix bundle`'d into a self-extracting executable. Same
 # runtime approach as packages/pnpm: reuse the upstream nixpkgs JS distribution
 # and ship a relative-path wrapper that invokes the sibling static node
@@ -18,7 +18,7 @@
 #
 # Deploy layout:
 #   $store/
-#     nodejs-slim24/bin/node            (separate package; static musl ELF)
+#     nodejs-slim26/bin/node            (separate package; static musl ELF)
 #     markdownlint-cli2/
 #       bin/markdownlint-cli2           (wrapper -> sibling node + entry .mjs)
 #       libexec/markdownlint-cli2/...   (JS, from the nixpkgs markdownlint-cli2)
@@ -30,7 +30,7 @@
   stdenvNoCC,
   writeText,
   markdownlint-cli2,
-  nodejs-slim24,
+  nodejs-slim26,
 }:
 
 let
@@ -39,7 +39,7 @@ let
     script_path="$(readlink -f "$0")"
     root="$(cd "$(dirname "$script_path")/.." && pwd)"
     store="$(cd "$root/.." && pwd)"
-    exec "$store/nodejs-slim24/bin/node" "$root/libexec/markdownlint-cli2/markdownlint-cli2-bin.mjs" "$@"
+    exec "$store/nodejs-slim26/bin/node" "$root/libexec/markdownlint-cli2/markdownlint-cli2-bin.mjs" "$@"
   '';
 in
 stdenvNoCC.mkDerivation {
@@ -65,7 +65,7 @@ stdenvNoCC.mkDerivation {
   '';
 
   # Even though markdownlint-cli2 is *built* with the regular node (it needs
-  # npm), make sure the shipped JS actually runs on the static `nodejs-slim24`
+  # npm), make sure the shipped JS actually runs on the static `nodejs-slim26`
   # we deploy alongside it — i.e. the exact command the runtime wrapper issues.
   # markdownlint-cli2 has no --version/--help that exits 0, so lint a trivial
   # clean markdown file and assert success.
@@ -74,7 +74,7 @@ stdenvNoCC.mkDerivation {
     runHook preInstallCheck
     check_dir=$(mktemp -d)
     printf '# Title\n\nHello world.\n' > "$check_dir/ok.md"
-    ( cd "$check_dir" && ${nodejs-slim24}/bin/node \
+    ( cd "$check_dir" && ${nodejs-slim26}/bin/node \
         $out/libexec/markdownlint-cli2/markdownlint-cli2-bin.mjs ok.md )
     runHook postInstallCheck
   '';

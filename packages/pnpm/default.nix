@@ -1,9 +1,9 @@
 # pnpm (on static node)
 #
-# pnpm running on our fully-static (musl) `nodejs-slim24` package.
+# pnpm running on our fully-static (musl) `nodejs-slim26` package.
 #
 # The interpreter selection is done upstream-style in packages/local.nix:
-#   pnpm = pkgs.pnpm.override { nodejs-slim = nodejs-slim24; }
+#   pnpm = pkgs.pnpm.override { nodejs-slim = nodejs-slim26; }
 # so the `pnpm` argument here is already the nixpkgs pnpm built against our
 # static node (its $out has libexec/pnpm + bin/{pnpm,pnpx}).
 #
@@ -12,13 +12,13 @@
 # on the .mjs shebang to locate node. After the standalone normalize pass that
 # shebang's /nix/store path is rewritten to `/usr/bin/env node`, which would
 # make the deployed pnpm depend on a node on the host PATH. Instead we ship a
-# relative-path wrapper that invokes the sibling `nodejs-slim24` package
+# relative-path wrapper that invokes the sibling `nodejs-slim26` package
 # explicitly, so the static node travels with pnpm:
 #
 #   $store/
-#     nodejs-slim24/bin/node   (separate package; static musl ELF)
+#     nodejs-slim26/bin/node   (separate package; static musl ELF)
 #     pnpm/
-#       bin/{pnpm,pnpx}        (wrapper: exec $store/nodejs-slim24/bin/node \
+#       bin/{pnpm,pnpx}        (wrapper: exec $store/nodejs-slim26/bin/node \
 #                                             $root/libexec/pnpm/bin/<entry> "$@")
 #       libexec/pnpm/...       (pnpm JS, from the overridden nixpkgs pnpm)
 #
@@ -46,7 +46,7 @@ let
       script_path="$(readlink -f "$0")"
       root="$(cd "$(dirname "$script_path")/.." && pwd)"
       store="$(cd "$root/.." && pwd)"
-      exec "$store/nodejs-slim24/bin/node" "$root/libexec/pnpm/bin/${entry}.${ext}" "$@"
+      exec "$store/nodejs-slim26/bin/node" "$root/libexec/pnpm/bin/${entry}.${ext}" "$@"
     '';
 in
 stdenvNoCC.mkDerivation {

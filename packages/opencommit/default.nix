@@ -1,6 +1,6 @@
 # opencommit (on static node)
 #
-# opencommit running on our fully-static (musl) `nodejs-slim24` package, instead
+# opencommit running on our fully-static (musl) `nodejs-slim26` package, instead
 # of being `nix bundle`'d into a self-extracting executable. Same runtime
 # approach as packages/pnpm: reuse the upstream nixpkgs JS distribution and ship
 # a relative-path wrapper that invokes the sibling static node explicitly, so
@@ -18,7 +18,7 @@
 #
 # Deploy layout:
 #   $store/
-#     nodejs-slim24/bin/node      (separate package; static musl ELF)
+#     nodejs-slim26/bin/node      (separate package; static musl ELF)
 #     opencommit/
 #       bin/{opencommit,oco}      (wrappers -> sibling node + out/cli.cjs)
 #       libexec/opencommit/...    (JS, from the nixpkgs opencommit)
@@ -30,7 +30,7 @@
   stdenvNoCC,
   writeText,
   opencommit,
-  nodejs-slim24,
+  nodejs-slim26,
 }:
 
 let
@@ -39,7 +39,7 @@ let
     script_path="$(readlink -f "$0")"
     root="$(cd "$(dirname "$script_path")/.." && pwd)"
     store="$(cd "$root/.." && pwd)"
-    exec "$store/nodejs-slim24/bin/node" "$root/libexec/opencommit/out/cli.cjs" "$@"
+    exec "$store/nodejs-slim26/bin/node" "$root/libexec/opencommit/out/cli.cjs" "$@"
   '';
 in
 stdenvNoCC.mkDerivation {
@@ -66,12 +66,12 @@ stdenvNoCC.mkDerivation {
   '';
 
   # Even though opencommit is *built* with the regular node (it needs npm), make
-  # sure the shipped JS actually runs on the static `nodejs-slim24` we deploy
+  # sure the shipped JS actually runs on the static `nodejs-slim26` we deploy
   # alongside it — i.e. the exact command the runtime wrapper issues.
   doInstallCheck = true;
   installCheckPhase = ''
     runHook preInstallCheck
-    ${nodejs-slim24}/bin/node $out/libexec/opencommit/out/cli.cjs --version
+    ${nodejs-slim26}/bin/node $out/libexec/opencommit/out/cli.cjs --version
     runHook postInstallCheck
   '';
 
