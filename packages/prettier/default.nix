@@ -63,10 +63,13 @@ stdenvNoCC.mkDerivation {
   '';
 
   meta = {
-    description = "prettier running on the sibling fully-static (musl) node package";
+    description = "prettier running on the sibling standalone node package";
     homepage = "https://prettier.io/";
     license = lib.licenses.mit;
-    platforms = [ "x86_64-linux" ];
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
     mainProgram = "prettier";
   };
 }

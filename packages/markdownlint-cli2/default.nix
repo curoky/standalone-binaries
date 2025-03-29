@@ -80,10 +80,13 @@ stdenvNoCC.mkDerivation {
   '';
 
   meta = {
-    description = "markdownlint-cli2 running on the sibling fully-static (musl) node package";
+    description = "markdownlint-cli2 running on the sibling standalone node package";
     homepage = "https://github.com/DavidAnson/markdownlint-cli2";
     license = lib.licenses.mit;
-    platforms = [ "x86_64-linux" ];
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
     mainProgram = "markdownlint-cli2";
   };
 }
