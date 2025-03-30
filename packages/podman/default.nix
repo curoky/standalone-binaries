@@ -21,7 +21,7 @@
   replaceVars,
   # extraPackages ? [ ],
   crun,
-  # runc,
+  runc,
   conmon,
   # extraRuntimes ? lib.optionals stdenv.hostPlatform.isLinux [ runc ], # e.g.: runc, gvisor, youki
   # fuse-overlayfs,
@@ -44,11 +44,31 @@
 let
   podman_bin = ./bin;
   podman_conf = ./conf;
+
+  # runc is pulled into podman's helpersBin via the upstream `extraRuntimes`
+  # default. Under pkgsStatic the real runc binary is already fully static, but
+  # the upstream installPhase runs `wrapProgram` on it, which renames the static
+  # binary to `.runc-wrapped` and installs a small *dynamic* launcher named
+  # `runc` (it references a /nix musl interpreter + rpath). podman's helpersBin
+  # ships that launcher, so the copied `runc` ends up dynamic and depends on
+  # /nix, tripping the standalone portability check. (The standalone `.#runc`
+  # output avoids this only because normalize.sh renames `.runc-wrapped` back
+  # over the launcher.) Drop the wrapper here and install the static binary
+  # directly; the PATH prefix it adds is not needed for the shipped runtime.
+  runcStatic = runc.overrideAttrs (_: {
+    installPhase = ''
+      runHook preInstall
+      install -Dm755 runc $out/bin/runc
+      installManPage man/*/*.[1-9]
+      runHook postInstall
+    '';
+  });
 in
 (podman.override {
   conmon = conmon;
   catatonit = catatonit;
   crun = crun;
+  runc = runcStatic;
 }).overrideAttrs
   (oldAttrs: rec {
     propagatedBuildInputs = [ ];
