@@ -87,14 +87,6 @@ in
     # fail to build on darwin), so build it from the native pkgs on both
     # platforms.
     cloc = pkgs.callPackage ./cloc { };
-    # exiftool is a perl tool like cloc: it runs against the sibling `perl`
-    # package at deploy time. Its only non-portable bits are the optional
-    # compression XS modules, which are rebuilt against `pkgsStatic` so the
-    # compression libs link statically (only /usr/lib system libs stay dynamic
-    # on darwin). Built from native pkgs.perlPackages on both platforms.
-    exiftool = pkgs.callPackage ./exiftool {
-      inherit pkgsStatic;
-    };
     parallel = pkgs.callPackage ./parallel { };
   };
 
@@ -105,6 +97,13 @@ in
       allLocales = false;
     };
     perl = pkgsStatic.callPackage ./perl { };
+    # exiftool is a perl tool like cloc: it runs against the sibling static
+    # `perl` at deploy time. That perl (-Uusedl) cannot dlopen XS .so, so its
+    # optional compression XS modules are compiled into the interpreter itself
+    # (see ./perl/default.nix). This package therefore ships only the pure-Perl
+    # pieces (script, Image::ExifTool, Archive::Zip) and needs no static linking,
+    # so it builds from the native pkgs.perlPackages.
+    exiftool = pkgs.callPackage ./exiftool { };
     nsight-systems = pkgsStatic.callPackage ./nsight-systems { };
     cmake = pkgsStatic.callPackage ./cmake/default { };
     cmake_3_27_9 = pkgsStatic.callPackage ./cmake/3_27_9 { };
@@ -203,6 +202,13 @@ in
   darwin = goWithoutCgo // rec {
     perl = pkgs.callPackage ./perl/darwin.nix {
       libxcryptStatic = pkgsStatic.libxcrypt;
+    };
+    # macOS exiftool: unlike Linux, the darwin sibling perl can dlopen XS
+    # modules, so the optional compression modules are shipped as .bundle files
+    # with their compression libs statically linked (only /usr/lib system libs
+    # stay dynamic). See ./exiftool/darwin.nix.
+    exiftool = pkgs.callPackage ./exiftool/darwin.nix {
+      inherit pkgsStatic;
     };
     # macOS counterpart of the Linux nodejs-slim26 (./nodejs/26): a standalone
     # Node.js 26 built via pkgsStatic so every nix dependency links as a static
