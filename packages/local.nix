@@ -45,40 +45,41 @@ in
 {
   # Cross-platform local packages.
   common = {
-    protobuf_3_8_0 = pkgsStatic.callPackage ./protobuf/3_8_0 { };
-    protobuf_3_9_2 = pkgsStatic.callPackage ./protobuf/3_9_2 { };
-    coreutils = pkgsStatic.coreutils.override {
-      singleBinary = false;
-    };
-    gnupg = pkgsStatic.gnupg.override {
-      enableMinimal = true;
-      guiSupport = false;
-    };
-
-    diffutils = pkgsStatic.callPackage ./diffutils { };
-    gettext = pkgsStatic.callPackage ./gettext { };
-    p7zip = pkgsStatic.callPackage ./p7zip { };
-    rsync = pkgsStatic.callPackage ./rsync { };
-
-    netron = pkgs.callPackage ./netron { };
-    git-filter-repo = pkgs.callPackage ./git-filter-repo { };
-
-    vim = pkgsStatic.callPackage ./vim { };
-    curl = pkgsStatic.callPackage ./curl { };
-    file = pkgsStatic.callPackage ./file { };
-    makeself = pkgsStatic.callPackage ./makeself { };
-    zsh = pkgsStatic.callPackage ./zsh { };
-    autoconf = pkgsStatic.callPackage ./autoconf { };
-    automake = pkgsStatic.callPackage ./automake { };
-    libtool = pkgsStatic.callPackage ./libtool { };
-
+    # unclassified (resource bundles, no compilation)
     cacert = pkgsStatic.callPackage ./cacert { };
     rime-plugins = pkgsStatic.callPackage ./rime-plugins { };
     tmux-plugins = pkgsStatic.callPackage ./tmux-plugins { };
     vim-plugins = pkgs.callPackage ./vim-plugins { };
     zsh-plugins = pkgsStatic.callPackage ./zsh-plugins { };
-    music-decrypto = pkgs.callPackage ./music-decrypto { };
 
+    # C / autotools (stdenv)
+    autoconf = pkgsStatic.callPackage ./autoconf { };
+    automake = pkgsStatic.callPackage ./automake { };
+    coreutils = pkgsStatic.coreutils.override {
+      singleBinary = false;
+    };
+    curl = pkgsStatic.callPackage ./curl { };
+    diffutils = pkgsStatic.callPackage ./diffutils { };
+    file = pkgsStatic.callPackage ./file { };
+    gettext = pkgsStatic.callPackage ./gettext { };
+    gnupg = pkgsStatic.gnupg.override {
+      enableMinimal = true;
+      guiSupport = false;
+    };
+    libtool = pkgsStatic.callPackage ./libtool { };
+    makeself = pkgsStatic.callPackage ./makeself { };
+    p7zip = pkgsStatic.callPackage ./p7zip { };
+    protobuf_3_8_0 = pkgsStatic.callPackage ./protobuf/3_8_0 { };
+    protobuf_3_9_2 = pkgsStatic.callPackage ./protobuf/3_9_2 { };
+    rsync = pkgsStatic.callPackage ./rsync { };
+    vim = pkgsStatic.callPackage ./vim { };
+    zsh = pkgsStatic.callPackage ./zsh { };
+
+    # Python (sibling-wrapper against the static python314)
+    git-filter-repo = pkgs.callPackage ./git-filter-repo { };
+    netron = pkgs.callPackage ./netron { };
+
+    # Perl (sibling-wrapper against the static perl)
     # cloc is a perl script; its wrapper runs against the sibling `perl` package
     # at deploy time (falling back to a system perl), so it ships cross-platform.
     # The `perl` package itself is defined per-platform in the linux/darwin sets
@@ -88,14 +89,29 @@ in
     # platforms.
     cloc = pkgs.callPackage ./cloc { };
     parallel = pkgs.callPackage ./parallel { };
+
+    # .NET
+    music-decrypto = pkgs.callPackage ./music-decrypto { };
   };
 
   # Linux-only local packages (patched tooling, container stack, multiple
   # clang-tools versions, static Python variants, extra wrapped tools).
   linux = rec {
-    glibcLocales = pkgs.glibcLocales.override {
-      allLocales = false;
-    };
+    # unclassified (repackaged prebuilt native binary, perl installer)
+    nsight-systems = pkgsStatic.callPackage ./nsight-systems { };
+
+    # C / autotools (stdenv)
+    cmake = pkgsStatic.callPackage ./cmake/default { };
+    cmake_3_27_9 = pkgsStatic.callPackage ./cmake/3_27_9 { };
+    cmake_4_1_2 = pkgsStatic.callPackage ./cmake/4_1_2 { };
+    git = pkgsStatic.callPackage ./git { };
+    openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
+    wget = pkgsStatic.callPackage ./wget { };
+
+    # Rust
+    miniserve = pkgsStatic.callPackage ./miniserve { };
+
+    # Perl (static perl interpreter, sibling-wrapper base)
     perl = pkgsStatic.callPackage ./perl { };
     # exiftool is a perl tool like cloc: it runs against the sibling static
     # `perl` at deploy time. That perl (-Uusedl) cannot dlopen XS .so, so its
@@ -104,28 +120,39 @@ in
     # pieces (script, Image::ExifTool, Archive::Zip) and needs no static linking,
     # so it builds from the native pkgs.perlPackages.
     exiftool = pkgs.callPackage ./exiftool { };
-    nsight-systems = pkgsStatic.callPackage ./nsight-systems { };
-    cmake = pkgsStatic.callPackage ./cmake/default { };
-    cmake_3_27_9 = pkgsStatic.callPackage ./cmake/3_27_9 { };
-    cmake_4_1_2 = pkgsStatic.callPackage ./cmake/4_1_2 { };
-    git = pkgsStatic.callPackage ./git { };
-    zellij = pkgs2605Static.callPackage ./zellij { };
+
+    # LLVM / clang tooling
+    clang-tools-18 = pkgsStatic.callPackage ./clang-tools/18 { };
+    clang-tools-19 = pkgsStatic.callPackage ./clang-tools/19 { };
+    clang-tools-20 = pkgsStatic.callPackage ./clang-tools/20 { };
+    clang-tools-21 = pkgsStatic.callPackage ./clang-tools/21 { };
+    clang-tools-22 = pkgsStatic.callPackage ./clang-tools/22 { };
+
+    # Python (static interpreters + sibling-wrapper tools)
+    python311 = pkgsStatic.callPackage ./python/311 { };
+    python312 = pkgsStatic.callPackage ./python/312 { };
+    python313 = pkgsStatic.callPackage ./python/313 { };
+    python314 = pkgsStatic.callPackage ./python/314 { };
+    python315 = pkgsStatic.callPackage ./python/315 { };
+    dool = pkgs.callPackage ./dool { };
+
+    # s6 stack
     execline = pkgsStatic.callPackage ./execline { };
     s6 = pkgsStatic.callPackage ./s6 {
       inherit execline;
     };
-    s6-rc = pkgsStatic.callPackage ./s6-rc {
-      inherit s6 execline;
-    };
     s6-linux-init = pkgsStatic.callPackage ./s6-linux-init {
       inherit s6;
     };
+    s6-rc = pkgsStatic.callPackage ./s6-rc {
+      inherit s6 execline;
+    };
 
-    # podman stack
-    gpgme = pkgsStatic.callPackage ./gpgme { };
-    crun = pkgsStatic.callPackage ./crun { };
-    conmon = pkgsStatic.callPackage ./conmon { };
+    # podman / container stack (podman is Go; crun/conmon/catatonit/gpgme are C)
     catatonit = pkgsStatic.callPackage ./catatonit { };
+    conmon = pkgsStatic.callPackage ./conmon { };
+    crun = pkgsStatic.callPackage ./crun { };
+    gpgme = pkgsStatic.callPackage ./gpgme { };
     podman = pkgsStatic.callPackage ./podman {
       inherit
         catatonit
@@ -134,24 +161,6 @@ in
         gpgme
         ;
     };
-
-    clang-tools-18 = pkgsStatic.callPackage ./clang-tools/18 { };
-    clang-tools-19 = pkgsStatic.callPackage ./clang-tools/19 { };
-    clang-tools-20 = pkgsStatic.callPackage ./clang-tools/20 { };
-    clang-tools-21 = pkgsStatic.callPackage ./clang-tools/21 { };
-    clang-tools-22 = pkgsStatic.callPackage ./clang-tools/22 { };
-
-    python311 = pkgsStatic.callPackage ./python/311 { };
-    python312 = pkgsStatic.callPackage ./python/312 { };
-    python313 = pkgsStatic.callPackage ./python/313 { };
-    python314 = pkgsStatic.callPackage ./python/314 { };
-    python315 = pkgsStatic.callPackage ./python/315 { };
-
-    dool = pkgs.callPackage ./dool { };
-
-    openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
-    wget = pkgsStatic.callPackage ./wget { };
-    miniserve = pkgsStatic.callPackage ./miniserve { };
 
     # Node.js stack: standalone fully-static (musl) Node.js runtimes plus a set
     # of Node CLI tools that run on them. Each runtime is shipped as its own
@@ -196,10 +205,45 @@ in
       inherit nodejs-slim26;
       inherit (pkgs) opencommit;
     };
+
+    # Rust (26.05 pinned static env)
+    zellij = pkgs2605Static.callPackage ./zellij { };
+
+    # C (native pkgs, non-static)
+    glibcLocales = pkgs.glibcLocales.override {
+      allLocales = false;
+    };
   };
 
   # Darwin-only local packages.
+  # Go: the `goWithoutCgo` set (built with CGO disabled) is merged in below.
   darwin = goWithoutCgo // rec {
+    # C (partial-static via pkgsStatic; only system libs stay dynamic on macOS)
+    # macOS ffmpeg (headless): partial-static via pkgsStatic — every nix dep
+    # linked statically, only /usr/lib + system frameworks stay dynamic (DESIGN.md
+    # darwin strategy 2). See ./ffmpeg/darwin.nix for the disabled features and
+    # their root causes (meson arm64 cross-file bug, openmp/llvm-static libatomic,
+    # liboapv dylib-only, network/TLS static configure link failures) and the
+    # x265 static-link fixes (kept: 8-bit HEVC encode).
+    ffmpeg = pkgsStatic.callPackage ./ffmpeg/darwin.nix { };
+    # macOS krb5: fully static via pkgsStatic, with two upstream darwin
+    # static-link defects patched (USE_CCAPI_MACOS / mit_des_zeroblock — see
+    # ./krb5/darwin.nix). On Linux krb5 comes straight from the manifest.
+    krb5 = pkgsStatic.callPackage ./krb5/darwin.nix { };
+    # macOS wget: take the fully-static `pkgsStatic.wget` (same set as Linux) and
+    # only override its build-time perl to the native one — the darwin static
+    # perl fails to build (see ./wget/darwin-static.nix). The resulting binary
+    # links every nix dep statically, leaving only /usr/lib system libs dynamic.
+    wget = pkgsStatic.callPackage ./wget/darwin-static.nix {
+      inherit (pkgs) perlPackages;
+    };
+    # Alternative (kept, not active): build native pkgs.wget and swap each
+    # non-system dep for its pkgsStatic archive (see ./wget/darwin.nix).
+    # wget = pkgs.callPackage ./wget/darwin.nix {
+    #   inherit pkgsStatic;
+    # };
+
+    # Perl (native perl; the darwin static perl fails to build)
     perl = pkgs.callPackage ./perl/darwin.nix {
       libxcryptStatic = pkgsStatic.libxcrypt;
     };
@@ -210,6 +254,8 @@ in
     exiftool = pkgs.callPackage ./exiftool/darwin.nix {
       inherit pkgsStatic;
     };
+
+    # Node.js stack
     # macOS counterpart of the Linux nodejs-slim26 (./nodejs/26): a standalone
     # Node.js 26 built via pkgsStatic so every nix dependency links as a static
     # archive, leaving only macOS system libs dynamic (full static is
@@ -241,31 +287,5 @@ in
       inherit nodejs-slim26;
       inherit (pkgs) opencommit;
     };
-
-    # macOS wget: take the fully-static `pkgsStatic.wget` (same set as Linux) and
-    # only override its build-time perl to the native one — the darwin static
-    # perl fails to build (see ./wget/darwin-static.nix). The resulting binary
-    # links every nix dep statically, leaving only /usr/lib system libs dynamic.
-    wget = pkgsStatic.callPackage ./wget/darwin-static.nix {
-      inherit (pkgs) perlPackages;
-    };
-    # Alternative (kept, not active): build native pkgs.wget and swap each
-    # non-system dep for its pkgsStatic archive (see ./wget/darwin.nix).
-    # wget = pkgs.callPackage ./wget/darwin.nix {
-    #   inherit pkgsStatic;
-    # };
-
-    # macOS ffmpeg (headless): partial-static via pkgsStatic — every nix dep
-    # linked statically, only /usr/lib + system frameworks stay dynamic (DESIGN.md
-    # darwin strategy 2). See ./ffmpeg/darwin.nix for the disabled features and
-    # their root causes (meson arm64 cross-file bug, openmp/llvm-static libatomic,
-    # liboapv dylib-only, network/TLS static configure link failures) and the
-    # x265 static-link fixes (kept: 8-bit HEVC encode).
-    ffmpeg = pkgsStatic.callPackage ./ffmpeg/darwin.nix { };
-
-    # macOS krb5: fully static via pkgsStatic, with two upstream darwin
-    # static-link defects patched (USE_CCAPI_MACOS / mit_des_zeroblock — see
-    # ./krb5/darwin.nix). On Linux krb5 comes straight from the manifest.
-    krb5 = pkgsStatic.callPackage ./krb5/darwin.nix { };
   };
 }
