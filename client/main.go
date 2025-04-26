@@ -14,7 +14,7 @@
 //   - Independent packages. Every package is treated as fully self-contained;
 //     sb performs no dependency resolution.
 //
-// Commands: install | remove | upgrade | info | list | outdated
+// Commands: install | remove | upgrade | info | list | outdated | sync
 //
 // `install` accepts multiple packages and runs in three phases:
 //  1. resolve every package's remote layer digest in parallel (a missing
@@ -46,6 +46,7 @@ import (
 	"github.com/vbauerster/mpb/v8"
 	"github.com/vbauerster/mpb/v8/decor"
 	"golang.org/x/sync/errgroup"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -319,8 +320,15 @@ func walkPkgFiles(store string, fn func(absPath, relPath string) error) error {
 
 // linkPkg creates relative symlinks from store/<name>/* into the prefix root.
 func linkPkg(prefix, name string) error {
+	return linkPkgInto(prefix, name, prefix)
+}
+
+// linkPkgInto creates relative symlinks from store/<name>/* into an arbitrary
+// destination root. It is the shared mechanism behind both the default
+// prefix-root linking and `sync` profile linking.
+func linkPkgInto(prefix, name, root string) error {
 	return walkPkgFiles(storePath(prefix, name), func(abs, rel string) error {
-		dest := filepath.Join(prefix, rel)
+		dest := filepath.Join(root, rel)
 		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 			return err
 		}
@@ -623,6 +631,165 @@ func cmdUpgrade(prefix, arch string, names []string) error {
 	return nil
 }
 
+// ---------------------------------------------------------------------------
+// Declarative manifest (sb.yaml) and `sync`.
+// ---------------------------------------------------------------------------
+
+// defaultManifest is the manifest filename resolved in the current directory
+// when `sync` is invoked without an explicit path.
+const defaultManifest = "sb.yaml"
+
+// manifest is a declarative set of packages to install. It is the sb
+// equivalent of a Brewfile / pyproject file.
+//
+//   - packages.link:   installed into the store and linked into the prefix root.
+//   - packages.unlink: installed into the store only (not linked into root).
+//   - profiles:        a sync-only convenience — each named profile installs its
+//     packages into the store and aggregates their files via relative symlinks
+//     under <prefix>/profile/<name>/ (profile packages are not linked into the
+//     prefix root).
+//
+// The rest of the client (install/remove/list) is unaware of profiles / the
+// link split; they exist purely in the manifest/sync layer.
+type manifest struct {
+	Prefix   string              `yaml:"prefix"`
+	Arch     string              `yaml:"arch"`
+	Packages packageSet          `yaml:"packages"`
+	Profiles map[string][]string `yaml:"profiles"`
+}
+
+// packageSet splits a manifest's packages by whether they are exposed via
+// symlinks in the prefix root.
+type packageSet struct {
+	Link   []string `yaml:"link"`
+	Unlink []string `yaml:"unlink"`
+}
+
+// loadManifest reads and parses a YAML manifest, requiring at least one package
+// (in packages.link, packages.unlink, or a profile).
+func loadManifest(path string) (manifest, error) {
+	var m manifest
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return m, err
+	}
+	if err := yaml.Unmarshal(data, &m); err != nil {
+		return m, fmt.Errorf("%s: %w", path, err)
+	}
+	if len(m.Packages.Link) == 0 && len(m.Packages.Unlink) == 0 && len(m.Profiles) == 0 {
+		return m, fmt.Errorf("%s: no packages listed", path)
+	}
+	return m, nil
+}
+
+// profilePackages returns the sorted, de-duplicated set of package names
+// referenced by all profiles.
+func (m manifest) profilePackages() []string {
+	seen := make(map[string]bool)
+	for _, pkgs := range m.Profiles {
+		for _, name := range pkgs {
+			seen[name] = true
+		}
+	}
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// cmdSync reconciles the installed set against a manifest. It installs/refreshes
+// every listed package (reusing installPackages), links each profile's packages
+// under <prefix>/profile/<name>/, and when prune is set removes installed
+// packages that the manifest no longer references. The manifest's prefix/arch
+// (if set) are used unless overridden: an explicit --arch always wins for arch;
+// the manifest prefix is used only when --prefix was not passed explicitly
+// (prefixSet is false). Note the log file still lives under the flag's prefix.
+func cmdSync(prefix, arch, file string, prefixSet, force, prune bool) error {
+	m, err := loadManifest(file)
+	if err != nil {
+		return err
+	}
+	if m.Arch != "" {
+		arch = m.Arch
+	}
+	if !prefixSet && m.Prefix != "" {
+		prefix = m.Prefix
+	}
+	profilePkgs := m.profilePackages()
+	logger.Info("sync started", "file", file, "prefix", prefix, "link", m.Packages.Link,
+		"unlink", m.Packages.Unlink, "profiles", len(m.Profiles), "prune", prune)
+	fmt.Printf("> Syncing %d package(s)", len(m.Packages.Link)+len(m.Packages.Unlink))
+	if len(m.Profiles) > 0 {
+		fmt.Printf(" + %d profile package(s)", len(profilePkgs))
+	}
+	fmt.Printf(" from %s...\n", file)
+
+	if len(m.Packages.Link) > 0 {
+		if err := installPackages(m.Packages.Link, installOpts{prefix: prefix, arch: arch, linked: true, force: force}); err != nil {
+			return err
+		}
+	}
+	// Unlinked packages and profile packages are installed into the store only
+	// (not linked into the prefix root); profile packages are additionally
+	// exposed through their profile directories below.
+	if len(m.Packages.Unlink) > 0 {
+		if err := installPackages(m.Packages.Unlink, installOpts{prefix: prefix, arch: arch, linked: false, force: force}); err != nil {
+			return err
+		}
+	}
+	if len(profilePkgs) > 0 {
+		if err := installPackages(profilePkgs, installOpts{prefix: prefix, arch: arch, linked: false, force: force}); err != nil {
+			return err
+		}
+	}
+	for _, profile := range sortedKeys(m.Profiles) {
+		root := filepath.Join(prefix, "profile", profile)
+		fmt.Printf("> Linking profile %s -> %s\n", profile, root)
+		for _, name := range m.Profiles[profile] {
+			logger.Info("profile link", "profile", profile, "package", name, "root", root)
+			if err := linkPkgInto(prefix, name, root); err != nil {
+				return fmt.Errorf("profile %s: %s: %w", profile, name, err)
+			}
+		}
+	}
+
+	if !prune {
+		return nil
+	}
+	want := make(map[string]bool, len(m.Packages.Link)+len(m.Packages.Unlink)+len(profilePkgs))
+	for _, name := range m.Packages.Link {
+		want[name] = true
+	}
+	for _, name := range m.Packages.Unlink {
+		want[name] = true
+	}
+	for _, name := range profilePkgs {
+		want[name] = true
+	}
+	for _, name := range installedNames(prefix) {
+		if want[name] {
+			continue
+		}
+		logger.Info("prune removing package not in manifest", "package", name)
+		if err := cmdRemove(prefix, name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// sortedKeys returns the map keys in deterministic (sorted) order.
+func sortedKeys(m map[string][]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func short(digest string) string {
 	if len(digest) > 19 {
 		return digest[:19]
@@ -739,7 +906,27 @@ func main() {
 		RunE:  func(cmd *cobra.Command, args []string) error { return cmdOutdated(prefix) },
 	}
 
-	root.AddCommand(install, remove, upgrade, info, list, outdated)
+	var prune bool
+	sync := &cobra.Command{
+		Use:   "sync [file]",
+		Short: "Install packages declared in a YAML manifest (default: sb.yaml)",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a, err := resolveArch()
+			if err != nil {
+				return err
+			}
+			file := defaultManifest
+			if len(args) == 1 {
+				file = args[0]
+			}
+			return cmdSync(prefix, a, file, cmd.Flags().Changed("prefix"), force, prune)
+		},
+	}
+	sync.Flags().BoolVar(&force, "force", false, "reinstall even if the digest already matches")
+	sync.Flags().BoolVar(&prune, "prune", false, "remove installed packages not listed in the manifest")
+
+	root.AddCommand(install, remove, upgrade, info, list, outdated, sync)
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
