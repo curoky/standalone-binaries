@@ -331,6 +331,9 @@
   shfmt = {
     platforms = [ "x86_64-linux" ];
   };
+  lark-cli = {
+    platforms = [ "x86_64-linux" ];
+  };
 
   # llvm pkgs
   lld_18 = {
