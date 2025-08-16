@@ -1,0 +1,48 @@
+name: Prune Nix Cache
+
+on:
+  push:
+    paths:
+      - '.github/workflows/prune-nix-cache.yaml'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  cache-prune:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_ACTOR: ${{ github.actor }}
+    steps:
+      - name: Install nixcache
+        run: curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/master/cmd/nixcache/install.sh | bash -s -- --prefix "$HOME/.local/bin"
+
+      - name: Report cache size before prune
+        run: |
+          before=$("$HOME/.local/bin/nixcache" size)
+          echo "before=$before" >>"$GITHUB_ENV"
+          echo "Cache size before prune: $before" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Prune old snapshots
+        run: $HOME/.local/bin/nixcache prune --keep 2 --keep-tags 3
+
+      - name: Report cache size after prune
+        run: |
+          after=$("$HOME/.local/bin/nixcache" size)
+          echo "Cache size after prune: $after" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Before: ${{ env.before }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # cache-cleanup:
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     actions: write
+  #   steps:
+  #     - name: Delete all caches
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: |
+  #         gh cache delete --all -R ${{ github.repository }}
