@@ -30,6 +30,12 @@ let
 in
 
 openssh_gssapi.overrideAttrs (oldAttrs: {
+  configureFlags = (oldAttrs.configureFlags or [ ]) ++ [
+    # QEMU user-mode cannot run OpenSSH's seccomp or rlimit pre-authentication
+    # sandboxes. The service is restricted to the host loopback by devspace.
+    "--with-sandbox=none"
+  ];
+
   postInstall = (oldAttrs.postInstall or "") + ''
     mv $out/bin/scp $out/bin/_scp
     cp ${wrapperScriptScp} $out/bin/scp
