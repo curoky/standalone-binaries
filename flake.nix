@@ -138,6 +138,8 @@
             git = defaultPkgsStatic.callPackage ./pkgs/patched/git.nix { };
             zellij = defaultPkgsStatic.callPackage ./pkgs/patched/zellij.nix { };
             crun = defaultPkgsStatic.callPackage ./pkgs/patched/crun.nix { };
+            podman = defaultPkgsStatic.callPackage ./pkgs/patched/podman.nix { };
+            conmon = defaultPkgsStatic.callPackage ./pkgs/patched/conmon.nix { };
 
             clang-tools-18 = defaultPkgsStatic.callPackage ./pkgs/patched/clang18.nix { };
             clang-tools-19 = defaultPkgsStatic.callPackage ./pkgs/patched/clang19.nix { };
