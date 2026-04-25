@@ -18,6 +18,8 @@ export CONTAINERS_POLICY_JSON=$root/../conf/policy.json
 # --runroot=$root/runroot \
 # --network-cmd-path=$root/bin \
 # --log-level=debug \
+
+mkdir -p /opt/podmanx/data/tmpdir
 exec -a "$0" "$root/_podman" \
   --out=$root/../podman.log \
   system service --time=0 unix:///tmp/podmanxd.sock \

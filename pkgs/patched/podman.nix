@@ -66,8 +66,15 @@ in
       coreutils
     ];
 
-    env = (oldAttrs.env or { }) // {
+    env = oldAttrs.env // {
       HELPER_BINARIES_DIR2 = "/opt/podmanx/libexec/podman";
+
+      LDFLAGS = lib.concatStringsSep " " (
+        lib.filter (s: s != "") [
+          (oldAttrs.env.LDFLAGS or "")
+          "-X go.podman.io/storage/pkg/configfile.adminOverrideConfigPath=/opt/podmanx/conf/"
+        ]
+      );
     };
 
     patches = [
