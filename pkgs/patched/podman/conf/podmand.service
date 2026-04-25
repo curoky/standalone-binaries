@@ -1,0 +1,15 @@
+[Unit]
+Description=Podman API Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+# Environment=PATH=/opt/podmanx/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/podmanx/bin/podman-server system service --time=0 unix:///tmp/podmand.sock
+ExecStop=/opt/podmanx/bin/podman stop --all
+Restart=always
+RestartSec=30s
+
+[Install]
+WantedBy=multi-user.target

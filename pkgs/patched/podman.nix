@@ -37,10 +37,14 @@
   # vfkit,
   # versionCheckHook,
   # writableTmpDirAsHomeHook,
-  # coreutils,
+  coreutils,
   # runtimeShell,
   podman,
 }:
+let
+  podmand_bin = ./podman/bin;
+  podmand_conf = ./podman/conf;
+in
 (podman.override {
   conmon = conmon;
   catatonit = catatonit;
@@ -48,9 +52,6 @@
 }).overrideAttrs
   (oldAttrs: rec {
     propagatedBuildInputs = [ ];
-    env = (oldAttrs.env or { }) // {
-      HELPER_BINARIES_DIR = "/opt/podman/libexec/podman";
-    };
     buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
       btrfs-progs
       gpgme
@@ -61,18 +62,37 @@
       # systemd
     ];
 
+    nativeInstallCheckInputs = [
+      coreutils
+    ];
+
+    env = (oldAttrs.env or { }) // {
+      HELPER_BINARIES_DIR2 = "/opt/podmanx/libexec/podman";
+    };
+
     patches = [
       (replaceVars ./podman/hardcode-paths.patch {
-        bin_path = "/opt/podman/libexec/podman";
+        bin_path = "/opt/podmanx/libexec/podman";
       })
 
       # we intentionally don't build and install the helper so we shouldn't display messages to users about it
       ./podman/rm-podman-mac-helper-msg.patch
     ];
 
-    postFixup = "";
+    postPatch = (oldAttrs.postPatch or "") + ''
+      substituteInPlace Makefile \
+        --replace-fail HELPER_BINARIES_DIR HELPER_BINARIES_DIR2
+    '';
 
+    postFixup = "";
     postInstall = "
       cp -Lf --remove-destination ${oldAttrs.passthru.helpersBin}/bin/* ${oldAttrs.env.HELPER_BINARIES_DIR}
+
+      mv $out/bin/podman $out/bin/_podman
+      rm -f $out/bin/podmansh
+
+      mkdir -p $out/conf
+      cp ${podmand_bin}/* $out/bin/
+      cp ${podmand_conf}/* $out/conf/
     ";
   })

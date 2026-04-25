@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_path="$(readlink -f "$0")"
+root=$(cd "$(dirname "$script_path")" && pwd)
+
+export CONTAINERS_CONF=$root/../conf/containers.conf
+export CONTAINERS_STORAGE_CONF=$root/../conf/storage.conf
+export CONTAINERS_REGISTRIES_CONF=$root/../conf/registries.conf
+export CONTAINERS_POLICY_JSON=$root/../conf/policy.json
+
+export CONTAINER_HOST=unix:///tmp/podman.sock
+
+exec -a "$0" "$root/_podman" --remote "$@"
