@@ -33,17 +33,6 @@ systemctl enable podmanxd.service
 systemctl start podmanxd.service
 systemctl status podmanxd.service
 
-# wget https://github.com/curoky/devspace/releases/download/v1.0/podman.tar
-# tar -x -f podman.tar
-
-# rm -rf /opt/podmanx
-# mkdir -p /opt/podmanx
-# cp -r ./* /opt/podmanx
-
-# echo 'systemctl daemon-reload'
-# echo 'systemctl enable podmanxd.service'
-# echo 'systemctl start podmanxd.service'
-# echo 'systemctl status podmanxd.service'
-# echo 'chmod +777 /tmp/podmanx.sock'
+chmod +777 /tmp/podmanxd.sock
 
 # echo 'nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml'

@@ -20,7 +20,5 @@ export CONTAINERS_POLICY_JSON=$root/../conf/policy.json
 # --log-level=debug \
 exec -a "$0" "$root/_podman" \
   --out=$root/../podman.log \
-  system service --time=0 unix:///tmp/podmandx.sock \
+  system service --time=0 unix:///tmp/podmanxd.sock \
   "$@"
-
-chmod +777 /tmp/podmanx.sock
