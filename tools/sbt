@@ -84,7 +84,10 @@ function download_pkg_from_ghcr(){
     "https://ghcr.io/v2/curoky/static-binaries-v${version}/blobs/$DIGEST"
   rm -rf $store_path
   mkdir -p $store_path
-  tar -xzf $cache_path/${name}.tar.gz -C $store_path --strip-components=2 # --delay-directory-restore
+  if ! tar -xzf "$cache_path/${name}.tar.gz" -C "$store_path" --strip-components=2; then
+    echo "ERROR: tar failed on $cache_path/${name}.tar.gz"
+    exit 1
+  fi
 }
 
 function download_link_pkg() {
