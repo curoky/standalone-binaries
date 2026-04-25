@@ -12,7 +12,7 @@ export CONTAINERS_POLICY_JSON=$root/../conf/policy.json
 # or --tmpdir=path
 # export TMPDIR=$root/tmpdir
 
-export PATH=$PATH:$root
+# export PATH=$PATH:$root
 
 # --imagestore=$root/storage \
 # --runroot=$root/runroot \
@@ -20,4 +20,7 @@ export PATH=$PATH:$root
 # --log-level=debug \
 exec -a "$0" "$root/_podman" \
   --out=$root/../podman.log \
+  system service --time=0 unix:///tmp/podmandx.sock \
   "$@"
+
+chmod +777 /tmp/podmanx.sock

@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=root
 # Environment=PATH=/opt/podmanx/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/opt/podmanx/bin/podman-server system service --time=0 unix:///tmp/podmand.sock
+ExecStart=/opt/podmanx/bin/podman-server
 ExecStop=/opt/podmanx/bin/podman stop --all
 Restart=always
 RestartSec=30s
