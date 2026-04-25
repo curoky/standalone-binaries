@@ -88,7 +88,7 @@ in
     postInstall = "
       cp -Lf --remove-destination ${oldAttrs.passthru.helpersBin}/bin/* ${oldAttrs.env.HELPER_BINARIES_DIR}
 
-      mv $out/bin/podman $out/bin/_podman
+      mv $out/bin/.podman-wrapped $out/bin/_podman
       rm -f $out/bin/podmansh
 
       mkdir -p $out/conf

@@ -17,17 +17,18 @@
 # limitations under the License.
 set -xeuo pipefail
 
-rm -rf /opt/podmanx/*
-cp -r ./* /opt/podmanx/
+abspath=$(cd "$(dirname "$0")" && pwd)
 
-rm -rf /etc/systemd/system/podmanxd.service
+mkdir -p /opt/podmanx/
+cp -rf --remove-destination $abspath/../* /opt/podmanx/
+
 mkdir -p /etc/systemd/system/
-cp -r ./conf/podmanxd.service /etc/systemd/system/podmanxd.service
+cp -rf --remove-destination ../conf/podmand.service /etc/systemd/system/podmand.service
 
 systemctl daemon-reload
-systemctl enable podmanxd.service
-systemctl start podmanxd.service
-systemctl status podmanxd.service
+systemctl enable podmand.service
+systemctl start podmand.service
+systemctl status podmand.service
 chmod +777 /tmp/podmanx.sock
 
 # wget https://github.com/curoky/devspace/releases/download/v1.0/podman.tar
