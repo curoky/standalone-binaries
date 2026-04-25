@@ -12,7 +12,7 @@
   yajl,
   argp-standalone,
   nixosTests,
-  # criu,
+  criu,
   crun,
 }:
 

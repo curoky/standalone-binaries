@@ -129,7 +129,7 @@
             music-decrypto = defaultPkgs.callPackage ./pkgs/music-decrypto.nix { };
           };
 
-          linux_only = {
+          linux_only = rec {
             glibcLocales = defaultPkgs.glibcLocales.override {
               allLocales = false;
             };
@@ -137,9 +137,21 @@
             cmake = defaultPkgsStatic.callPackage ./pkgs/patched/cmake.nix { };
             git = defaultPkgsStatic.callPackage ./pkgs/patched/git.nix { };
             zellij = defaultPkgsStatic.callPackage ./pkgs/patched/zellij.nix { };
+            gpgme = defaultPkgsStatic.callPackage ./pkgs/patched/gpgme.nix { };
             crun = defaultPkgsStatic.callPackage ./pkgs/patched/crun.nix { };
-            podman = defaultPkgsStatic.callPackage ./pkgs/patched/podman.nix { };
             conmon = defaultPkgsStatic.callPackage ./pkgs/patched/conmon.nix { };
+            catatonit = defaultPkgsStatic.callPackage ./pkgs/patched/catatonit.nix { };
+
+            podman = defaultPkgsStatic.callPackage ./pkgs/patched/podman.nix {
+              inherit catatonit;
+              inherit crun;
+              inherit conmon;
+              inherit gpgme;
+            };
+
+            podman-bundle = defaultPkgsStatic.callPackage ./pkgs/wrapped/podman-bundle.nix {
+              inherit podman;
+            };
 
             clang-tools-18 = defaultPkgsStatic.callPackage ./pkgs/patched/clang18.nix { };
             clang-tools-19 = defaultPkgsStatic.callPackage ./pkgs/patched/clang19.nix { };
