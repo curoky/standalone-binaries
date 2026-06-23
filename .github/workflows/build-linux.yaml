@@ -1,4 +1,4 @@
-name: build darwin v2
+name: build linux
 
 on:
   # push:
@@ -7,7 +7,7 @@ on:
   #     - dev
   push:
     paths:
-      - '.github/workflows/build-darwin-v2.yaml'
+      - '.github/workflows/build-linux.yaml'
       - 'pkgs/**'
       - 'pkgs-list/**'
       - 'scripts/**'
@@ -22,12 +22,9 @@ on:
   schedule:
     - cron: '0 0 * * 0'
 
-env:
-  CACHED_PKG: '["aria2", "flex", "gdb", "uv", "yazi", "starship", "fd", "bison", "protobuf_27", "protobuf_28", "protobuf_29"]'
-
 jobs:
   build:
-    runs-on: macos-26
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
@@ -42,24 +39,26 @@ jobs:
           - name: bat
           - name: bazelisk
           - name: binutils
-          - name: biome
+          # - name: biome
           - name: bison
           - name: buildifier
           - name: bzip2
           - name: cacert
-          # - name: cloc
-          # - name: cmake
+          - name: cloc
+          - name: cmake
+          - name: cmake_3_27_9
+          - name: cmake_4_1_2
           - name: connect
           - name: coreutils
           - name: croc
-          # - name: cronie # TODO: export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
+          - name: cronie
           - name: curl
           - name: diffutils
           - name: dive
           - name: dool
           - name: dprint
-          # - name: ethtool # TODO: export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
-          # - name: exiftool
+          - name: ethtool
+          - name: exiftool
           - name: eza
           - name: fd
           - name: file
@@ -73,58 +72,58 @@ jobs:
           - name: getopt
           - name: gettext
           - name: gh
-          # - name: git
+          - name: git
           - name: git-absorb
           - name: git-extras
           - name: git-filter-repo
           - name: git-lfs
-          # - name: glibcLocales
+          - name: glibcLocales
           - name: gnugrep
           - name: gnumake
           - name: gnupatch
-          # - name: gnupg
+          - name: gnupg
           - name: gnused
           - name: gnutar
           - name: go-task
-          # - name: gost
+          - name: gost
           - name: gzip
-          # - name: indent
-          # - name: inetutils
-          # - name: iproute2
-          # - name: iptables
-          # - name: iputils
+          - name: indent
+          - name: inetutils
+          - name: iproute2
+          - name: iptables
+          - name: iputils
           - name: jq
-          # - name: krb5
+          - name: krb5
           - name: lefthook
           - name: less
-          # - name: libcap
+          - name: libcap
           - name: libtool
-          # - name: lsb-release
+          - name: lsb-release
           - name: lsof
-          # - name: lua
+          - name: lua
           - name: m4
           - name: makeself
-          # - name: man
+          - name: man
           - name: mcfly
-          # - name: miniserve
-          # - name: music-decrypto
+          - name: miniserve
+          - name: music-decrypto
           - name: ncdu_1
           - name: netcat
           - name: netron
-          # - name: nettools
+          - name: nettools
           - name: ninja
-          # - name: nixfmt
+          - name: nixfmt
           # - name: nsight-systems
-          # - name: numactl
-          # - name: openssh_gssapi
+          - name: numactl
+          - name: openssh_gssapi
           - name: openssl
           - name: oras
           - name: p7zip
-          # - name: parallel
+          - name: parallel
           - name: patchelf
-          # - name: perl
+          - name: perl
           - name: pkg-config
-          # - name: procps
+          - name: procps
           - name: procs
           - name: protobuf_23
           - name: protobuf_24
@@ -137,9 +136,9 @@ jobs:
           - name: protobuf_3_9_2
           - name: protobuf3_20
           - name: protobuf3_21
-          # - name: python311
-          # - name: python312
-          # - name: python313
+          - name: python311
+          - name: python312
+          - name: python313
           - name: rime-plugins
           - name: ripgrep
           - name: rsync
@@ -147,13 +146,13 @@ jobs:
           - name: scc
           - name: shellcheck
           - name: shfmt
-          - name: silver-searcher
+          # - name: silver-searcher
           - name: snappy
           - name: sqlite
           - name: starship
-          # - name: strace
+          - name: strace
           - name: tokei
-          # - name: tmux
+          - name: tmux
           - name: tmux-plugins
           - name: tree
           - name: tzdata
@@ -162,73 +161,57 @@ jobs:
           - name: uv
           - name: vim
           - name: vim-plugins
-          # - name: wget
+          - name: wget
           - name: xxd
           - name: xz
           - name: yazi
-          # - name: zellij
+          - name: zellij
           - name: zip
           - name: zlib
           - name: zlib-ng
           - name: zsh
           - name: zsh-plugins
           - name: zstd
-          # - name: crun
-          # - name: runc
-          # - name: podman
-          # - name: conmon
+          - name: crun
+          - name: runc
+          - name: podman
+          - name: conmon
 
-          # - name: s6
-          # - name: s6-rc
-          # - name: s6-linux-init
-          # - name: s6-linux-utils
-          # - name: s6-portable-utils
-          # - name: s6-networking
-          # - name: s6-dns
-          # - name: skalibs
-          # - name: execline
+          - name: s6
+          - name: s6-rc
+          - name: s6-linux-init
+          - name: s6-linux-utils
+          - name: s6-portable-utils
+          - name: s6-networking
+          - name: s6-dns
+          - name: skalibs
+          - name: execline
 
           - name: lxgw-wenkai
           - name: fira-code
           - name: nerd-fonts.fira-code
           - name: nerd-fonts.ubuntu-mono
 
-          # > meson.build:6:0: ERROR: 'objc' compiler binary not defined in cross file [binaries] section
-          # - name: parallel
-
-          # FileNotFoundError: [Errno 2] No such file or directory: 'lipo'
-          # - name: wget
-
-          #  > ./Modules/ossaudiodev.c:42:10: fatal error: 'sys/soundcard.h' file not found
-          # - name: python311
-
-          # dep perl, and perl failed with ar command not found
-          # - name: exiftool
-          # - name: smartmontools
-
     steps:
       - run: echo "skip_steps=true" >> $GITHUB_ENV
       - run: echo "skip_steps=false" >> $GITHUB_ENV
         if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.name == matrix.name || inputs.name == '*')) || (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'schedule' }}
 
-      - uses: Homebrew/actions/setup-homebrew@main
-        if: ${{ env.skip_steps != 'true' }}
-
-      - run: echo "/opt/homebrew/opt/binutils/bin" >> $GITHUB_PATH
-      - run: echo "/opt/homebrew/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
-      - run: echo "/opt/homebrew/opt/gnu-sed/libexec/gnubin" >> $GITHUB_PATH
-      - run: brew install binutils gnu-sed coreutils rsync
-        if: ${{ env.skip_steps != 'true' }}
-
       - uses: actions/checkout@v5
+        if: ${{ env.skip_steps != 'true' }}
+
+      - run: |
+          sudo apt-get update -y
+          sudo apt-get install -y rsync
         if: ${{ env.skip_steps != 'true' }}
 
       - uses: DeterminateSystems/nix-installer-action@main
         if: ${{ env.skip_steps != 'true' }}
 
-      # - uses: DeterminateSystems/magic-nix-cache-action@main
-      #   if: ${{ env.skip_steps != 'true' && contains(fromJSON(env.CACHED_PKG), matrix.name) }}
+      - run: nix flake update nixpkgs-unstable
+        if: ${{ env.skip_steps != 'true' }}
 
+      # - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix config show substituters
         if: ${{ env.skip_steps != 'true' }}
 
@@ -243,7 +226,7 @@ jobs:
           nix-store -qR $(readlink -f ./result) | cachix push curoky-static-binaries-v2
           rsync -av --copy-unsafe-links ./result/ ./${{ matrix.name }}/
           find ./${{ matrix.name }} -type d -exec chmod +w {} +
-          tar -czvf ./${{ matrix.name }}.darwin-arm64.tar.gz ./${{ matrix.name }}
+          tar -czvf ./${{ matrix.name }}.linux-x86_64.tar.gz ./${{ matrix.name }}
         if: ${{ env.skip_steps != 'true' }}
 
       - uses: oras-project/setup-oras@v1
@@ -258,6 +241,6 @@ jobs:
         if: ${{ env.skip_steps != 'true' }}
 
       - run: >
-          oras push ghcr.io/curoky/static-binaries-v3:${{ matrix.name }}-darwin-arm64
-          ./${{ matrix.name }}.darwin-arm64.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip
+          oras push ghcr.io/curoky/static-binaries-v3:${{ matrix.name }}-linux-x86_64
+          ./${{ matrix.name }}.linux-x86_64.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip
         if: ${{ env.skip_steps != 'true' }}

@@ -1,4 +1,4 @@
-name: build llvm-tools v2
+name: build llvm-tools
 
 on:
   # push:
@@ -7,7 +7,7 @@ on:
   #     - dev
   push:
     paths:
-      - '.github/workflows/build-llvm-tools-v2.yaml'
+      - '.github/workflows/build-llvm-tools.yaml'
       - 'pkgs/**'
       - 'pkgs-list/**'
       - 'scripts/**'
@@ -59,6 +59,9 @@ jobs:
         if: ${{ env.skip_steps != 'true' }}
 
       - uses: DeterminateSystems/nix-installer-action@main
+        if: ${{ env.skip_steps != 'true' }}
+
+      - run: nix flake update nixpkgs-unstable
         if: ${{ env.skip_steps != 'true' }}
 
       - uses: cachix/cachix-action@v15
