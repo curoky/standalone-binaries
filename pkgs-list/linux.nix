@@ -60,7 +60,9 @@
   fzf = { };
   gdu = { };
   gh = { };
-  git-lfs = { };
+  git-lfs = {
+    version = "25.11";
+  };
   go-task = { };
   gost = { };
   lefthook = { };

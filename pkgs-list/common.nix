@@ -102,11 +102,13 @@
   lxgw-wenkai = {
     isStatic = false;
   };
-  nerd-fonts.fira-code = {
+  "nerd-fonts.fira-code" = {
     isStatic = false;
+    alias = "nerd-fonts.fira-code";
   };
-  nerd-fonts.ubuntu-mono = {
+  "nerd-fonts.ubuntu-mono" = {
     isStatic = false;
+    alias = "nerd-fonts.ubuntu-mono";
   };
 
   # rust pkgs
