@@ -77,8 +77,11 @@
               # rawPkg = lib.attrByPath (lib.splitString "." name) null base;
               rawPkg = base.${name} or (lib.attrByPath (lib.splitString "." name) null base);
 
-              selectedOutput = conf.output or "out";
-              finalDrv = lib.getOutput selectedOutput rawPkg;
+              selectedOutputs = conf.output or [ "out" ];
+              finalDrv = env.pkgs.symlinkJoin {
+                name = conf.alias or name;
+                paths = map (o: lib.getOutput o rawPkg) selectedOutputs;
+              };
 
               finalName = conf.alias or name;
             in

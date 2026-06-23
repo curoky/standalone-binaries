@@ -60,7 +60,7 @@ The flake currently defines outputs for:
    The manifest is `pkgs-list/common.nix` merged with `pkgs-list/<platform>.nix`. Each entry maps a name to a small configuration attrset used to pick:
    - `version`: which nixpkgs input to import (`unstable`, `25.11`, `25.05`, `24.11`, `24.05`)
    - `isStatic`: whether to use `pkgsStatic` or regular `pkgs` for that nixpkgs input
-   - `output`: which output of the derivation to expose (`out` by default, sometimes `bin`)
+   - `output`: list of derivation outputs to expose (`[ "out" ]` by default, sometimes `[ "bin" ]`). The listed outputs are merged with `symlinkJoin`.
    - `alias`: rename the exported flake package
 
 2. **Local packages (`customPkgs`)**  
@@ -126,7 +126,7 @@ The flake also configures a Cachix substituter; CI pushes build closures to Cach
    - Linux-only: `pkgs-list/linux.nix`
    - macOS-only: `pkgs-list/macos.nix`
 2. Decide whether it should use `pkgsStatic` (`isStatic = true`, default) or regular `pkgs` (`isStatic = false`).
-3. If the package has multiple outputs, pick the right one via `output = "bin"` or another output name.
+3. If the package has multiple outputs, pick the right one(s) via `output = [ "bin" ]` (or list several to merge them).
 4. If the nixpkgs attribute name is awkward, use `alias` to export a better public name.
 5. Ensure CI includes it in the workflow matrix if it should be published.
 

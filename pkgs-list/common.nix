@@ -6,12 +6,12 @@
   };
   bison = { };
   bzip2 = {
-    output = "bin";
+    output = [ "bin" ];
   };
   connect = { };
   findutils = { };
   flac = {
-    output = "bin";
+    output = [ "bin" ];
   };
   flex = { };
   gawk = { };
@@ -26,7 +26,7 @@
   gzip = { };
   inetutils = { };
   jq = {
-    output = "bin";
+    output = [ "bin" ];
   };
   gdb = {
     version = "25.11";
@@ -38,36 +38,36 @@
   netcat = { };
   ninja = { };
   openssl = {
-    output = "bin";
+    output = [ "bin" ];
   };
   pkg-config-unwrapped = {
     alias = "pkg-config";
   };
   snappy = {
-    output = "bin";
+    output = [ "bin" ];
   };
   sqlite = {
-    output = "bin";
+    output = [ "bin" ];
   };
   tree = { };
   tzdata = {
-    output = "out";
+    output = [ "out" ];
   };
   xxd = { };
   unzip = { };
   util-linux = { };
   xz = {
-    output = "bin";
+    output = [ "bin" ];
   };
   zip = { };
   zlib = {
-    output = "bin";
+    output = [ "bin" ];
   };
   zlib-ng = {
-    output = "bin";
+    output = [ "bin" ];
   };
   zstd = {
-    output = "bin";
+    output = [ "bin" ];
   };
 
   protobuf_25 = { };

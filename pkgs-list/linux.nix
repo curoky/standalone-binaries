@@ -28,23 +28,26 @@
   s6 = { };
   s6-rc = { };
   s6-linux-init = {
-    output = "bin";
+    output = [
+      "out"
+      "bin"
+    ];
   };
   s6-linux-utils = {
-    output = "bin";
+    output = [ "bin" ];
   };
   s6-portable-utils = {
-    output = "bin";
+    output = [ "bin" ];
   };
   s6-networking = {
-    output = "bin";
+    output = [ "bin" ];
   };
   s6-dns = {
-    output = "bin";
+    output = [ "bin" ];
   };
   skalibs = { };
   execline = {
-    output = "bin";
+    output = [ "bin" ];
   };
 
   # go pkgs
