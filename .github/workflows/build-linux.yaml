@@ -21,6 +21,11 @@ on:
 env:
   CACHIX_NAME: curoky-static-binaries-v2
   CACHIX_STORE: https://curoky-static-binaries-v2.cachix.org
+  # Packages built by dedicated workflows (build-llvm-tools.yaml); excluded from
+  # this workflow so they are not built/published twice. Space-separated.
+  EXCLUDE_PKGS: >-
+    clang-tools-18 clang-tools-19 clang-tools-20 clang-tools-21 clang-tools-22
+    lld_18 lld_19 lld_20 lld_21 lld_22
 
 jobs:
   discover:
@@ -52,6 +57,12 @@ jobs:
                 pkgs))
             )
           ' > pkgs.tsv
+
+          # Packages built by dedicated workflows are excluded via EXCLUDE_PKGS
+          # (configured at the top-level env), so they are not built twice.
+          for name in $EXCLUDE_PKGS; do
+            grep -vP "^${name}\t" pkgs.tsv > pkgs.tsv.tmp && mv pkgs.tsv.tmp pkgs.tsv
+          done
 
           # Decide which packages to consider.
           # - workflow_dispatch with a specific name  -> only that package
