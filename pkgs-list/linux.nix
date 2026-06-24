@@ -27,12 +27,6 @@
   # s6-overlay
   s6 = { };
   s6-rc = { };
-  s6-linux-init = {
-    output = [
-      "out"
-      "bin"
-    ];
-  };
   s6-linux-utils = {
     output = [ "bin" ];
   };
