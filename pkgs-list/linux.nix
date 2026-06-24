@@ -25,6 +25,7 @@
   shellcheck = { };
 
   # s6 = { };
+  # s6-rc = { };
   # s6-linux-init = {
   #   output = [
   #     "out"
