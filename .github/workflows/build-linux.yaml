@@ -42,7 +42,7 @@ jobs:
 
           # All package names exposed by the flake, excluding the "all" aggregate.
           mapfile -t all_pkgs < <(
-            nix eval --json .#packages.x86_64-linux --apply builtins.attrNames \
+            nix eval --accept-flake-config --json .#packages.x86_64-linux --apply builtins.attrNames \
               | nix run nixpkgs#jq -- -r '.[] | select(. != "all")'
           )
 
@@ -71,8 +71,8 @@ jobs:
             # Resolve the output path without building, then ask the binary cache
             # whether it already has it. A cache miss (path-info fails) means the
             # package must be rebuilt.
-            out_path=$(nix eval --raw ".#packages.x86_64-linux.${name}.outPath")
-            if nix path-info --store "$CACHIX_STORE" "$out_path" >/dev/null 2>&1; then
+            out_path=$(nix eval --accept-flake-config --raw ".#packages.x86_64-linux.${name}.outPath")
+            if nix path-info --accept-flake-config --store "$CACHIX_STORE" "$out_path" >/dev/null 2>&1; then
               echo "cache hit : $name"
             else
               echo "need build: $name"
