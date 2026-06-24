@@ -189,8 +189,8 @@ jobs:
 
           - name: lxgw-wenkai
           - name: fira-code
-          - name: nerd-fonts.fira-code
-          - name: nerd-fonts.ubuntu-mono
+          # - name: nerd-fonts.fira-code
+          # - name: nerd-fonts.ubuntu-mono
 
     steps:
       - run: echo "skip_steps=true" >> $GITHUB_ENV
