@@ -226,8 +226,8 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
         if: ${{ env.skip_steps != 'true' }}
 
-      - run: nix flake update nixpkgs-unstable
-        if: ${{ env.skip_steps != 'true' }}
+      # - run: nix flake update
+      #   if: ${{ env.skip_steps != 'true' }}
 
       # - uses: DeterminateSystems/magic-nix-cache-action@main
       #   if: ${{ env.skip_steps != 'true' && contains(fromJSON(env.CACHED_PKG), matrix.name) }}
