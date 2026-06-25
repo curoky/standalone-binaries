@@ -259,7 +259,7 @@
               }
               ''
                 mkdir -p $out
-                cp -pRL ${drv}/* $out/ 2>/dev/null || true
+                cp -pRP ${drv}/* $out/ 2>/dev/null || true
                 chmod -R u+w $out
 
                 bash $builderScript $out

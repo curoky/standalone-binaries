@@ -25,6 +25,19 @@ rm -rf $prefix/share/man
 rm -rf $prefix/share/doc
 rm -rf $prefix/share/bash-completion
 
+# Resolve symlinks:
+#   - links pointing inside $prefix: keep as symlinks (saves space)
+#   - links pointing outside $prefix (e.g. into /nix/store) or dangling:
+#     inline the real file so the artifact stays self-contained
+# This must run before strip/nuke-refs so inlined files get processed too.
+find "$prefix" -type l -print0 | while IFS= read -r -d '' link; do
+  target=$(readlink -f "$link")
+  if [[ ! -e $target ]]; then
+    rm -f "$link"
+  elif [[ $target != "$prefix"* ]]; then
+    cp -L --remove-destination "$target" "$link"
+  fi
+done
 
 find "$prefix" -type f -print0 | while IFS= read -r -d '' f; do
 
@@ -48,13 +61,6 @@ find "$prefix" -type f -print0 | while IFS= read -r -d '' f; do
 
   if [[ $f == *.a ]] || [[ $f == *.pyc ]]; then
     rm -f "$f"
-  fi
-done
-
-find "$prefix" -type l -print0 | while IFS= read -r -d '' link; do
-  target=$(readlink -f "$link")
-  if [[ ! -e $link ]] || [[ $target != "$prefix"* ]]; then
-    rm -f "$link"
   fi
 done
 
