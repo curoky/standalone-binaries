@@ -12,7 +12,7 @@ let
 
     script_path="$(readlink -f "$0")"
     root=$(cd "$(dirname "$script_path")" && pwd)/..
-    export FPATH=$FPATH:$root/share/zsh/5.9/functions
+    export FPATH=$FPATH:$root/share/zsh/${zsh.version}/functions
 
     exec -a "$0" "$root/bin/_zsh" "$@"
   '';
