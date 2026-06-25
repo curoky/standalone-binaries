@@ -43,6 +43,12 @@ jobs:
       matrix: ${{ steps.set.outputs.matrix }}
       count: ${{ steps.set.outputs.count }}
     steps:
+      - uses: Homebrew/actions/setup-homebrew@main
+
+      # GNU grep provides `grep -P` (PCRE), which BSD grep on macOS lacks.
+      - run: echo "/opt/homebrew/opt/grep/libexec/gnubin" >> $GITHUB_PATH
+      - run: brew install grep
+
       - uses: actions/checkout@v5
 
       - uses: DeterminateSystems/nix-installer-action@main

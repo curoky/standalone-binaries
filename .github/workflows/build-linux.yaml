@@ -26,6 +26,7 @@ env:
   EXCLUDE_PKGS: >-
     clang-tools-18 clang-tools-19 clang-tools-20 clang-tools-21 clang-tools-22
     lld_18 lld_19 lld_20 lld_21 lld_22
+    clang_18 clang_19 clang_20 clang_21 clang_22
 
 jobs:
   discover:
