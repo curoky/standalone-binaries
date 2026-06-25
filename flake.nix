@@ -146,7 +146,10 @@
             cmake_4_1_2 = defaultPkgsStatic.callPackage ./pkgs/patched/cmake_4_1_2.nix { };
             git = defaultPkgsStatic.callPackage ./pkgs/patched/git.nix { };
             zellij = Pkgs2605Static.callPackage ./pkgs/patched/zellij.nix { };
-            s6 = defaultPkgsStatic.callPackage ./pkgs/patched/s6.nix { };
+            execline = defaultPkgsStatic.callPackage ./pkgs/patched/execline.nix { };
+            s6 = defaultPkgsStatic.callPackage ./pkgs/patched/s6.nix {
+              inherit execline;
+            };
             s6-rc = defaultPkgsStatic.callPackage ./pkgs/patched/s6-rc.nix {
               inherit s6;
             };
