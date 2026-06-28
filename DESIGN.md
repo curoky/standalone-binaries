@@ -4,45 +4,54 @@ This document describes the intended design of this repository: what it builds, 
 
 ## Purpose
 
-This repo produces a curated set of mostly-statically-linked (or at least highly portable) tool binaries, built via Nix and published as per-tool archives.
+This repo produces a curated set of **standalone, portable** tool binaries, built via Nix and published as per-tool archives.
 
 The primary goals are:
-- Provide ready-to-use tool binaries for minimal environments (containers, initramfs, scratch-like images, etc.).
+- Provide ready-to-use tool binaries for minimal or foreign environments (containers, initramfs, scratch-like images, etc.).
 - Make builds reproducible and centrally defined (single flake).
-- Reduce runtime dependencies by preferring static builds and by normalizing outputs (strip, remove Nix store references in scripts, remove docs/manpages, etc.).
+- Reduce runtime coupling: normalize outputs (strip, remove Nix store references, drop docs/manpages, inline external symlinks) so binaries don't depend on the build host or the Nix store layout.
+
+### Standalone strategy (preference order)
+
+"Standalone" means portable and self-contained — **not** necessarily a single fully static ELF. When deciding how to build a tool, prefer in this order:
+
+1. **Static compilation** where it works (`pkgsStatic`). This remains the default for most packages.
+2. **Manual patch + bundle** when full static linking isn't practical: rewrite hard-coded paths, vendor configuration, and bundle required resources (see `packages/`).
+3. **`nix bundle`** only as a last resort, for tools that genuinely cannot be statically compiled (e.g. Node.js-based tools).
 
 Non-goals:
-- Guarantee that every tool is fully static on every platform. Some packages are intentionally non-static (e.g. fonts) and “static” may be best-effort depending on upstream.
-- Provide a general-purpose packaging framework beyond what is needed for this repository.
+- Guarantee that every tool is a fully static single binary on every platform. Some packages are intentionally non-static (e.g. fonts), and "static" is best-effort depending on upstream.
+- Provide a general-purpose packaging framework beyond what this repository needs.
 
 ## High-Level Architecture
 
-At a high level, the build pipeline is:
-1. Select a set of package derivations (from nixpkgs and/or local overrides).
-2. Apply platform-specific adjustments (Linux-only packages; Darwin Go CGO disabling).
-3. Wrap each derivation with a “strip/normalize” step to reduce size and remove Nix-specific references.
+The build pipeline is:
+1. Select upstream package derivations declaratively via per-platform manifests.
+2. Merge in locally-defined packages (patched/wrapped/pinned builds) and platform-specific additions.
+3. Wrap each derivation with a "standalone normalization" step to slim it down and remove Nix-specific references.
 4. Expose each final derivation as a flake package output.
-5. In CI, build each package, package it into a tar.gz, and publish to an OCI registry using `oras`.
+5. In CI, build each package, archive it into a tar.gz, and publish to an OCI registry using `oras`.
 
-The core implementation lives in [flake.nix](file:///workspace/static-binaries/flake.nix).
+The flake is intentionally thin; logic lives in `lib/` and the package definitions live in `manifests/` and `packages/`.
 
 ## Repository Layout
 
-- [flake.nix](file:///workspace/static-binaries/flake.nix): Single source of truth for what gets built and how it gets normalized.
-- [pkgs-list/](file:///workspace/static-binaries/pkgs-list): “Manifest” of upstream nixpkgs packages to include.
-  - [common.nix](file:///workspace/static-binaries/pkgs-list/common.nix): Shared package list for all platforms.
-  - [linux.nix](file:///workspace/static-binaries/pkgs-list/linux.nix): Linux-only additions.
-  - [macos.nix](file:///workspace/static-binaries/pkgs-list/macos.nix): macOS-only additions.
-- [pkgs/](file:///workspace/static-binaries/pkgs): Local package definitions and overrides.
-  - `pkgs/patched/`: Patch/override nixpkgs packages (static flags, hard-coded paths, vendored configs, etc.).
-  - `pkgs/wrapped/`: Wrapper derivations and bundled resource layouts.
-  - `pkgs/python3/`, `pkgs/pypkgs/`: Python builds and Python-based tools.
-- [scripts/patch.sh](file:///workspace/static-binaries/scripts/patch.sh): Normalization script used by the stripping wrapper.
+- [flake.nix](file:///workspace/static-binaries/flake.nix): Thin entry point. Declares inputs, builds per-system envs, wires helpers, and exposes outputs.
+- [lib/](file:///workspace/static-binaries/lib): Reusable build helpers.
+  - [make-manifest-packages.nix](file:///workspace/static-binaries/lib/make-manifest-packages.nix): Turns a manifest attrset into a set of upstream nixpkgs derivations.
+  - [make-standalone.nix](file:///workspace/static-binaries/lib/make-standalone.nix): Wraps a derivation with the normalization step (runs `scripts/normalize.sh`).
+- [manifests/](file:///workspace/static-binaries/manifests): Declarative selection of upstream nixpkgs packages.
+  - [default.nix](file:///workspace/static-binaries/manifests/default.nix): Single manifest keyed by package name; each entry declares its target `platforms` and optional per-platform config overrides.
+- [packages/](file:///workspace/static-binaries/packages): Locally-defined derivations and overrides, organized **one directory per package**.
+  - [local.nix](file:///workspace/static-binaries/packages/local.nix): Explicit manifest that aggregates local packages into `{ common; linux; darwin; }` via `callPackage ./<pkg>`.
+  - `packages/<pkg>/default.nix`: One directory per local package; the directory also holds that package's own resources (patches, wrapper scripts, vendored configs, e.g. `packages/podman/{bin,conf,*.patch}`, `packages/python/311/Setup.local`).
+  - Multi-version applications are grouped under a single application directory with one subdirectory per version: `packages/cmake/{default,3_27_9,4_1_2}`, `packages/python/{311,312,313}`, `packages/clang-tools/{18,19,20,21,22}`, `packages/protobuf/{3_8_0,3_9_2}`. The default/current version of an app lives in `default/`.
+  - `packages/protobuf/generic-v3.nix`: A shared builder reused by the protobuf version directories; shared builders are not given their own version subdirectory.
+- [scripts/normalize.sh](file:///workspace/static-binaries/scripts/normalize.sh): Output normalization used by the standalone wrapper.
 - CI workflows:
-  - [build-linux-v2.yaml](file:///workspace/static-binaries/.github/workflows/build-linux-v2.yaml)
-  - [build-darwin-v2.yaml](file:///workspace/static-binaries/.github/workflows/build-darwin-v2.yaml)
-
-There is also a [docker/](file:///workspace/static-binaries/docker) directory. It may be an experimental or legacy build path; if it becomes a supported path, document the intended contract here.
+  - [build-linux.yaml](file:///workspace/static-binaries/.github/workflows/build-linux.yaml)
+  - [build-darwin.yaml](file:///workspace/static-binaries/.github/workflows/build-darwin.yaml)
+  - [build-llvm-tools.yaml](file:///workspace/static-binaries/.github/workflows/build-llvm-tools.yaml): dedicated builder for clang-tools / lld (excluded from the main Linux matrix).
 
 ## Flake Outputs and Package Selection
 
@@ -52,71 +61,61 @@ The flake currently defines outputs for:
 - `x86_64-linux`
 - `aarch64-darwin`
 
+### Per-system environments
+
+`flake.nix` builds one "env" per pinned nixpkgs input (`unstable`, `26.05`, `25.11`, `25.05`, `24.11`, `24.05`). Each env exposes both `pkgs` and `pkgsStatic`. The manifest picks which env + variant a package comes from.
+
 ### Package Sources
 
-`flake.nix` builds the final package set by merging three sources:
+The final package set merges three sources:
 
-1. **Upstream packages (manifest-driven)**  
-   The manifest is `pkgs-list/common.nix` merged with `pkgs-list/<platform>.nix`. Each entry maps a name to a small configuration attrset used to pick:
-   - `version`: which nixpkgs input to import (`unstable`, `25.11`, `25.05`, `24.11`, `24.05`)
-   - `isStatic`: whether to use `pkgsStatic` or regular `pkgs` for that nixpkgs input
-   - `output`: list of derivation outputs to expose (`[ "out" ]` by default, sometimes `[ "bin" ]`). The listed outputs are merged with `symlinkJoin`.
-   - `alias`: rename the exported flake package
+1. **Upstream packages (manifest-driven)** — `lib/make-manifest-packages.nix` applied to `manifests/default.nix` for the current system. Each manifest entry maps a package name to a config attrset:
+   - `platforms`: list of systems the package is built for (omitted => all systems).
+   - `version`: which nixpkgs env to import (defaults to `unstable`).
+   - `isStatic`: use `pkgsStatic` (`true`, default) or regular `pkgs` (`false`).
+   - `output`: list of derivation outputs to expose (`[ "out" ]` by default; sometimes `[ "bin" ]`), merged with `symlinkJoin`.
+   - `alias`: rename the exported flake package.
+   - `"<system>"`: a per-platform key that overrides any of the fields above (effective config = package-level shared config `//` platform key, platform wins).
 
-2. **Local packages (`customPkgs`)**  
-   Local definitions are built with `callPackage` from files under `pkgs/`. This is where the repo pins special versions (e.g. protobuf) or provides patched/wrapped variants.
+2. **Local packages** — `packages/local.nix` returns `{ common; linux; darwin; }`:
+   - `common`: cross-platform pinned/patched/wrapped builds (e.g. specific protobuf versions, `coreutils`, vim/zsh/curl wrappers).
+   - `linux`: Linux-only patched tooling (podman stack, multiple clang-tools versions, static Python variants, etc.).
+   - `darwin`: a subset of Go tools rebuilt with `CGO_ENABLED=0` to reduce dynamic library dependence.
 
-3. **Platform-specific additions**
-   - On Linux: extra packages and patched tooling (including podman stack, multiple clang-tools versions, static Python variants).
-   - On Darwin: for a subset of Go tools, `CGO_ENABLED=0` is set to reduce dynamic library dependence.
+3. **Platform merge** — the flake merges `upstreamPackages // local.common // (local.linux | local.darwin)` depending on the target system.
 
-### “all” Aggregation Output
+### "all" Aggregation Output
 
-In addition to per-package outputs, the flake provides an `all` output using a `linkFarm` over all derivations. This is primarily a convenience for local use and inspection.
+In addition to per-package outputs, the flake provides an `all` output using a `linkFarm` over all standalone derivations. This is a convenience for local use and inspection.
 
-## Normalization / Stripping Pipeline
+## Standalone Normalization Pipeline
 
-Every derivation in the final package set is wrapped by `stripDrv`, implemented in [flake.nix](file:///workspace/static-binaries/flake.nix). This wrapper:
-- Copies the derivation output into a fresh `$out`.
-- Makes the output writable.
-- Runs [scripts/patch.sh](file:///workspace/static-binaries/scripts/patch.sh) over the output tree.
+Every derivation in the final package set is wrapped by `make-standalone.nix`, which:
+- Copies the derivation output into a fresh, writable `$out`.
+- Runs [scripts/normalize.sh](file:///workspace/static-binaries/scripts/normalize.sh) over the output tree.
 
-The current `patch.sh` normalization includes:
-- Remove common non-essential directories (`share/man`, `share/doc`, `share/bash-completion`, `nix-support`).
-- For text files:
-  - Rewrite shebangs from hard-coded Nix store paths to `/usr/bin/env ...` where possible.
-  - Remove Nix store path fragments to reduce runtime coupling.
-- For ELF binaries:
-  - `strip --strip-unneeded` (best-effort).
-  - `nuke-refs` to remove Nix store references.
-- Rename wrapped executables:
-  - Files named like `.*-wrapped` are renamed by removing `-wrapped` and the leading dot.
+This wrapper is purely post-processing; it does not change how a package is compiled (static vs dynamic). The normalization in `normalize.sh` includes:
+- Remove non-essential directories (`share/man`, `share/doc`, `share/bash-completion`, `nix-support`).
+- Resolve symlinks: keep links pointing inside `$out`; inline (copy) the real file for links pointing outside (e.g. into `/nix/store`) so the payload stays self-contained; drop dangling links.
+- For text files: rewrite shebangs from hard-coded Nix store paths to `/usr/bin/env ...`; strip Nix store path fragments.
+- For ELF binaries: `strip --strip-unneeded` (best-effort) and `nuke-refs`.
+- Rename `.*-wrapped` executables by removing the `-wrapped` suffix and leading dot.
 - Remove `.a` and `.pyc` files.
-- Remove symlinks that are broken or point outside of the output prefix.
 
-Design intent: keep runtime payloads small and reduce implicit dependence on the Nix store layout.
+Design intent: keep runtime payloads small and remove implicit dependence on the Nix store layout.
 
 ## CI / Publishing Model
 
-The CI model is “build each tool independently and publish an artifact per tool”.
+The CI model is "build each tool independently and publish an artifact per tool".
 
 ### Build selection (Linux)
 
-The Linux workflow uses a two-stage model to avoid spinning up one runner per
-package on every change:
+The Linux workflow uses a two-stage model to avoid spinning up one runner per package on every change:
 
-1. A `discover` job enumerates all package names dynamically via
-   `nix eval .#packages.x86_64-linux --apply builtins.attrNames` (excluding the
-   `all` aggregate). It then, for each package, resolves its `outPath` and queries
-   the Cachix binary cache with `nix path-info --store <cachix>`. Packages whose
-   output is missing from the cache are collected into a GitHub Actions matrix
-   (`{"include":[{"name":...}]}`) emitted as a job output.
-2. The `build` job consumes that matrix via `fromJSON` and only runs for the
-   selected packages. When nothing needs building, the matrix is empty and the
-   `build` job is skipped entirely (`if: needs.discover.outputs.count != '0'`).
+1. A `discover` job enumerates all package names via `nix eval .#packages.x86_64-linux` (excluding the `all` aggregate), resolves each package's `outPath`, and queries the Cachix binary cache with `nix path-info --store <cachix>`. Packages missing from the cache form a GitHub Actions matrix emitted as a job output. Packages in `EXCLUDE_PKGS` (built by dedicated workflows) are filtered out.
+2. The `build` job consumes that matrix via `fromJSON` and runs only for selected packages. When nothing needs building, the `build` job is skipped (`if: needs.discover.outputs.count != '0'`).
 
-`workflow_dispatch` with a specific `name` builds only that package; with `*`
-(or empty) it forces all packages. `schedule` always forces all packages.
+`workflow_dispatch` with a specific `name` builds only that package; with `*` (or empty) it forces all packages. `schedule` always forces all packages.
 
 ### Artifacts
 
@@ -130,8 +129,8 @@ In both Linux and Darwin workflows:
 ### Publishing
 
 Workflows publish the tarball to `ghcr.io` using `oras push`, tagged as:
-- `ghcr.io/curoky/static-binaries-v3:<name>-linux-x86_64`
-- `ghcr.io/curoky/static-binaries-v3:<name>-darwin-arm64`
+- `ghcr.io/curoky/static-binaries-v4:<name>-linux-x86_64`
+- `ghcr.io/curoky/static-binaries-v4:<name>-darwin-arm64`
 
 The flake also configures a Cachix substituter; CI pushes build closures to Cachix to speed up subsequent builds.
 
@@ -139,24 +138,23 @@ The flake also configures a Cachix substituter; CI pushes build closures to Cach
 
 ### Add a new upstream tool from nixpkgs
 
-1. Add an entry to the appropriate manifest file:
-   - Common: `pkgs-list/common.nix`
-   - Linux-only: `pkgs-list/linux.nix`
-   - macOS-only: `pkgs-list/macos.nix`
+1. Add an entry to [manifests/default.nix](file:///workspace/static-binaries/manifests/default.nix):
+   - Omit `platforms` for an all-platform package, or set `platforms = [ "x86_64-linux" ]` / `[ "aarch64-darwin" ]` to restrict it.
+   - For a package that exists everywhere but needs a different config per system, add a per-platform key, e.g. `aria2 = { "aarch64-darwin" = { version = "24.11"; }; };`.
 2. Decide whether it should use `pkgsStatic` (`isStatic = true`, default) or regular `pkgs` (`isStatic = false`).
 3. If the package has multiple outputs, pick the right one(s) via `output = [ "bin" ]` (or list several to merge them).
 4. If the nixpkgs attribute name is awkward, use `alias` to export a better public name.
-5. Ensure CI includes it in the workflow matrix if it should be published.
 
 ### Add a local override / patched build
 
-1. Create a derivation under `pkgs/` (typically `pkgs/patched/` or `pkgs/wrapped/`).
-2. Wire it into `customPkgs` or `linux_only` in `flake.nix`.
-3. Prefer minimal diffs: only patch what is necessary to improve portability, reduce dynamic deps, or fix runtime paths.
+1. Create a directory `packages/<pkg>/` with a `default.nix`, plus any resources (patches, wrapper scripts, vendored configs) the package needs alongside it.
+2. Wire it into the appropriate set in `packages/local.nix` (`common`, `linux`, or `darwin`) via `callPackage ./<pkg> { }`. `local.nix` remains the explicit manifest of local packages (no auto-discovery).
+3. Follow the standalone strategy: prefer static; otherwise patch + bundle; use `nix bundle` only when static is impossible.
+4. Prefer minimal diffs: only patch what is necessary to improve portability, reduce dynamic deps, or fix runtime paths.
 
 ### Change normalization behavior
 
-Edit [scripts/patch.sh](file:///workspace/static-binaries/scripts/patch.sh). Treat this script as a compatibility surface:
+Edit [scripts/normalize.sh](file:///workspace/static-binaries/scripts/normalize.sh). Treat this script as a compatibility surface:
 - Changing removals/rewrites can break tools in subtle ways.
 - Prefer incremental changes and validate on a representative sample of packages.
 

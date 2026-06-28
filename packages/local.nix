@@ -1,0 +1,141 @@
+# local.nix
+#
+# Locally-defined packages: pinned versions, patched builds, wrapped bundles,
+# and platform-specific (Linux-only) tooling. These are the packages where the
+# repo does manual work (patch + bundle) rather than just selecting an upstream
+# nixpkgs derivation via the manifest.
+#
+# Returns an attrset:
+#   { common = { ... }; linux = { ... }; darwin = { ... }; }
+# The caller merges the relevant platform set into the final package set.
+{
+  lib,
+  pkgs,
+  pkgsStatic,
+  pkgs2605Static,
+  pkgs2511,
+}:
+let
+  # Darwin: build a subset of Go tools with CGO disabled to reduce dynamic
+  # library dependence (standalone-friendly without a fully static toolchain).
+  goWithoutCgo =
+    lib.genAttrs
+      [
+        "gdu"
+        "gh"
+        "bazelisk"
+        "croc"
+        "go-task"
+        "git-lfs"
+        "shfmt"
+        "fzf"
+        "dive"
+        "scc"
+        "buildifier"
+        "lefthook"
+        "oras"
+      ]
+      (
+        name:
+        pkgs2511.${name}.overrideAttrs (oldAttrs: {
+          env.CGO_ENABLED = "0";
+        })
+      );
+in
+{
+  # Cross-platform local packages.
+  common = {
+    protobuf_3_8_0 = pkgsStatic.callPackage ./protobuf/3_8_0 { };
+    protobuf_3_9_2 = pkgsStatic.callPackage ./protobuf/3_9_2 { };
+    coreutils = pkgsStatic.coreutils.override {
+      singleBinary = false;
+    };
+    gnupg = pkgsStatic.gnupg.override {
+      enableMinimal = true;
+      guiSupport = false;
+    };
+
+    diffutils = pkgsStatic.callPackage ./diffutils { };
+    gettext = pkgsStatic.callPackage ./gettext { };
+    p7zip = pkgsStatic.callPackage ./p7zip { };
+    rsync = pkgsStatic.callPackage ./rsync { };
+
+    dool = pkgsStatic.callPackage ./dool { };
+    netron = pkgsStatic.callPackage ./netron { };
+    git-filter-repo = pkgsStatic.callPackage ./git-filter-repo { };
+
+    vim = pkgsStatic.callPackage ./vim { };
+    curl = pkgsStatic.callPackage ./curl { };
+    file = pkgsStatic.callPackage ./file { };
+    makeself = pkgsStatic.callPackage ./makeself { };
+    zsh = pkgsStatic.callPackage ./zsh { };
+    autoconf = pkgsStatic.callPackage ./autoconf { };
+    automake = pkgsStatic.callPackage ./automake { };
+    libtool = pkgsStatic.callPackage ./libtool { };
+
+    cacert = pkgsStatic.callPackage ./cacert { };
+    rime-plugins = pkgsStatic.callPackage ./rime-plugins { };
+    tmux-plugins = pkgsStatic.callPackage ./tmux-plugins { };
+    vim-plugins = pkgs.callPackage ./vim-plugins { };
+    zsh-plugins = pkgsStatic.callPackage ./zsh-plugins { };
+    music-decrypto = pkgs.callPackage ./music-decrypto { };
+  };
+
+  # Linux-only local packages (patched tooling, container stack, multiple
+  # clang-tools versions, static Python variants, extra wrapped tools).
+  linux = rec {
+    glibcLocales = pkgs.glibcLocales.override {
+      allLocales = false;
+    };
+    nsight-systems = pkgsStatic.callPackage ./nsight-systems { };
+    cmake = pkgsStatic.callPackage ./cmake/default { };
+    cmake_3_27_9 = pkgsStatic.callPackage ./cmake/3_27_9 { };
+    cmake_4_1_2 = pkgsStatic.callPackage ./cmake/4_1_2 { };
+    git = pkgsStatic.callPackage ./git { };
+    zellij = pkgs2605Static.callPackage ./zellij { };
+    execline = pkgsStatic.callPackage ./execline { };
+    s6 = pkgsStatic.callPackage ./s6 {
+      inherit execline;
+    };
+    s6-rc = pkgsStatic.callPackage ./s6-rc {
+      inherit s6 execline;
+    };
+    s6-linux-init = pkgsStatic.callPackage ./s6-linux-init {
+      inherit s6;
+    };
+
+    # podman stack
+    gpgme = pkgsStatic.callPackage ./gpgme { };
+    crun = pkgsStatic.callPackage ./crun { };
+    conmon = pkgsStatic.callPackage ./conmon { };
+    catatonit = pkgsStatic.callPackage ./catatonit { };
+    podman = pkgsStatic.callPackage ./podman {
+      inherit
+        catatonit
+        crun
+        conmon
+        gpgme
+        ;
+    };
+
+    clang-tools-18 = pkgsStatic.callPackage ./clang-tools/18 { };
+    clang-tools-19 = pkgsStatic.callPackage ./clang-tools/19 { };
+    clang-tools-20 = pkgsStatic.callPackage ./clang-tools/20 { };
+    clang-tools-21 = pkgsStatic.callPackage ./clang-tools/21 { };
+    clang-tools-22 = pkgsStatic.callPackage ./clang-tools/22 { };
+
+    python311 = pkgsStatic.callPackage ./python/311 { };
+    python312 = pkgsStatic.callPackage ./python/312 { };
+    python313 = pkgsStatic.callPackage ./python/313 { };
+
+    openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
+    perl = pkgsStatic.callPackage ./perl { };
+    wget = pkgsStatic.callPackage ./wget { };
+    cloc = pkgsStatic.callPackage ./cloc { };
+    parallel = pkgsStatic.callPackage ./parallel { };
+    miniserve = pkgsStatic.callPackage ./miniserve { };
+  };
+
+  # Darwin-only local packages.
+  darwin = goWithoutCgo;
+}

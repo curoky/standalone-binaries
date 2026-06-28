@@ -4,8 +4,9 @@ on:
   push:
     paths:
       - '.github/workflows/build-linux.yaml'
-      - 'pkgs/**'
-      - 'pkgs-list/**'
+      - 'packages/**'
+      - 'manifests/**'
+      - 'lib/**'
       - 'scripts/**'
       - 'flake*'
   workflow_dispatch:
@@ -150,5 +151,5 @@ jobs:
       - run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - run: >
-          oras push ghcr.io/curoky/static-binaries-v3:${{ matrix.name }}-linux-x86_64
+          oras push ghcr.io/curoky/static-binaries-v4:${{ matrix.name }}-linux-x86_64
           ./${{ matrix.name }}.linux-x86_64.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip
