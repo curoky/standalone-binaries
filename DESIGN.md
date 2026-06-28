@@ -17,7 +17,7 @@ The primary goals are:
 
 1. **Static compilation** where it works (`pkgsStatic`). This remains the default for most packages.
 2. **Manual patch + bundle** when full static linking isn't practical: rewrite hard-coded paths, vendor configuration, and bundle required resources (see `packages/`).
-3. **`nix bundle`** only as a last resort, for tools that genuinely cannot be statically compiled (e.g. Node.js-based tools).
+3. **`nix bundle`** only as a last resort, for tools that genuinely cannot be statically compiled (e.g. Node.js-based tools). Implemented via `lib/make-bundle.nix` (matthewbauer/nix-bundle); produces a single self-extracting executable and is **Linux only** (relies on user namespaces).
 
 Non-goals:
 - Guarantee that every tool is a fully static single binary on every platform. Some packages are intentionally non-static (e.g. fonts), and "static" is best-effort depending on upstream.
@@ -40,6 +40,7 @@ The flake is intentionally thin; logic lives in `lib/` and the package definitio
 - [lib/](file:///workspace/static-binaries/lib): Reusable build helpers.
   - [make-manifest-packages.nix](file:///workspace/static-binaries/lib/make-manifest-packages.nix): Turns a manifest attrset into a set of upstream nixpkgs derivations.
   - [make-standalone.nix](file:///workspace/static-binaries/lib/make-standalone.nix): Wraps a derivation with the normalization step (runs `scripts/normalize.sh`).
+  - [make-bundle.nix](file:///workspace/static-binaries/lib/make-bundle.nix): Bundles a derivation into a single self-extracting executable via `nix bundle` (matthewbauer/nix-bundle), for tools that cannot be statically compiled. Linux only. Bundle outputs skip the standalone normalization step.
 - [manifests/](file:///workspace/static-binaries/manifests): Declarative selection of upstream nixpkgs packages.
   - [default.nix](file:///workspace/static-binaries/manifests/default.nix): Single manifest keyed by package name; each entry declares its target `platforms` and optional per-platform config overrides.
 - [packages/](file:///workspace/static-binaries/packages): Locally-defined derivations and overrides, organized **one directory per package**.
@@ -75,6 +76,7 @@ The final package set merges three sources:
    - `isStatic`: use `pkgsStatic` (`true`, default) or regular `pkgs` (`false`).
    - `output`: list of derivation outputs to expose (`[ "out" ]` by default; sometimes `[ "bin" ]`), merged with `symlinkJoin`.
    - `alias`: rename the exported flake package.
+   - `bundle`: `nix bundle` the package into a single self-extracting executable instead of normalizing it (Linux only, for tools that cannot be statically compiled). Bundle packages always use regular `pkgs`.
    - `"<system>"`: a per-platform key that overrides any of the fields above (effective config = package-level shared config `//` platform key, platform wins).
 
 2. **Local packages** — `packages/local.nix` returns `{ common; linux; darwin; }`:
@@ -93,6 +95,8 @@ In addition to per-package outputs, the flake provides an `all` output using a `
 Every derivation in the final package set is wrapped by `make-standalone.nix`, which:
 - Copies the derivation output into a fresh, writable `$out`.
 - Runs [scripts/normalize.sh](file:///workspace/static-binaries/scripts/normalize.sh) over the output tree.
+
+Bundle packages (`bundle = true` in the manifest) are the exception: they are produced by `make-bundle.nix` as a single self-extracting executable and skip normalization entirely (stripping / nuke-refs / shebang rewriting would corrupt the archive).
 
 This wrapper is purely post-processing; it does not change how a package is compiled (static vs dynamic). The normalization in `normalize.sh` includes:
 - Remove non-essential directories (`share/man`, `share/doc`, `share/bash-completion`, `nix-support`).
@@ -144,6 +148,7 @@ The flake also configures a Cachix substituter; CI pushes build closures to Cach
 2. Decide whether it should use `pkgsStatic` (`isStatic = true`, default) or regular `pkgs` (`isStatic = false`).
 3. If the package has multiple outputs, pick the right one(s) via `output = [ "bin" ]` (or list several to merge them).
 4. If the nixpkgs attribute name is awkward, use `alias` to export a better public name.
+5. If the tool cannot be statically compiled and has no practical patch+bundle (e.g. a Node.js tool), set `bundle = true` with `isStatic = false` and `platforms = [ "x86_64-linux" ]` to `nix bundle` it into a single self-extracting executable (see `prettier` / `pnpm`).
 
 ### Add a local override / patched build
 
