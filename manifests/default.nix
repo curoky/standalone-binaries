@@ -329,26 +329,26 @@
   ## ---- nix-bundle (Linux only) ------------------------------------------
   # Node.js based tools that cannot be statically compiled; bundled into a
   # single self-extracting executable via nix bundle (see lib/make-bundle.nix).
-  prettier = {
-    platforms = [ "x86_64-linux" ];
-    isStatic = false;
-    bundle = true;
-  };
-  pnpm = {
-    platforms = [ "x86_64-linux" ];
-    isStatic = false;
-    bundle = true;
-  };
-  markdownlint-cli2 = {
-    platforms = [ "x86_64-linux" ];
-    isStatic = false;
-    bundle = true;
-  };
-  opencommit = {
-    platforms = [ "x86_64-linux" ];
-    isStatic = false;
-    bundle = true;
-  };
+  # prettier = {
+  #   platforms = [ "x86_64-linux" ];
+  #   isStatic = false;
+  #   bundle = true;
+  # };
+  # pnpm = {
+  #   platforms = [ "x86_64-linux" ];
+  #   isStatic = false;
+  #   bundle = true;
+  # };
+  # markdownlint-cli2 = {
+  #   platforms = [ "x86_64-linux" ];
+  #   isStatic = false;
+  #   bundle = true;
+  # };
+  # opencommit = {
+  #   platforms = [ "x86_64-linux" ];
+  #   isStatic = false;
+  #   bundle = true;
+  # };
 
   ## ---- cross-platform with per-platform overrides -----------------------
   # linux uses default version; darwin pins a specific version.
