@@ -130,6 +130,13 @@ in
 
     openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
     perl = pkgsStatic.callPackage ./perl { };
+
+    # JVM based tool: shipped as a normal multi-file package whose thin
+    # wrapper locates a JRE at runtime from the co-located sibling package
+    # `jre21` (`$store/jre21`), instead of `nix bundle`'ing a full JRE closure
+    # into a single self-extracting executable.
+    jre21 = pkgs.callPackage ./jre/21 { };
+    lemminx = pkgs.callPackage ./lemminx { };
     wget = pkgsStatic.callPackage ./wget { };
     cloc = pkgsStatic.callPackage ./cloc { };
     parallel = pkgsStatic.callPackage ./parallel { };
