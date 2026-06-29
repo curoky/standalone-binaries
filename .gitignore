@@ -2,4 +2,5 @@
 tmp
 *.tar.gz
 result
-tools/sbt/sbt
+client/psb
+client/client

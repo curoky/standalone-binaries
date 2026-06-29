@@ -55,7 +55,7 @@ The flake is intentionally thin; logic lives in `lib/` and the package definitio
   - [build-linux.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-linux.yaml)
   - [build-darwin.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-darwin.yaml)
   - [build-llvm-tools.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-llvm-tools.yaml): dedicated builder for clang-tools / lld (excluded from the main Linux matrix).
-  - [build-sbt.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-sbt.yaml): cross-compiles and publishes the Go `sbt` client itself (`sbt-<arch>`).
+  - [build-psb.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-psb.yaml): cross-compiles and publishes the Go `psb` client itself (`psb-<arch>`).
 
 ## Flake Outputs and Package Selection
 
@@ -141,43 +141,43 @@ Workflows publish the tarball to `ghcr.io` using `oras push`, tagged as:
 
 The flake also configures a Cachix substituter; CI pushes build closures to Cachix to speed up subsequent builds.
 
-## Client Install / Upgrade Model (`tools/sbt`)
+## Client Install / Upgrade Model (`client/`)
 
-[tools/sbt](file:///workspace/prebuilt-standalone-binaries/tools/sbt) is a small package manager (a brew/apt-style client) for **minimal environments that have no Nix/Homebrew/package manager**. It is written in **Go** as a single, statically-linked binary, cross-compiled for `linux-x86_64` and `darwin-arm64`. It pulls the published tarballs straight from the `ghcr.io/curoky/prebuilt-standalone-binaries` OCI registry (reusing the `<name>-<arch>` tag -> layer blob digest flow described above) and installs them locally.
+[client/](file:///workspace/prebuilt-standalone-binaries/client) is a small package manager (a brew/apt-style client) for **minimal environments that have no Nix/Homebrew/package manager**. It is written in **Go** as a single, statically-linked binary (`psb`), cross-compiled for `linux-x86_64` and `darwin-arm64`. It pulls the published tarballs straight from the `ghcr.io/curoky/prebuilt-standalone-binaries` OCI registry (reusing the `<name>-<arch>` tag -> layer blob digest flow described above) and installs them locally.
 
 ### Design principles
 
-- **No host runtime dependencies.** sbt is one static binary built with `CGO_ENABLED=0`; **nothing** (`curl`/`tar`/`oras`/`jq`/Nix) is needed on the target host. It leans on well-maintained Go libraries rather than hand-rolled plumbing: [go-containerregistry](https://github.com/google/go-containerregistry) (`crane`) for all OCI access (auth, manifest, layer pull, digest), [cobra](https://github.com/spf13/cobra) for the CLI, and [`x/sync/errgroup`](https://pkg.go.dev/golang.org/x/sync/errgroup) for bounded-parallel fan-out. Tarball extraction uses the standard library (`archive/tar` + `compress/gzip`). The same source cross-compiles to both platforms.
+- **No host runtime dependencies.** psb is one static binary built with `CGO_ENABLED=0`; **nothing** (`curl`/`tar`/`oras`/`jq`/Nix) is needed on the target host. It leans on well-maintained Go libraries rather than hand-rolled plumbing: [go-containerregistry](https://github.com/google/go-containerregistry) (`crane`) for all OCI access (auth, manifest, layer pull, digest), [cobra](https://github.com/spf13/cobra) for the CLI, and [`x/sync/errgroup`](https://pkg.go.dev/golang.org/x/sync/errgroup) for bounded-parallel fan-out. Tarball extraction uses the standard library (`archive/tar` + `compress/gzip`). The same source cross-compiles to both platforms.
 - **Relocatable installs.** Everything a package exposes under the prefix is a **relative** symlink. Because links are relative, the entire prefix can be moved anywhere with **zero repair**.
-- **Independent packages.** Every package is treated as fully self-contained; sbt does **no dependency resolution**. Each package is installed, removed, and relocated on its own. Runtime-heavy packages (node/python/perl tools) carry their own relative-path wrappers, so an individual `store/<name>/` directory is self-contained as well.
+- **Independent packages.** Every package is treated as fully self-contained; psb does **no dependency resolution**. Each package is installed, removed, and relocated on its own. Runtime-heavy packages (node/python/perl tools) carry their own relative-path wrappers, so an individual `store/<name>/` directory is self-contained as well.
 - **Platforms.** Auto-detected arch tag is `linux-x86_64` (Linux/x86_64) or `darwin-arm64` (macOS/arm64), matching the published OCI tags; override with `--arch`.
-- **Self-publishing.** sbt is itself published to the registry as `sbt-<arch>` by [build-sbt.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-sbt.yaml), so it can be bootstrapped with a single `curl` and afterwards upgraded like any other package.
+- **Self-publishing.** psb is itself published to the registry as `psb-<arch>` by [build-psb.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-psb.yaml), so it can be bootstrapped with a single `curl` and afterwards upgraded like any other package.
 
 ### Source layout
 
-[tools/sbt](file:///workspace/prebuilt-standalone-binaries/tools/sbt) is a Go module:
-- [main.go](file:///workspace/prebuilt-standalone-binaries/tools/sbt/main.go): the entire client (OCI access, store/meta/link, commands, CLI).
-- [main_test.go](file:///workspace/prebuilt-standalone-binaries/tools/sbt/main_test.go): offline unit tests (tar extraction + relative-link relocation + arg parsing + metadata round-trip).
+[client/](file:///workspace/prebuilt-standalone-binaries/client) is a Go module:
+- [main.go](file:///workspace/prebuilt-standalone-binaries/client/main.go): the entire client (OCI access, store/meta/link, commands, CLI).
+- [main_test.go](file:///workspace/prebuilt-standalone-binaries/client/main_test.go): offline unit tests (tar extraction + relative-link relocation + arg parsing + metadata round-trip).
 
 ### Local layout
 
-Packages are installed under a prefix (default `/opt/sbt`):
+Packages are installed under a prefix (default `/opt/psb`):
 
 - `store/<name>/`: the extracted package contents.
-- `store/<name>/.sbt-meta`: per-package metadata, kept **inside** the package directory so it is created and removed atomically with the package. It is a plain `key=value` file (`name`, `arch`, `digest`, `linked`, `installed_at`).
-- `bin/`, `lib/`, `share/`, ...: when installed with `--link` (default), **relative** symlinks into `store/<name>/` (the `.sbt-meta` file is excluded from linking). `--nolink` installs into the store only.
+- `store/<name>/.psb-meta`: per-package metadata, kept **inside** the package directory so it is created and removed atomically with the package. It is a plain `key=value` file (`name`, `arch`, `digest`, `linked`, `installed_at`).
+- `bin/`, `lib/`, `share/`, ...: when installed with `--link` (default), **relative** symlinks into `store/<name>/` (the `.psb-meta` file is excluded from linking). `--nolink` installs into the store only.
 
 ### Upgrade semantics (digest comparison)
 
-There is no human-readable version embedded in the OCI tag (`<name>-<arch>`), so "needs update" is decided by **OCI blob digest comparison**: the client resolves the remote manifest's layer digest and compares it against the `digest` recorded in the local `.sbt-meta`. If they differ, the package is re-downloaded and re-extracted; otherwise it is skipped (`install` is idempotent unless `--force` is given).
+There is no human-readable version embedded in the OCI tag (`<name>-<arch>`), so "needs update" is decided by **OCI blob digest comparison**: the client resolves the remote manifest's layer digest and compares it against the `digest` recorded in the local `.psb-meta`. If they differ, the package is re-downloaded and re-extracted; otherwise it is skipped (`install` is idempotent unless `--force` is given).
 
 ### Subcommands
 
-- `install <pkg>...`: install/refresh **one or more** packages; skips packages whose local digest already matches the remote (override with `--force`). `--link`/`--nolink` control symlink exposure. Multi-package installs run in three phases: (1) resolve every package's remote digest **in parallel** — if any package is missing, sbt aborts with the full list and installs nothing; (2) download the needed blobs **in parallel** into the cache; (3) extract + link **serially**.
+- `install <pkg>...`: install/refresh **one or more** packages; skips packages whose local digest already matches the remote (override with `--force`). `--link`/`--nolink` control symlink exposure. Multi-package installs run in three phases: (1) resolve every package's remote digest **in parallel** — if any package is missing, psb aborts with the full list and installs nothing; (2) download the needed blobs **in parallel** into the cache; (3) extract + link **serially**.
 - `remove <pkg>`: remove a package's symlinks (when linked) and delete its `store/<name>/` directory.
 - `upgrade [pkg...]`: upgrade the given packages, or all installed packages when none is given (reuses the install digest-skip logic, preserving each package's recorded arch/linked).
 - `info <pkg>`: show a package's recorded metadata (or its registry coordinates if not installed) and whether it is up to date vs. the remote digest.
-- `list`: list installed packages and their recorded digests by reading each `store/*/.sbt-meta`.
+- `list`: list installed packages and their recorded digests by reading each `store/*/.psb-meta`.
 - `outdated`: report installed packages whose remote digest has changed.
 
 Common options: `--prefix PATH|--prefix=PATH` and `--arch ARCH|--arch=ARCH` (both `--opt value` and `--opt=value` forms accepted; options may appear before or after the package names).

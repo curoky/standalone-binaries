@@ -1,4 +1,4 @@
-module github.com/curoky/prebuilt-standalone-binaries/tools/sbt
+module github.com/curoky/prebuilt-standalone-binaries/client
 
 go 1.26
 
