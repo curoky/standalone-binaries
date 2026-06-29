@@ -38,24 +38,24 @@ The flake is intentionally thin; logic lives in `lib/` and the package definitio
 
 ## Repository Layout
 
-- [flake.nix](file:///workspace/static-binaries/flake.nix): Thin entry point. Declares inputs, builds per-system envs, wires helpers, and exposes outputs.
-- [lib/](file:///workspace/static-binaries/lib): Reusable build helpers.
-  - [make-manifest-packages.nix](file:///workspace/static-binaries/lib/make-manifest-packages.nix): Turns a manifest attrset into a set of upstream nixpkgs derivations.
-  - [make-standalone.nix](file:///workspace/static-binaries/lib/make-standalone.nix): Wraps a derivation with the normalization step (runs `scripts/normalize.sh`).
-  - [make-bundle.nix](file:///workspace/static-binaries/lib/make-bundle.nix): Bundles a derivation into a single self-extracting executable via `nix bundle` (matthewbauer/nix-bundle), for tools that cannot be statically compiled. Linux only. Bundle outputs skip the standalone normalization step.
-- [manifests/](file:///workspace/static-binaries/manifests): Declarative selection of upstream nixpkgs packages.
-  - [default.nix](file:///workspace/static-binaries/manifests/default.nix): Single manifest keyed by package name; each entry declares its target `platforms` and optional per-platform config overrides.
-- [packages/](file:///workspace/static-binaries/packages): Locally-defined derivations and overrides, organized **one directory per package**.
-  - [local.nix](file:///workspace/static-binaries/packages/local.nix): Explicit manifest that aggregates local packages into `{ common; linux; darwin; }` via `callPackage ./<pkg>`.
+- [flake.nix](file:///workspace/prebuilt-standalone-binaries/flake.nix): Thin entry point. Declares inputs, builds per-system envs, wires helpers, and exposes outputs.
+- [lib/](file:///workspace/prebuilt-standalone-binaries/lib): Reusable build helpers.
+  - [make-manifest-packages.nix](file:///workspace/prebuilt-standalone-binaries/lib/make-manifest-packages.nix): Turns a manifest attrset into a set of upstream nixpkgs derivations.
+  - [make-standalone.nix](file:///workspace/prebuilt-standalone-binaries/lib/make-standalone.nix): Wraps a derivation with the normalization step (runs `scripts/normalize.sh`).
+  - [make-bundle.nix](file:///workspace/prebuilt-standalone-binaries/lib/make-bundle.nix): Bundles a derivation into a single self-extracting executable via `nix bundle` (matthewbauer/nix-bundle), for tools that cannot be statically compiled. Linux only. Bundle outputs skip the standalone normalization step.
+- [manifests/](file:///workspace/prebuilt-standalone-binaries/manifests): Declarative selection of upstream nixpkgs packages.
+  - [default.nix](file:///workspace/prebuilt-standalone-binaries/manifests/default.nix): Single manifest keyed by package name; each entry declares its target `platforms` and optional per-platform config overrides.
+- [packages/](file:///workspace/prebuilt-standalone-binaries/packages): Locally-defined derivations and overrides, organized **one directory per package**.
+  - [local.nix](file:///workspace/prebuilt-standalone-binaries/packages/local.nix): Explicit manifest that aggregates local packages into `{ common; linux; darwin; }` via `callPackage ./<pkg>`.
   - `packages/<pkg>/default.nix`: One directory per local package; the directory also holds that package's own resources (patches, wrapper scripts, vendored configs, e.g. `packages/podman/{bin,conf,*.patch}`, `packages/python/311/Setup.local`).
   - Multi-version applications are grouped under a single application directory with one subdirectory per version: `packages/cmake/{default,3_27_9,4_1_2}`, `packages/python/{311,312,313}`, `packages/clang-tools/{18,19,20,21,22}`, `packages/protobuf/{3_8_0,3_9_2}`. The default/current version of an app lives in `default/`.
   - `packages/protobuf/generic-v3.nix`: A shared builder reused by the protobuf version directories; shared builders are not given their own version subdirectory.
-- [scripts/normalize.sh](file:///workspace/static-binaries/scripts/normalize.sh): Output normalization used by the standalone wrapper.
+- [scripts/normalize.sh](file:///workspace/prebuilt-standalone-binaries/scripts/normalize.sh): Output normalization used by the standalone wrapper.
 - CI workflows:
-  - [build-linux.yaml](file:///workspace/static-binaries/.github/workflows/build-linux.yaml)
-  - [build-darwin.yaml](file:///workspace/static-binaries/.github/workflows/build-darwin.yaml)
-  - [build-llvm-tools.yaml](file:///workspace/static-binaries/.github/workflows/build-llvm-tools.yaml): dedicated builder for clang-tools / lld (excluded from the main Linux matrix).
-  - [build-sbt.yaml](file:///workspace/static-binaries/.github/workflows/build-sbt.yaml): cross-compiles and publishes the Go `sbt` client itself (`sbt-<arch>`).
+  - [build-linux.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-linux.yaml)
+  - [build-darwin.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-darwin.yaml)
+  - [build-llvm-tools.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-llvm-tools.yaml): dedicated builder for clang-tools / lld (excluded from the main Linux matrix).
+  - [build-sbt.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-sbt.yaml): cross-compiles and publishes the Go `sbt` client itself (`sbt-<arch>`).
 
 ## Flake Outputs and Package Selection
 
@@ -97,7 +97,7 @@ In addition to per-package outputs, the flake provides an `all` output using a `
 
 Every derivation in the final package set is wrapped by `make-standalone.nix`, which:
 - Copies the derivation output into a fresh, writable `$out`.
-- Runs [scripts/normalize.sh](file:///workspace/static-binaries/scripts/normalize.sh) over the output tree.
+- Runs [scripts/normalize.sh](file:///workspace/prebuilt-standalone-binaries/scripts/normalize.sh) over the output tree.
 
 Bundle packages (`bundle = true` in the manifest) are the exception: they are produced by `make-bundle.nix` as a single self-extracting executable and skip normalization entirely (stripping / nuke-refs / shebang rewriting would corrupt the archive).
 
@@ -136,14 +136,14 @@ In both Linux and Darwin workflows:
 ### Publishing
 
 Workflows publish the tarball to `ghcr.io` using `oras push`, tagged as:
-- `ghcr.io/curoky/static-binaries-v4:<name>-linux-x86_64`
-- `ghcr.io/curoky/static-binaries-v4:<name>-darwin-arm64`
+- `ghcr.io/curoky/prebuilt-standalone-binaries:<name>-linux-x86_64`
+- `ghcr.io/curoky/prebuilt-standalone-binaries:<name>-darwin-arm64`
 
 The flake also configures a Cachix substituter; CI pushes build closures to Cachix to speed up subsequent builds.
 
 ## Client Install / Upgrade Model (`tools/sbt`)
 
-[tools/sbt](file:///workspace/static-binaries/tools/sbt) is a small package manager (a brew/apt-style client) for **minimal environments that have no Nix/Homebrew/package manager**. It is written in **Go** as a single, statically-linked binary, cross-compiled for `linux-x86_64` and `darwin-arm64`. It pulls the published tarballs straight from the `ghcr.io/curoky/static-binaries-v4` OCI registry (reusing the `<name>-<arch>` tag -> layer blob digest flow described above) and installs them locally.
+[tools/sbt](file:///workspace/prebuilt-standalone-binaries/tools/sbt) is a small package manager (a brew/apt-style client) for **minimal environments that have no Nix/Homebrew/package manager**. It is written in **Go** as a single, statically-linked binary, cross-compiled for `linux-x86_64` and `darwin-arm64`. It pulls the published tarballs straight from the `ghcr.io/curoky/prebuilt-standalone-binaries` OCI registry (reusing the `<name>-<arch>` tag -> layer blob digest flow described above) and installs them locally.
 
 ### Design principles
 
@@ -151,13 +151,13 @@ The flake also configures a Cachix substituter; CI pushes build closures to Cach
 - **Relocatable installs.** Everything a package exposes under the prefix is a **relative** symlink. Because links are relative, the entire prefix can be moved anywhere with **zero repair**.
 - **Independent packages.** Every package is treated as fully self-contained; sbt does **no dependency resolution**. Each package is installed, removed, and relocated on its own. Runtime-heavy packages (node/python/perl tools) carry their own relative-path wrappers, so an individual `store/<name>/` directory is self-contained as well.
 - **Platforms.** Auto-detected arch tag is `linux-x86_64` (Linux/x86_64) or `darwin-arm64` (macOS/arm64), matching the published OCI tags; override with `--arch`.
-- **Self-publishing.** sbt is itself published to the registry as `sbt-<arch>` by [build-sbt.yaml](file:///workspace/static-binaries/.github/workflows/build-sbt.yaml), so it can be bootstrapped with a single `curl` and afterwards upgraded like any other package.
+- **Self-publishing.** sbt is itself published to the registry as `sbt-<arch>` by [build-sbt.yaml](file:///workspace/prebuilt-standalone-binaries/.github/workflows/build-sbt.yaml), so it can be bootstrapped with a single `curl` and afterwards upgraded like any other package.
 
 ### Source layout
 
-[tools/sbt](file:///workspace/static-binaries/tools/sbt) is a Go module:
-- [main.go](file:///workspace/static-binaries/tools/sbt/main.go): the entire client (OCI access, store/meta/link, commands, CLI).
-- [main_test.go](file:///workspace/static-binaries/tools/sbt/main_test.go): offline unit tests (tar extraction + relative-link relocation + arg parsing + metadata round-trip).
+[tools/sbt](file:///workspace/prebuilt-standalone-binaries/tools/sbt) is a Go module:
+- [main.go](file:///workspace/prebuilt-standalone-binaries/tools/sbt/main.go): the entire client (OCI access, store/meta/link, commands, CLI).
+- [main_test.go](file:///workspace/prebuilt-standalone-binaries/tools/sbt/main_test.go): offline unit tests (tar extraction + relative-link relocation + arg parsing + metadata round-trip).
 
 ### Local layout
 
@@ -188,7 +188,7 @@ This is a client-only concern: the CI/publishing model above is unchanged, becau
 
 ### Add a new upstream tool from nixpkgs
 
-1. Add an entry to [manifests/default.nix](file:///workspace/static-binaries/manifests/default.nix):
+1. Add an entry to [manifests/default.nix](file:///workspace/prebuilt-standalone-binaries/manifests/default.nix):
    - Omit `platforms` for an all-platform package, or set `platforms = [ "x86_64-linux" ]` / `[ "aarch64-darwin" ]` to restrict it.
    - For a package that exists everywhere but needs a different config per system, add a per-platform key, e.g. `aria2 = { "aarch64-darwin" = { version = "24.11"; }; };`.
 2. Decide whether it should use `pkgsStatic` (`isStatic = true`, default) or regular `pkgs` (`isStatic = false`).
@@ -207,7 +207,7 @@ Example — Node.js tools (`packages/pnpm`, `packages/prettier`, `packages/markd
 
 ### Change normalization behavior
 
-Edit [scripts/normalize.sh](file:///workspace/static-binaries/scripts/normalize.sh). Treat this script as a compatibility surface:
+Edit [scripts/normalize.sh](file:///workspace/prebuilt-standalone-binaries/scripts/normalize.sh). Treat this script as a compatibility surface:
 - Changing removals/rewrites can break tools in subtle ways.
 - Prefer incremental changes and validate on a representative sample of packages.
 

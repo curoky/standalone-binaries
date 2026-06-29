@@ -1,4 +1,4 @@
-module github.com/curoky/static-binaries/tools/sbt
+module github.com/curoky/prebuilt-standalone-binaries/tools/sbt
 
 go 1.26
 

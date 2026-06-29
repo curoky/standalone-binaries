@@ -27,12 +27,12 @@ static ELF. The order of preference is:
 ## 📥 Download
 
 Prebuilt artifacts are published per-tool to an OCI registry
-(`ghcr.io/curoky/static-binaries-v4`) and on the GitHub Releases page.
+(`ghcr.io/curoky/prebuilt-standalone-binaries`) and on the GitHub Releases page.
 
 ### Release v1.0
 
 Access the assets for version `v1.0` directly here:
-> **https://github.com/curoky/static-binaries/releases/tag/v1.0**
+> **https://github.com/curoky/prebuilt-standalone-binaries/releases/tag/v1.0**
 
 ## 📂 Repository Layout
 

@@ -1,5 +1,5 @@
-// Command sbt is a tiny package manager for the prebuilt static-binaries
-// published at ghcr.io/curoky/static-binaries-v4.
+// Command sbt is a tiny package manager for the prebuilt-standalone-binaries
+// published at ghcr.io/curoky/prebuilt-standalone-binaries.
 //
 // Design goals (see DESIGN.md "Client Install / Upgrade Model"):
 //
@@ -46,7 +46,7 @@ import (
 )
 
 const (
-	defaultRegistry = "ghcr.io/curoky/static-binaries-v4"
+	defaultRegistry = "ghcr.io/curoky/prebuilt-standalone-binaries"
 	metaFile        = ".sbt-meta"
 	defaultPrefix   = "/opt/sbt"
 	maxParallel     = 8 // cap concurrent registry requests / downloads
@@ -550,7 +550,7 @@ func main() {
 
 	root := &cobra.Command{
 		Use:           "sbt",
-		Short:         "package manager for ghcr.io/curoky/static-binaries",
+		Short:         "package manager for ghcr.io/curoky/prebuilt-standalone-binaries",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
