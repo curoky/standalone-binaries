@@ -129,7 +129,12 @@ in
     python313 = pkgsStatic.callPackage ./python/313 { };
 
     openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
+    wget = pkgsStatic.callPackage ./wget { };
+    parallel = pkgsStatic.callPackage ./parallel { };
+    miniserve = pkgsStatic.callPackage ./miniserve { };
+
     perl = pkgsStatic.callPackage ./perl { };
+    cloc = pkgsStatic.callPackage ./cloc { };
 
     # JVM based tool: shipped as a normal multi-file package whose thin
     # wrapper locates a JRE at runtime from the co-located sibling package
@@ -137,36 +142,40 @@ in
     # into a single self-extracting executable.
     jre21 = pkgs.callPackage ./jre/21 { };
     lemminx = pkgs.callPackage ./lemminx { };
-    wget = pkgsStatic.callPackage ./wget { };
-    cloc = pkgsStatic.callPackage ./cloc { };
-    parallel = pkgsStatic.callPackage ./parallel { };
-    miniserve = pkgsStatic.callPackage ./miniserve { };
 
-    # Standalone fully-static (musl) Node.js 24 runtime, shipped as its own
-    # package (deploy dir `nodejs-slim24`) so other packages (e.g. pnpm) can
-    # reference it as a sibling directory at deploy time — the same convention
-    # dool/netron use for the `python311` package. The package patches
-    # nodejs-slim directly (overlay + .overrideAttrs) for the static build; see
-    # packages/nodejs/24/default.nix.
-    nodejs-slim24 = pkgsStatic.callPackage ./nodejs/24 { };
-
-    # pnpm running on our static `nodejs-slim24`. We use the upstream nixpkgs
-    # pnpm package as-is, just overriding its `nodejs-slim` argument with our
-    # static node (upstream explicitly documents "Override nodejs-slim instead
-    # of nodejs"). The pnpm package itself only unpacks the pnpm JS — no native
-    # build — so building it from `pkgs` is fine; only the interpreter matters.
-    # Building it this way also exercises the static node end-to-end (its
-    # postInstall runs `node pnpm completion ...` and its passthru tests run on
-    # the static node), validating that the static runtime actually works.
+    # Node.js stack: a standalone fully-static (musl) Node.js 24 runtime plus a
+    # set of Node CLI tools that run on it. The runtime is shipped as its own
+    # package (deploy dir `nodejs-slim24`) so the tools can reference it as a
+    # sibling directory at deploy time — the same convention dool/netron use for
+    # `python311`.
     #
-    # The ./pnpm wrapper then replaces upstream's $out/bin/pnpm symlink (which
-    # relies on pnpm.mjs's shebang to find node) with a relative-path wrapper
-    # that invokes the sibling `nodejs-slim24` package
-    # ($store/nodejs-slim24/bin/node), so the static node travels with the
-    # deployed pnpm instead of depending on a node on the host PATH after the
-    # standalone normalize pass.
+    # Like `pnpm`, every tool is built against our static node (overriding the
+    # upstream `nodejs`/`nodejs-slim` interpreter), which also exercises the
+    # static runtime end-to-end. The ./<tool> wrapper then reuses that tool's JS
+    # distribution and ships a relative-path wrapper that invokes the sibling
+    # `nodejs-slim24` package ($store/nodejs-slim24/bin/node) explicitly, so the
+    # static node travels with the deployed tool instead of depending on a node
+    # on the host PATH after the standalone normalize pass. This supersedes the
+    # previous `bundle = true` manifest entries.
+    #
+    # prettier exposes a `nodejs` arg directly; markdownlint-cli2/opencommit are
+    # buildNpmPackage tools, so we override `nodejs` on their `buildNpmPackage`.
+    nodejs-slim24 = pkgsStatic.callPackage ./nodejs/24 { };
     pnpm = pkgsStatic.callPackage ./pnpm {
       pnpm = pkgs.pnpm.override { nodejs-slim = nodejs-slim24; };
+    };
+    prettier = pkgsStatic.callPackage ./prettier {
+      prettier = pkgs.prettier.override { nodejs = nodejs-slim24; };
+    };
+    markdownlint-cli2 = pkgsStatic.callPackage ./markdownlint-cli2 {
+      markdownlint-cli2 = pkgs.markdownlint-cli2.override {
+        buildNpmPackage = pkgs.buildNpmPackage.override { nodejs = nodejs-slim24; };
+      };
+    };
+    opencommit = pkgsStatic.callPackage ./opencommit {
+      opencommit = pkgs.opencommit.override {
+        buildNpmPackage = pkgs.buildNpmPackage.override { nodejs = nodejs-slim24; };
+      };
     };
   };
 

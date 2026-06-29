@@ -150,7 +150,7 @@ The flake also configures a Cachix substituter; CI pushes build closures to Cach
 2. Decide whether it should use `pkgsStatic` (`isStatic = true`, default) or regular `pkgs` (`isStatic = false`).
 3. If the package has multiple outputs, pick the right one(s) via `output = [ "bin" ]` (or list several to merge them).
 4. If the nixpkgs attribute name is awkward, use `alias` to export a better public name.
-5. If the tool cannot be statically compiled and has no practical patch+bundle (e.g. a Node.js tool), set `bundle = true` with `isStatic = false` and `platforms = [ "x86_64-linux" ]` to `nix bundle` it into a single self-extracting executable (see `prettier`). Prefer a from-source static build over bundling when a tool's runtime can itself be built static (see `pnpm` under "local override", below).
+5. If the tool cannot be statically compiled, prefer the shared-sibling wrapper approach over `nix bundle`: ship it as a local package whose JS/runtime is reused from upstream and wrapped to invoke the co-located static `nodejs-slim24` sibling (see `pnpm`, `prettier`, `markdownlint-cli2`, `opencommit` under "local override", below). Use `bundle = true` (with `isStatic = false` and `platforms = [ "x86_64-linux" ]`) only as a true last resort for tools that have no reusable sibling runtime.
 
 ### Add a local override / patched build
 
@@ -159,7 +159,7 @@ The flake also configures a Cachix substituter; CI pushes build closures to Cach
 3. Follow the standalone strategy: prefer static; otherwise patch + bundle; use `nix bundle` only when static is impossible.
 4. Prefer minimal diffs: only patch what is necessary to improve portability, reduce dynamic deps, or fix runtime paths.
 
-Example — `pnpm` (`packages/pnpm-static/`): instead of `nix bundle`, it is built from source as a single static (musl) ELF by injecting the pnpm JS into `pkgsStatic.nodejs-slim` via Node's Single Executable Application (SEA) feature (the same approach as the upstream `@pnpm/exe` artifact, reproduced with nixpkgs). The blob is added with `objcopy` and the SEA fuse is flipped in-place (nixpkgs has no `postject`). This supersedes the previous `bundle = true` pnpm entry in the manifest.
+Example — Node.js tools (`packages/pnpm`, `packages/prettier`, `packages/markdownlint-cli2`, `packages/opencommit`): instead of `nix bundle`, each is built against our static `nodejs-slim24` by overriding the upstream interpreter (`pnpm`/`prettier` take a `nodejs`/`nodejs-slim` arg directly; the `buildNpmPackage` tools override `nodejs` on their `buildNpmPackage`), then reuses that tool's JS distribution (`lib/node_modules/<pkg>`) and replaces the upstream bin wrapper(s) with a relative-path script that invokes the sibling static node (`$store/nodejs-slim24/bin/node`) explicitly, so the static node travels with the deployed tool instead of depending on a node on the host PATH after the standalone normalize pass. This supersedes the previous `bundle = true` entries for these tools in the manifest.
 
 ### Change normalization behavior
 
