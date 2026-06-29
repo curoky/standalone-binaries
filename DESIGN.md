@@ -158,6 +158,7 @@ The flake also configures a Cachix substituter; CI pushes build closures to Cach
 [client/](file:///workspace/standalone-binaries/client) is a Go module:
 - [main.go](file:///workspace/standalone-binaries/client/main.go): the entire client (OCI access, store/meta/link, commands, CLI).
 - [main_test.go](file:///workspace/standalone-binaries/client/main_test.go): offline unit tests (tar extraction + relative-link relocation + arg parsing + metadata round-trip).
+- [install.sh](file:///workspace/standalone-binaries/client/install.sh): the **bootstrap installer** for `sb` itself. On a fresh host there is no `oras`/Go/Nix, only `curl` + `tar`, so it cannot use `sb` to install `sb`. It pulls the `sb-<arch>` artifact straight over the ghcr registry HTTP API (anonymous pull token -> manifest -> single layer blob), extracts `sb/sb`, and drops the binary into the install dir (default `~/.local/bin`; override via `SB_INSTALL_DIR`/`--prefix` and `SB_ARCH`/`--arch`). Intended to be run as `curl -fsSL <raw-url>/install.sh | bash`. After this one-shot bootstrap, `sb` upgrades itself like any other package.
 
 ### Local layout
 
