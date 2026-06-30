@@ -46,10 +46,26 @@
 
           # One env per pinned nixpkgs input, exposing both regular and static
           # package sets. The manifest selects which env + variant to use.
-          mkEnv = input: {
-            pkgs = import input { inherit system; };
-            pkgsStatic = (import input { inherit system; }).pkgsStatic;
-          };
+          #
+          # On Linux, `pkgsStatic` is the musl64 *cross* set
+          # (pkgsCross.musl64.pkgsStatic: build = glibc, host == target =
+          # musl-static) rather than the native-static set (build == host ==
+          # target == musl). Both are x86-64, so `buildPlatform.canExecute
+          # hostPlatform` stays true and checkPhases are not disabled. The
+          # reason for cross: packages that link Rust deps (e.g. node 26's
+          # temporal_capi) otherwise rebuild the entire musl LLVM + rustc
+          # toolchain from source; the cross set takes rust's `fastCross` path,
+          # reusing the cached glibc rustc/LLVM instead. On Darwin the native
+          # pkgsStatic is kept (pkgsCross.musl64 there means cross-to-Linux).
+          mkEnv =
+            input:
+            let
+              base = import input { inherit system; };
+            in
+            {
+              pkgs = base;
+              pkgsStatic = if isDarwin then base.pkgsStatic else base.pkgsCross.musl64.pkgsStatic;
+            };
           envs = {
             "unstable" = mkEnv inputs.nixpkgs-unstable;
             "26.05" = mkEnv inputs.nixpkgs-2605;

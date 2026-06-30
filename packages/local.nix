@@ -158,6 +158,11 @@ in
     # wrapper derivations add an installCheck that runs the shipped JS under
     # `nodejs-slim24` to confirm the tool actually works on the static runtime.
     nodejs-slim24 = pkgsStatic.callPackage ./nodejs/24 { };
+    # node 26 links temporal_capi (a Rust dep). Under a native-static set this
+    # rebuilds the whole musl LLVM + rustc toolchain from source. On Linux the
+    # `pkgsStatic` passed in here is the musl64 *cross* set (see flake.nix /
+    # mkEnv), which instead reuses the cached glibc rustc/LLVM via rust's
+    # `fastCross` path. The node output is still a fully-static musl binary.
     nodejs-slim26 = pkgsStatic.callPackage ./nodejs/26 { };
     pnpm = pkgsStatic.callPackage ./pnpm {
       pnpm = pkgs.pnpm.override { nodejs-slim = nodejs-slim24; };
