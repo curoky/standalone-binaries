@@ -31,6 +31,8 @@ The shipped binary must be portable and **must not depend on any dynamic library
 
 If a build retains `/nix/store` dylibs, fix it (`CGO_ENABLED=0`, patch install names / rpaths, or — with confirmation — copy the dylib).
 
+For strategy 2, when the darwin `pkgsStatic` set would only drag in a separate static toolchain (no real static-libc payoff) but the tool has just one or two non-system dynamic deps, a lighter variant is: build from the **native `pkgs`** derivation (prebuilt in the upstream cache, no local toolchain build) and inject only that dependency's static archive (e.g. `pkgs.perl.override { libxcrypt = pkgsStatic.libxcrypt; }`), then rewrite any remaining `/nix/store` Mach-O install names to `@loader_path`-relative paths in the package's `postInstall` (`normalize.sh` does not touch Mach-O load commands). This keeps the result depending only on `/usr/lib` system libs and relocatable. `packages/perl` uses this on darwin while staying fully static via `pkgsStatic` on Linux.
+
 For runtimes that are not statically linkable but are reusable across tools (e.g. a Python interpreter), prefer the **shared-sibling wrapper** variant of strategy 2 instead of `nix bundle`: ship the heavy runtime as its own package (e.g. `packages/python/311`) and give each tool a thin wrapper that resolves the runtime at execution time from the co-located sibling under a shared `$store` parent (e.g. `netron` -> `$store/python311`). This keeps tools as ordinary multi-file packages (so they can expose several binaries when needed), shares one runtime across tools instead of duplicating it, and still goes through normal standalone normalization.
 
 Non-goals:

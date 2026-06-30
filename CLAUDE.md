@@ -62,6 +62,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## 5. Keep Design Updated
 
+**Always load DESIGN.md into context before starting any task.**
+
+Read `DESIGN.md` at the start of every task to ground your work in the repository's intended design.
+
 **Design changes must update DESIGN.md.**
 
 If your change affects any of the following, update `DESIGN.md` in the same change:
