@@ -154,16 +154,16 @@ in
     wget = pkgsStatic.callPackage ./wget { };
     miniserve = pkgsStatic.callPackage ./miniserve { };
 
-    # Node.js stack: a standalone fully-static (musl) Node.js 24 runtime plus a
-    # set of Node CLI tools that run on it. The runtime is shipped as its own
-    # package (deploy dir `nodejs-slim24`) so the tools can reference it as a
-    # sibling directory at deploy time — the same convention dool/netron use for
-    # `python311`. Each ./<tool> wrapper reuses the tool's JS distribution and
-    # ships a relative-path wrapper that invokes the sibling `nodejs-slim24`
-    # package ($store/nodejs-slim24/bin/node) explicitly, so the static node
-    # travels with the deployed tool instead of depending on a node on the host
-    # PATH after the standalone normalize pass. This supersedes the previous
-    # `bundle = true` manifest entries.
+    # Node.js stack: standalone fully-static (musl) Node.js runtimes plus a set
+    # of Node CLI tools that run on them. Each runtime is shipped as its own
+    # package (deploy dirs `nodejs-slim24` / `nodejs-slim26`) so the tools can
+    # reference it as a sibling directory at deploy time — the same convention
+    # dool/netron use for `python311`. Each ./<tool> wrapper reuses the tool's JS
+    # distribution and ships a relative-path wrapper that invokes the sibling
+    # `nodejs-slim26` package ($store/nodejs-slim26/bin/node) explicitly, so the
+    # static node travels with the deployed tool instead of depending on a node
+    # on the host PATH after the standalone normalize pass. This supersedes the
+    # previous `bundle = true` manifest entries.
     #
     # pnpm/prettier additionally build against our static node by overriding the
     # upstream interpreter (pnpm only unpacks JS; prettier uses pnpm to fetch
@@ -172,7 +172,10 @@ in
     # (absent from nodejs-slim), so they are *built* with the regular node and
     # only switch to the sibling static node at runtime via the wrapper. Their
     # wrapper derivations add an installCheck that runs the shipped JS under
-    # `nodejs-slim24` to confirm the tool actually works on the static runtime.
+    # `nodejs-slim26` to confirm the tool actually works on the static runtime.
+    #
+    # nodejs-slim24 is retained as a standalone runtime package; the CLI tools
+    # above now target nodejs-slim26.
     nodejs-slim24 = pkgsStatic.callPackage ./nodejs/24 { };
     # node 26 links temporal_capi (a Rust dep). Under a native-static set this
     # rebuilds the whole musl LLVM + rustc toolchain from source. On Linux the
@@ -181,17 +184,17 @@ in
     # `fastCross` path. The node output is still a fully-static musl binary.
     nodejs-slim26 = pkgsStatic.callPackage ./nodejs/26 { };
     pnpm = pkgsStatic.callPackage ./pnpm {
-      pnpm = pkgs.pnpm.override { nodejs-slim = nodejs-slim24; };
+      pnpm = pkgs.pnpm.override { nodejs-slim = nodejs-slim26; };
     };
     prettier = pkgsStatic.callPackage ./prettier {
-      prettier = pkgs.prettier.override { nodejs = nodejs-slim24; };
+      prettier = pkgs.prettier.override { nodejs = nodejs-slim26; };
     };
     markdownlint-cli2 = pkgsStatic.callPackage ./markdownlint-cli2 {
-      inherit nodejs-slim24;
+      inherit nodejs-slim26;
       inherit (pkgs) markdownlint-cli2;
     };
     opencommit = pkgsStatic.callPackage ./opencommit {
-      inherit nodejs-slim24;
+      inherit nodejs-slim26;
       inherit (pkgs) opencommit;
     };
   };

@@ -1,9 +1,9 @@
 # prettier (on static node)
 #
-# prettier running on our fully-static (musl) `nodejs-slim24` package, instead
+# prettier running on our fully-static (musl) `nodejs-slim26` package, instead
 # of being `nix bundle`'d into a self-extracting executable. Same approach as
 # packages/pnpm: the interpreter is overridden upstream-style in
-# packages/local.nix (`pkgs.prettier.override { nodejs = nodejs-slim24; }`), so
+# packages/local.nix (`pkgs.prettier.override { nodejs = nodejs-slim26; }`), so
 # the `prettier` argument here is already built against our static node. This
 # derivation reuses that prettier's JS distribution and ships a relative-path
 # wrapper that invokes the sibling static node explicitly, so the static node
@@ -16,9 +16,9 @@
 #
 # Deploy layout:
 #   $store/
-#     nodejs-slim24/bin/node   (separate package; static musl ELF)
+#     nodejs-slim26/bin/node   (separate package; static musl ELF)
 #     prettier/
-#       bin/prettier           (wrapper: exec $store/nodejs-slim24/bin/node \
+#       bin/prettier           (wrapper: exec $store/nodejs-slim26/bin/node \
 #                                          $root/libexec/prettier/bin/prettier.cjs "$@")
 #       libexec/prettier/...   (prettier JS, from the nixpkgs prettier)
 #
@@ -37,7 +37,7 @@ let
     script_path="$(readlink -f "$0")"
     root="$(cd "$(dirname "$script_path")/.." && pwd)"
     store="$(cd "$root/.." && pwd)"
-    exec "$store/nodejs-slim24/bin/node" "$root/libexec/prettier/bin/prettier.cjs" "$@"
+    exec "$store/nodejs-slim26/bin/node" "$root/libexec/prettier/bin/prettier.cjs" "$@"
   '';
 in
 stdenvNoCC.mkDerivation {
