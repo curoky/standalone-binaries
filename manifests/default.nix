@@ -277,6 +277,9 @@
       version = "25.11";
     };
   };
+  go-outline = {
+    platforms = [ "x86_64-linux" ];
+  };
   go-task = {
     platforms = [ "x86_64-linux" ];
   };
