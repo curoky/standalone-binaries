@@ -43,6 +43,8 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/spf13/cobra"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -144,8 +146,11 @@ func remoteDigest(name, arch string) (string, error) {
 	return d.String(), nil
 }
 
-// downloadLayer streams a package's layer tarball into the cache.
-func downloadLayer(name, arch, dst string) error {
+// downloadLayer streams a package's layer tarball into the cache. If wrap is
+// non-nil it is called with the compressed layer size and must return a reader
+// that reports read progress (e.g. an mpb bar's ProxyReader) wrapping rc; the
+// returned closer, if any, is closed when the copy finishes.
+func downloadLayer(name, arch, dst string, wrap func(size int64, rc io.ReadCloser) io.ReadCloser) error {
 	layer, err := remoteLayer(name, arch)
 	if err != nil {
 		return err
@@ -163,7 +168,17 @@ func downloadLayer(name, arch, dst string) error {
 		return err
 	}
 	defer f.Close()
-	_, err = io.Copy(f, rc)
+	var src io.Reader = rc
+	if wrap != nil {
+		size, err := layer.Size()
+		if err != nil {
+			return err
+		}
+		proxy := wrap(size, rc)
+		defer proxy.Close()
+		src = proxy
+	}
+	_, err = io.Copy(f, src)
 	return err
 }
 
@@ -393,28 +408,47 @@ func installPackages(names []string, o installOpts) error {
 		toFetch = append(toFetch, name)
 	}
 
-	// Phase 2: download the needed layers in parallel into the cache.
+	// Phase 2: download the needed layers in parallel into the cache, each
+	// with its own byte-level progress bar rendered by mpb.
 	phase2 := time.Now()
-	if len(toFetch) > 0 {
-		fmt.Printf("> Downloading %d package(s)...\n", len(toFetch))
-	}
 	var dg errgroup.Group
 	dg.SetLimit(maxParallel)
-	for _, name := range toFetch {
-		name := name
-		dg.Go(func() error {
-			logger.Debug("download started", "package", name)
-			err := downloadLayer(name, o.arch, cachePath(o.arch, name))
-			if err != nil {
-				logger.Error("download failed", "package", name, "err", err)
-			} else {
-				logger.Debug("download done", "package", name)
-			}
-			return err
-		})
-	}
-	if err := dg.Wait(); err != nil {
-		return fmt.Errorf("download failed: %w", err)
+	if len(toFetch) > 0 {
+		fmt.Printf("> Downloading %d package(s)...\n", len(toFetch))
+		p := mpb.New(mpb.WithWidth(64))
+		for _, name := range toFetch {
+			name := name
+			dg.Go(func() error {
+				logger.Debug("download started", "package", name)
+				wrap := func(size int64, rc io.ReadCloser) io.ReadCloser {
+					bar := p.New(size,
+						mpb.BarStyle().Rbound("|"),
+						mpb.PrependDecorators(
+							decor.Name(name, decor.WC{C: decor.DindentRight | decor.DextraSpace, W: 22}),
+							decor.CountersKibiByte("% .2f / % .2f"),
+						),
+						mpb.AppendDecorators(
+							decor.Percentage(decor.WC{W: 5}),
+							decor.Name(" "),
+							decor.AverageSpeed(decor.SizeB1024(0), "% .2f"),
+						),
+					)
+					return bar.ProxyReader(rc)
+				}
+				err := downloadLayer(name, o.arch, cachePath(o.arch, name), wrap)
+				if err != nil {
+					logger.Error("download failed", "package", name, "err", err)
+				} else {
+					logger.Debug("download done", "package", name)
+				}
+				return err
+			})
+		}
+		werr := dg.Wait()
+		p.Wait()
+		if werr != nil {
+			return fmt.Errorf("download failed: %w", werr)
+		}
 	}
 	logger.Info("phase 2 (download) done", "count", len(toFetch), "took", time.Since(phase2).String())
 

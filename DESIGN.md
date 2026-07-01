@@ -165,7 +165,7 @@ The flake also configures a Cachix substituter; CI pushes build closures to Cach
 
 ### Design principles
 
-- **No host runtime dependencies.** sb is one static binary built with `CGO_ENABLED=0`; **nothing** (`curl`/`tar`/`oras`/`jq`/Nix) is needed on the target host. It leans on well-maintained Go libraries rather than hand-rolled plumbing: [go-containerregistry](https://github.com/google/go-containerregistry) (`crane`) for all OCI access (auth, manifest, layer pull, digest), [cobra](https://github.com/spf13/cobra) for the CLI, and [`x/sync/errgroup`](https://pkg.go.dev/golang.org/x/sync/errgroup) for bounded-parallel fan-out. Tarball extraction uses the standard library (`archive/tar` + `compress/gzip`). The same source cross-compiles to both platforms.
+- **No host runtime dependencies.** sb is one static binary built with `CGO_ENABLED=0`; **nothing** (`curl`/`tar`/`oras`/`jq`/Nix) is needed on the target host. It leans on well-maintained Go libraries rather than hand-rolled plumbing: [go-containerregistry](https://github.com/google/go-containerregistry) (`crane`) for all OCI access (auth, manifest, layer pull, digest), [cobra](https://github.com/spf13/cobra) for the CLI, [`x/sync/errgroup`](https://pkg.go.dev/golang.org/x/sync/errgroup) for bounded-parallel fan-out, and [mpb](https://github.com/vbauerster/mpb) for concurrent download progress bars. Tarball extraction uses the standard library (`archive/tar` + `compress/gzip`). The same source cross-compiles to both platforms.
 - **Relocatable installs.** Everything a package exposes under the prefix is a **relative** symlink. Because links are relative, the entire prefix can be moved anywhere with **zero repair**.
 - **Independent packages.** Every package is treated as fully self-contained; sb does **no dependency resolution**. Each package is installed, removed, and relocated on its own. Runtime-heavy packages (node/python/perl tools) carry their own relative-path wrappers, so an individual `store/<name>/` directory is self-contained as well.
 - **Platforms.** Auto-detected arch tag is `linux-x86_64` (Linux/x86_64) or `darwin-arm64` (macOS/arm64), matching the published OCI tags; override with `--arch`.
@@ -203,7 +203,7 @@ Common options: `--prefix PATH|--prefix=PATH` and `--arch ARCH|--arch=ARCH` (bot
 
 ### Logging
 
-Every invocation writes a detailed, structured (slog text) log to `<prefix>/sb.log` (the prefix is created if missing). The terminal only shows simplified key-step output (the `> ...` lines, including install progress and an end-of-run summary with elapsed time); the full per-package resolve/download/extract/link events and phase timings go to the log file. Pass `--verbose` to also stream that log to stderr.
+Every invocation writes a detailed, structured (slog text) log to `<prefix>/sb.log` (the prefix is created if missing). The terminal shows simplified key-step output (the `> ...` lines, including install progress and an end-of-run summary with elapsed time) plus, during the download phase, a per-package byte-level progress bar (rendered by [mpb](https://github.com/vbauerster/mpb)); the full per-package resolve/download/extract/link events and phase timings go to the log file. Pass `--verbose` to also stream that log to stderr (it goes to stderr, so it does not clash with the progress bars on stdout).
 
 This is a client-only concern: the CI/publishing model above is unchanged, because the comparison relies on the layer digest that `ghcr.io` already computes during `oras push`.
 
