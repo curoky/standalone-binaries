@@ -32,8 +32,12 @@
     ];
     env = {
       NIX_LDFLAGS = "";
+      CFLAGS = "-static";
+      LDFLAGS = "-static";
+      CRUN_LDFLAGS = "-all-static";
     };
     configureFlags = [
+      "--enable-static"
       "--disable-systemd"
       "--enable-embedded-yajl"
       "--without-python-bindings"
