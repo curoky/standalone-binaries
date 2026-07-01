@@ -15,6 +15,10 @@ let
   # the darwin portability ladder (DESIGN.md strategy 2): every nix dependency
   # linked statically, only system libraries stay dynamic. On Linux wget is built
   # from the fully-static `pkgsStatic` set instead (see ./default.nix).
+  #
+  # NOTE: this dependency-by-dependency variant is kept as an alternative; the
+  # active darwin build uses ./darwin-static.nix (the pkgsStatic route with only
+  # the build-time perl overridden), wired in packages/local.nix.
   wget_static = wget.override {
     libidn2 = pkgsStatic.libidn2;
     zlib = pkgsStatic.zlib;
