@@ -24,6 +24,51 @@ If `nixpkgs.pkgsStatic.<x>` (or the appropriate stock build) now compiles, links
 and passes the portability check, delete the local patch and use upstream via the
 manifest.
 
+## First: is this package even a regression candidate?
+
+The deciding question is **what would happen to this override if upstream had no
+bugs at all.**
+
+- If a bug-free upstream would make the override *empty* — you'd have nothing
+  left to write — the override is a pure **workaround**, and it is a regression
+  candidate. Its entire reason to exist is an upstream defect; remove the defect
+  and the override has no content.
+- If a bug-free upstream would *still* leave the override with work to do — it
+  would keep doing that work regardless — the override encodes a **deliberate
+  packaging decision**, not a workaround. It is never a regression candidate,
+  because no upstream fix can ever cover it.
+
+So classify by the override's *intent*, not its mechanics (the same `overrideAttrs`
+call can be either):
+
+- **Workaround (candidate).** Every line traces to "the stock build fails / links
+  wrong / isn't portable." It disables a broken check, toggles off a feature that
+  won't build, swaps an input to dodge a link failure, adjusts flags to satisfy
+  the static toolchain. The produced program is byte-for-byte what upstream
+  *intends* to ship; the override only removes the obstacle to building it. When
+  nixpkgs fixes the obstacle, the override becomes a no-op — that's the signal to
+  regress. (e.g. blanking a failing `installCheckPhase`; `--disable-gpg-test` +
+  `doCheck = false`; dropping a flag that bakes an absolute store path so the
+  binary is relocatable.)
+
+- **Packaging decision (not a candidate).** The override changes *what the package
+  is or how it's consumed* in a way upstream neither offers nor should: it renames
+  the real binary behind a wrapper, redirects runtime lookups to sibling packages
+  or `$PATH`, bundles extra runtime deps into `$out`, or ships vendored
+  scripts/config. The value is this repackaging itself. A bug-free upstream still
+  wouldn't do any of it, so there is nothing to "fix back to." (e.g. renaming a
+  binary to `_name` and dropping in a wrapper script; wrapping a tool to run
+  against a sibling `perl` and vendoring its Perl deps.)
+
+The litmus test: mentally assume upstream is perfect, then ask "is the override
+now empty?" Empty ⇒ candidate. Still has a job ⇒ leave it alone. When you can't
+tell (the intent isn't clear from the code or its comment), ask before touching
+it.
+
+A single override can contain both — a workaround part *and* a packaging part.
+Only the workaround part is regressable; keep the packaging part. See step 4's
+"partial regression" note.
+
 ## When to run this
 
 - Auditing/reviewing entries under `packages/`.
@@ -34,9 +79,12 @@ manifest.
 ## Procedure
 
 1. **Identify why the patch exists.** Read the local
-   `packages/<pkg>/*.nix` and its comments. The comment almost always names the
-   exact failure (e.g. "darwin `pkgsStatic.perl` fails at `mktables`",
-   "`liboapv` ships only a `.dylib`"). That failure is your regression test.
+   `packages/<pkg>/*.nix` and its comments. First classify it using the
+   "regression candidate?" section above — if it is intentional repackaging (a
+   wrapper, renamed binaries, or bundled sibling deps), **stop**; it is not
+   regressable. Otherwise the comment almost always names the exact failure
+   (e.g. "darwin `pkgsStatic.perl` fails at `mktables`", "`liboapv` ships only a
+   `.dylib`"). That failure is your regression test.
 
 2. **Test the stock upstream build.** Build the plain upstream derivation the
    patch was replacing, for the target platform(s):
@@ -83,6 +131,10 @@ manifest.
 
 ## Guardrails
 
+- Only bug/portability patches are regressable. Never delete an intentional
+  repackaging override (wrapper scripts, renamed binaries, sibling/bundled deps)
+  — see "is this package even a regression candidate?". Upstream build fixes do
+  not make repackaging obsolete.
 - Do not regress on assumption — always build and verify upstream on **all**
   target platforms first.
 - Only regress when upstream is both **buildable** and **portable**. Buildable
