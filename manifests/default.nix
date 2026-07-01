@@ -21,6 +21,7 @@
 #   };
 {
   ## ---- common (all platforms) -------------------------------------------
+
   bash = { };
   binutils-unwrapped = {
     alias = "binutils";
@@ -36,6 +37,9 @@
   };
   flex = { };
   gawk = { };
+  gdb = {
+    version = "25.11";
+  };
   getopt = { };
   gettext = { };
   git-extras = { };
@@ -49,9 +53,6 @@
   jq = {
     output = [ "bin" ];
   };
-  gdb = {
-    version = "25.11";
-  };
   less = { };
   lsof = { };
   m4 = { };
@@ -60,6 +61,9 @@
   ninja = { };
   openssl = {
     output = [ "bin" ];
+  };
+  patchelf = {
+    version = "25.05";
   };
   pkg-config-unwrapped = {
     alias = "pkg-config";
@@ -74,9 +78,9 @@
   tzdata = {
     output = [ "out" ];
   };
-  xxd = { };
   unzip = { };
   util-linux = { };
+  xxd = { };
   xz = {
     output = [ "bin" ];
   };
@@ -91,44 +95,7 @@
     output = [ "bin" ];
   };
 
-  protobuf_25 = {
-    platforms = [ "x86_64-linux" ];
-  };
-  protobuf_27 = {
-    platforms = [ "x86_64-linux" ];
-  };
-  protobuf_29 = {
-    platforms = [ "x86_64-linux" ];
-  };
-  protobuf3_20 = {
-    platforms = [ "x86_64-linux" ];
-    version = "24.05";
-  };
-  protobuf3_21 = {
-    platforms = [ "x86_64-linux" ];
-    version = "24.05";
-  };
-  protobuf_23 = {
-    platforms = [ "x86_64-linux" ];
-    version = "24.05";
-  };
-  protobuf_24 = {
-    platforms = [ "x86_64-linux" ];
-    version = "25.05";
-  };
-  protobuf_26 = {
-    platforms = [ "x86_64-linux" ];
-    version = "25.05";
-  };
-  protobuf_28 = {
-    platforms = [ "x86_64-linux" ];
-    version = "25.05";
-  };
-  patchelf = {
-    version = "25.05";
-  };
-
-  # font
+  # fonts
   fira-code = {
     isStatic = false;
   };
@@ -164,10 +131,14 @@
   };
 
   ## ---- linux only -------------------------------------------------------
+
   cronie = {
     platforms = [ "x86_64-linux" ];
   };
   ethtool = {
+    platforms = [ "x86_64-linux" ];
+  };
+  indent = {
     platforms = [ "x86_64-linux" ];
   };
   iproute2 = {
@@ -179,51 +150,84 @@
   iputils = {
     platforms = [ "x86_64-linux" ];
   };
+  krb5 = {
+    platforms = [ "x86_64-linux" ];
+  };
   libcap = {
     platforms = [ "x86_64-linux" ];
   };
   lsb-release = {
     platforms = [ "x86_64-linux" ];
   };
+  lua = {
+    platforms = [ "x86_64-linux" ];
+  };
   man = {
-    platforms = [ "x86_64-linux" ];
-  };
-  numactl = {
-    platforms = [ "x86_64-linux" ];
-  };
-  strace = {
-    platforms = [ "x86_64-linux" ];
-  };
-  indent = {
-    platforms = [ "x86_64-linux" ];
-  };
-  krb5 = {
-    platforms = [ "x86_64-linux" ];
-  };
-  procps = {
     platforms = [ "x86_64-linux" ];
   };
   nettools = {
     platforms = [ "x86_64-linux" ];
   };
-  lua = {
-    platforms = [ "x86_64-linux" ];
-  };
-  tmux = {
+  nil = {
     platforms = [ "x86_64-linux" ];
   };
   nixfmt = {
     platforms = [ "x86_64-linux" ];
   };
-  nil = {
+  numactl = {
+    platforms = [ "x86_64-linux" ];
+  };
+  procps = {
+    platforms = [ "x86_64-linux" ];
+  };
+  strace = {
+    platforms = [ "x86_64-linux" ];
+  };
+  tmux = {
     platforms = [ "x86_64-linux" ];
   };
 
-  s6-linux-utils = {
+  # protobuf
+  protobuf_23 = {
+    platforms = [ "x86_64-linux" ];
+    version = "24.05";
+  };
+  protobuf_24 = {
+    platforms = [ "x86_64-linux" ];
+    version = "25.05";
+  };
+  protobuf_25 = {
+    platforms = [ "x86_64-linux" ];
+  };
+  protobuf_26 = {
+    platforms = [ "x86_64-linux" ];
+    version = "25.05";
+  };
+  protobuf_27 = {
+    platforms = [ "x86_64-linux" ];
+  };
+  protobuf_28 = {
+    platforms = [ "x86_64-linux" ];
+    version = "25.05";
+  };
+  protobuf_29 = {
+    platforms = [ "x86_64-linux" ];
+  };
+  protobuf3_20 = {
+    platforms = [ "x86_64-linux" ];
+    version = "24.05";
+  };
+  protobuf3_21 = {
+    platforms = [ "x86_64-linux" ];
+    version = "24.05";
+  };
+
+  # s6 stack
+  s6-dns = {
     platforms = [ "x86_64-linux" ];
     output = [ "bin" ];
   };
-  s6-portable-utils = {
+  s6-linux-utils = {
     platforms = [ "x86_64-linux" ];
     output = [ "bin" ];
   };
@@ -231,7 +235,7 @@
     platforms = [ "x86_64-linux" ];
     output = [ "bin" ];
   };
-  s6-dns = {
+  s6-portable-utils = {
     platforms = [ "x86_64-linux" ];
     output = [ "bin" ];
   };
@@ -239,7 +243,7 @@
     platforms = [ "x86_64-linux" ];
   };
 
-  # go pkgs (linux only)
+  # go pkgs
   bazelisk = {
     platforms = [ "x86_64-linux" ];
   };
@@ -291,13 +295,13 @@
   gopls = {
     platforms = [ "x86_64-linux" ];
   };
+  gost = {
+    platforms = [ "x86_64-linux" ];
+  };
   gotests = {
     platforms = [ "x86_64-linux" ];
   };
   gotools = {
-    platforms = [ "x86_64-linux" ];
-  };
-  gost = {
     platforms = [ "x86_64-linux" ];
   };
   impl = {
@@ -309,17 +313,17 @@
   oras = {
     platforms = [ "x86_64-linux" ];
   };
+  runc = {
+    platforms = [ "x86_64-linux" ];
+  };
   scc = {
     platforms = [ "x86_64-linux" ];
   };
   shfmt = {
     platforms = [ "x86_64-linux" ];
   };
-  runc = {
-    platforms = [ "x86_64-linux" ];
-  };
 
-  # llvm pkgs (linux only)
+  # llvm pkgs
   lld_18 = {
     platforms = [ "x86_64-linux" ];
   };
