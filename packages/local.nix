@@ -200,7 +200,7 @@ in
   };
 
   # Darwin-only local packages.
-  darwin = goWithoutCgo // {
+  darwin = goWithoutCgo // rec {
     perl = pkgs.callPackage ./perl/darwin.nix {
       libxcryptStatic = pkgsStatic.libxcrypt;
     };
@@ -211,6 +211,29 @@ in
     # reference it identically.
     nodejs-slim26 = pkgsStatic.callPackage ./nodejs/26/darwin.nix {
       inherit (pkgs) python3 cctools;
+    };
+
+    # macOS counterparts of the Linux Node.js CLI tools: the wrapper derivations
+    # (packages/{pnpm,prettier,markdownlint-cli2,opencommit}) are platform-
+    # agnostic — they reuse the upstream nixpkgs JS distribution and ship a
+    # relative-path wrapper that invokes the sibling `nodejs-slim26` — so they
+    # are reused verbatim here against the darwin `nodejs-slim26` above. pnpm/
+    # prettier build against the static node by overriding the upstream
+    # interpreter; markdownlint-cli2/opencommit are built with the regular node
+    # (they need npm) and only switch to the sibling static node at runtime.
+    pnpm = pkgsStatic.callPackage ./pnpm {
+      pnpm = pkgs.pnpm.override { nodejs-slim = nodejs-slim26; };
+    };
+    prettier = pkgsStatic.callPackage ./prettier {
+      prettier = pkgs.prettier.override { nodejs = nodejs-slim26; };
+    };
+    markdownlint-cli2 = pkgsStatic.callPackage ./markdownlint-cli2 {
+      inherit nodejs-slim26;
+      inherit (pkgs) markdownlint-cli2;
+    };
+    opencommit = pkgsStatic.callPackage ./opencommit {
+      inherit nodejs-slim26;
+      inherit (pkgs) opencommit;
     };
 
     # macOS wget: take the fully-static `pkgsStatic.wget` (same set as Linux) and

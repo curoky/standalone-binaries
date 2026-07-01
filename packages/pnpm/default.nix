@@ -73,10 +73,13 @@ stdenvNoCC.mkDerivation {
   '';
 
   meta = {
-    description = "pnpm running on the sibling fully-static (musl) node package";
+    description = "pnpm running on the sibling standalone node package";
     homepage = "https://pnpm.io/";
     license = lib.licenses.mit;
-    platforms = [ "x86_64-linux" ];
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
     mainProgram = "pnpm";
   };
 }

@@ -76,10 +76,13 @@ stdenvNoCC.mkDerivation {
   '';
 
   meta = {
-    description = "opencommit running on the sibling fully-static (musl) node package";
+    description = "opencommit running on the sibling standalone node package";
     homepage = "https://github.com/di-sukharev/opencommit";
     license = lib.licenses.mit;
-    platforms = [ "x86_64-linux" ];
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
     mainProgram = "opencommit";
   };
 }
