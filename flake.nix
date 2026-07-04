@@ -103,6 +103,34 @@
           manifest = import ./manifests/default.nix;
           upstreamPackages = makeManifestPackages system manifest;
 
+          # --- probe (manifest/patch-free upstream exploration) ------------
+          # `nix build .#probe.<channel>.<pkg>` builds a raw upstream nixpkgs
+          # package straight from a channel's pkgsStatic and runs it through the
+          # normal artifact pipeline, bypassing both the manifest and the local
+          # packages/ patches. Use it to check whether a package builds
+          # unpatched on a given channel. <channel> is a channel key below and
+          # <pkg> is any nixpkgs attr name.
+          probeChannels = {
+            unstable = envs.unstable;
+            "2605" = envs."26.05";
+            "2511" = envs."25.11";
+            "2505" = envs."25.05";
+            "2411" = envs."24.11";
+            "2405" = envs."24.05";
+          };
+          mkProbeChannel =
+            env:
+            # Lazily map every top-level attr name to its artifact build.
+            # attrNames only forces the top-level keys (cheap, does not build
+            # packages); the artifact derivation is only realised when a
+            # concrete `probe.<channel>.<pkg>` attr is accessed. Non-package or
+            # unresolvable attrs simply fail when built, which is acceptable for
+            # an exploration entrypoint.
+            lib.genAttrs (builtins.attrNames env.pkgsStatic) (
+              name: makeArtifacts name env.pkgsStatic.${name}
+            );
+          probe = lib.mapAttrs (_: mkProbeChannel) probeChannels;
+
           # --- local packages (patched / wrapped / pinned) -----------------
           localPackages = import ./packages/local.nix {
             inherit pkgs pkgsStatic;
@@ -149,6 +177,7 @@
             all-fast = mkAll "all-standalone-tools-fast" (name: !isSlowLLVM name);
           };
           tarballs = tarballPackages;
+          probe = probe;
           # Pre-artifact upstream/local derivations (the `--source` inputs to
           # make-artifacts), keyed by package name. Standalone outputs relativize
           # their contents and drop all store references, so the source closure
@@ -164,6 +193,7 @@
     {
       packages = lib.mapAttrs (_: o: o.packages) perSystemOutputs;
       tarballs = lib.mapAttrs (_: o: o.tarballs) perSystemOutputs;
+      probe = lib.mapAttrs (_: o: o.probe) perSystemOutputs;
       sources = lib.mapAttrs (_: o: o.sources) perSystemOutputs;
     };
 }

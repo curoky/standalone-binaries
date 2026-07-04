@@ -87,6 +87,7 @@ cache segment 和 retention 规则见[发布与 cache 模型](docs/release-model
 | 登记或回归本地定制 | `docs/regression/`、manifest、`packages/local/` |
 | 修改产物后处理与校验 | `cmd/artifact/AGENTS.md`、`lib/make-artifacts.nix` |
 | 修改包选择或 flake outputs | `lib/`、`flake.nix` |
+| 探测某包在某 channel 无 patch 能否构建 | `nix build .#probe.<system>.<channel>.<pkg>` |
 | 修改 `bm` | `cmd/binman/AGENTS.md` |
 | 修改 Nix cache | `cmd/nixcache/AGENTS.md`、`docs/release-model.md` |
 
@@ -113,6 +114,20 @@ build 成功判断；补充 `--version` 或代表性 smoke test。
 
 不要把 eval、dry-run、lint 或代码审查表述为实际构建通过。完整构建成本过高时，明确
 报告已执行和未执行的验证。
+
+## 探针（probe）
+
+`nix build .#probe.<system>.<channel>.<pkg>` 直接从某 channel 的 `pkgsStatic`
+取任意 nixpkgs 包并走完整 artifact 流程，**绕过 manifest 和 `packages/` 本地
+patch**，用于探测某个包在某 channel 上不打 patch 能否编译过、能否打包。
+
+- `<channel>`：`unstable`、`2605`、`2511`、`2505`、`2411`、`2405`（见
+  `flake.nix` 的 `probeChannels`）。
+- `<pkg>`：任意 nixpkgs 顶层 attr 名；带点的嵌套 attr（如
+  `llvmPackages_18.clang-unwrapped`）因 flake attr 路径限制不支持。
+- 构建变体与正式流程一致：Linux musl cross static，Darwin 原生 static。
+- 探针是探索入口，不进入包集合、发布或回归清单；非包或不可解析的 attr 在构建时
+  自然报错属预期。定型的包仍须回到 `manifests/default.nix` 或 `packages/`。
 
 ## 文档规则
 
