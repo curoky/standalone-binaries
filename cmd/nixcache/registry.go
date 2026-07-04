@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -13,7 +14,6 @@ import (
 	"os"
 	"path"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -114,7 +114,7 @@ func registryRequest[T any](ctx context.Context, name string, request func(conte
 	panic("unreachable")
 }
 
-func (client *registryClient) listTags(ctx context.Context, tagPrefix string) ([]string, error) {
+func (client *registryClient) listTags(ctx context.Context, system string) ([]string, error) {
 	log.Printf("listing cache tags from %s", client.repo.Reference.Repository)
 	tags, err := registryRequest(ctx, "list cache tags", func(requestCtx context.Context) ([]string, error) {
 		return registry.Tags(requestCtx, client.repo)
@@ -128,22 +128,24 @@ func (client *registryClient) listTags(ctx context.Context, tagPrefix string) ([
 	}
 	log.Printf("cache tags fetched: %d total", len(tags))
 
-	match := segmentPrefix
-	if tagPrefix != "" {
-		match = tagPrefix
-	}
 	segmentTags := make([]string, 0, len(tags))
 	for _, tag := range tags {
-		if strings.HasPrefix(tag, match) {
-			segmentTags = append(segmentTags, tag)
+		suffix, ok := strings.CutPrefix(tag, segmentPrefix)
+		if !ok {
+			continue
 		}
+		_, suffix, ok = strings.Cut(suffix, "-")
+		if system != "" && (!ok || !strings.HasPrefix(suffix, system+"-")) {
+			continue
+		}
+		segmentTags = append(segmentTags, tag)
 	}
-	log.Printf("segment tags to load: %d (prefix %q)", len(segmentTags), match)
+	log.Printf("matching segment tags: %d (system %q)", len(segmentTags), system)
 	return segmentTags, nil
 }
 
-func (client *registryClient) listSegments(ctx context.Context, tagPrefix string) ([]segmentRef, error) {
-	tags, err := client.listTags(ctx, tagPrefix)
+func (client *registryClient) listSegments(ctx context.Context, system string) ([]segmentRef, error) {
+	tags, err := client.listTags(ctx, system)
 	if err != nil {
 		return nil, err
 	}
@@ -151,12 +153,7 @@ func (client *registryClient) listSegments(ctx context.Context, tagPrefix string
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(segments, func(i, j int) bool {
-		if !segments[i].CreatedAt.Equal(segments[j].CreatedAt) {
-			return segments[i].CreatedAt.Before(segments[j].CreatedAt)
-		}
-		return segments[i].Tag < segments[j].Tag
-	})
+	slices.SortFunc(segments, compareSegments)
 	log.Printf("listed cache: %d segment(s)", len(segments))
 	return segments, nil
 }
@@ -168,8 +165,8 @@ func (client *registryClient) listSegments(ctx context.Context, tagPrefix string
 // worker pool.
 const segmentLoadConcurrency = 32
 
-func (client *registryClient) listManifests(ctx context.Context, tagPrefix string) ([]manifestRef, error) {
-	tags, err := client.listTags(ctx, tagPrefix)
+func (client *registryClient) listManifests(ctx context.Context, system string) ([]manifestRef, error) {
+	tags, err := client.listTags(ctx, system)
 	if err != nil {
 		return nil, err
 	}
@@ -374,21 +371,11 @@ func validateSegment(tag string, item segment, manifest manifestRef) error {
 	return nil
 }
 
-func (client *registryClient) loadEntries(ctx context.Context, tagPrefix string) (map[string]cacheEntry, error) {
-	segments, err := client.listSegments(ctx, tagPrefix)
-	if err != nil {
-		return nil, err
+func compareSegments(a, b segmentRef) int {
+	if order := a.CreatedAt.Compare(b.CreatedAt); order != 0 {
+		return order
 	}
-	entries := make(map[string]cacheEntry)
-	snapshots := make(map[string]struct{})
-	for _, item := range segments {
-		snapshots[item.Snapshot] = struct{}{}
-		for hash, entry := range item.Entries {
-			entries[hash] = entry
-		}
-	}
-	log.Printf("loaded %d segment(s) across %d snapshot(s): %d entries", len(segments), len(snapshots), len(entries))
-	return entries, nil
+	return cmp.Compare(a.Tag, b.Tag)
 }
 
 func (client *registryClient) blobReader(ctx context.Context, digest string) (io.ReadCloser, error) {
@@ -503,10 +490,6 @@ func (client *registryClient) segmentTag(state snapshot, runID string) string {
 	return fmt.Sprintf("%s%s-%s", segmentTagPrefix(state.ID, state.System), runID, rand.Text())
 }
 
-// segmentTagPrefix is the tag namespace shared by every segment of a given
-// snapshot+system: `v1-<snapshot16>-<system>-`. serve filters tags by this
-// prefix so it only fetches manifests that can actually be cache hits, and
-// segmentTag appends `<runID>-<rand>` to make each run's tag unique within it.
 func segmentTagPrefix(snapshotID, system string) string {
 	short := strings.TrimPrefix(snapshotID, "sha256:")
 	if len(short) > 16 {

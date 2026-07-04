@@ -39,8 +39,14 @@ identity。
 
 ## Cache 命中判定
 
-命中判定只使用当前 `flake.lock` 和包定义产生的确切 `outPath`。探测成功则跳过，探测失败则
-构建。以下情形跳过 cache 探测并强制构建候选范围：
+命中判定只使用当前 `flake.lock` 和包定义产生的确切 `outPath`。`serve` 读取同平台所有
+现存 snapshot 的 segment；snapshot 只决定上传归属和 retention 分组，不隔离读取。
+因此 lock 改变后，未改变的 outPath 仍可命中；不同 outPath 不按包名或版本替代。
+
+每个 `serve` 进程在内存中复用已验证的不可变 segment，每 5 分钟列举 tag，只读取新增项，
+移除已删除项并原子更新索引。刷新失败保留完整旧索引；NAR payload 仍按需下载。
+
+探测成功则跳过，探测明确未命中则构建。以下情形跳过 cache 探测并强制构建候选范围：
 
 - `schedule` 触发（每周定时全量刷新）；
 - `workflow_dispatch` 且 `skip_discover=true`。
