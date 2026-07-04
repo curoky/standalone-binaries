@@ -1,6 +1,7 @@
 {
   pkgs,
   pkgsStatic,
+  s6PkgsStatic,
 }:
 let
   mkClangTools = pkgsStatic.callPackage ../../clang-tools { };
@@ -90,15 +91,18 @@ rec {
   };
   dool = pkgs.callPackage ../../dool { };
 
-  # s6 stack.
-  execline = pkgsStatic.callPackage ../../execline { };
-  s6 = pkgsStatic.callPackage ../../s6 {
+  # s6 stack. Pinned to s6PkgsStatic (a fixed unstable revision) instead of the
+  # default unstable pkgsStatic: a later unstable bump broke these builds. The
+  # manifest-driven s6 upstream packages are pinned to the same revision; see
+  # flake.nix (nixpkgs-s6) and manifests/default.nix.
+  execline = s6PkgsStatic.callPackage ../../execline { };
+  s6 = s6PkgsStatic.callPackage ../../s6 {
     inherit execline;
   };
-  s6-linux-init = pkgsStatic.callPackage ../../s6-linux-init {
+  s6-linux-init = s6PkgsStatic.callPackage ../../s6-linux-init {
     inherit s6 execline;
   };
-  s6-rc = pkgsStatic.callPackage ../../s6-rc {
+  s6-rc = s6PkgsStatic.callPackage ../../s6-rc {
     inherit s6 execline;
   };
 

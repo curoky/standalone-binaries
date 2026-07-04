@@ -3,6 +3,12 @@
 
   inputs = {
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Pinned unstable revision for the s6 stack (execline / s6 / s6-linux-init /
+    # s6-rc / s6-dns / s6-linux-utils / s6-networking / s6-portable-utils /
+    # skalibs). A later unstable bump broke these builds, so they stay on the
+    # last revision verified to build+portable (recorded in the regression
+    # docs). Only the s6 stack uses this env; everything else tracks unstable.
+    nixpkgs-s6-2026-08-23.url = "github:NixOS/nixpkgs/56c02bc00adcf003215cc4bd996d6efaf4cff188";
     nixpkgs-2605.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixpkgs-2505.url = "github:NixOS/nixpkgs/nixos-25.05";
@@ -58,6 +64,7 @@
             };
           envs = {
             "unstable" = mkEnv inputs.nixpkgs-unstable;
+            "s6-pin" = mkEnv inputs.nixpkgs-s6-2026-08-23;
             "26.05" = mkEnv inputs.nixpkgs-2605;
             "25.11" = mkEnv inputs.nixpkgs-2511;
             "25.05" = mkEnv inputs.nixpkgs-2505;
@@ -99,6 +106,10 @@
           # --- local packages (patched / wrapped / pinned) -----------------
           localPackages = import ./packages/local.nix {
             inherit pkgs pkgsStatic;
+            # The s6 stack's local packages (execline / s6 / s6-linux-init /
+            # s6-rc) build against this pinned static set instead of unstable;
+            # see the nixpkgs-s6 input comment.
+            s6PkgsStatic = envs."s6-pin".pkgsStatic;
           };
 
           allPackages =
