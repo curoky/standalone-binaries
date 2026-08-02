@@ -87,6 +87,7 @@
 | `s6-networking` | 📌 `s6-pin` | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。除 pin 外直接用 manifest 上游包，无本地 patch | 后续 unstable 修复 s6 stack 编译后去掉 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
 | `s6-portable-utils` | 📌 `s6-pin` | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。除 pin 外直接用 manifest 上游包，无本地 patch | 后续 unstable 修复 s6 stack 编译后去掉 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
 | `skalibs` | 📌 `s6-pin` | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。除 pin 外直接用 manifest 上游包，无本地 patch | 后续 unstable 修复 s6 stack 编译后去掉 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
+| `sudo` | 🩹 本地 | 🟡 | stock `pkgsStatic.sudo` 无条件 `buildInputs = [ pam ]`，linux-pam 的 `badPlatforms` 含 `isStatic`，musl-static 下 eval 即被拒。override 用 `sudo.override { pam = null; }` 去掉 pam 引用（解除 fail-closed）并 `--disable-pam`，得到 musl 纯静态产物。setuid 位无法在 tarball 中保留，主 `sudo` 运行时会因 "must be owned by uid 0" 拒绝执行（提权需外部设置 setuid）；`visudo`/`cvtsudoers` 等子命令可直接运行 | 上游 pam 可静态化（或 stock sudo 提供无 pam 的静态路径）后删除 override；setuid 与产品边界保留 | dc5d91f84032 | `packages/sudo/` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |

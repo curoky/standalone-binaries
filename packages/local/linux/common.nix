@@ -33,6 +33,10 @@ rec {
   openssh_gssapi = pkgsStatic.callPackage ../../openssh_gssapi { };
   poppler = pkgsStatic.callPackage ../../poppler { };
   postgresql = pkgsStatic.callPackage ../../postgresql { };
+  # sudo drops pam (--disable-pam) to clear pkgsStatic's isStatic badPlatform and
+  # link fully static; ships a relocatable binary only (setuid applied out of
+  # band). See packages/sudo.
+  sudo = pkgsStatic.callPackage ../../sudo { };
   wget = pkgsStatic.callPackage ../../wget/linux.nix { };
 
   # Rust.
