@@ -20,6 +20,30 @@ import (
 	"oras.land/oras-go/v2/content"
 )
 
+func TestReadMetadataVerifiesBody(t *testing.T) {
+	body := []byte(`{"key":"value"}`)
+	descriptor := content.NewDescriptorFromBytes(segmentMediaType, body)
+	for _, test := range []struct {
+		name       string
+		body       []byte
+		descriptor ocispec.Descriptor
+	}{
+		{"digest", []byte(`{"key":"other"}`), descriptor},
+		{"truncated", body[:len(body)-1], descriptor},
+		{"trailing", append(bytes.Clone(body), ' '), descriptor},
+		{"oversized", body, ocispec.Descriptor{Size: maxMetadataSize + 1, Digest: descriptor.Digest}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := readMetadata(bytes.NewReader(test.body), test.descriptor); err == nil {
+				t.Fatal("invalid metadata accepted")
+			}
+		})
+	}
+	if _, err := readMetadata(bytes.NewReader(body), descriptor); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMissingRepositoryIsEmpty(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v2/cache/tags/list" {

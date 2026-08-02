@@ -85,13 +85,16 @@ func (index *cacheIndex) refresh(ctx context.Context) (int, error) {
 	ordered := slices.SortedFunc(maps.Values(segments), compareSegments)
 	entries := make(map[string]cacheEntry)
 	snapshots := make(map[string]struct{})
+	nars := make(map[string]cacheEntry)
 	for _, ref := range ordered {
 		snapshots[ref.Snapshot] = struct{}{}
 		maps.Copy(entries, ref.Entries)
-	}
-	nars := make(map[string]cacheEntry, len(entries))
-	for _, entry := range entries {
-		nars[entry.NARURL] = entry
+		for _, entry := range ref.Entries {
+			if previous, ok := nars[entry.NARURL]; ok && (previous.NARDigest != entry.NARDigest || previous.NARSize != entry.NARSize) {
+				return 0, fmt.Errorf("conflicting NAR URL %s", entry.NARURL)
+			}
+			nars[entry.NARURL] = entry
+		}
 	}
 
 	index.mu.Lock()

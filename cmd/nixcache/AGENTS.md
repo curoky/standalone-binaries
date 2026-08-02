@@ -1,7 +1,7 @@
 # Nixcache Agent Guide
 
 `cmd/nixcache/` 是本仓库专用的 GHCR-backed Nix binary cache，提供 `push`、
-`serve`、`probe`、`prune` 和 `size`。全局约束见根 [`AGENTS.md`](../../AGENTS.md)，CI
+`serve`、`probe`、`publication`、`prune` 和 `size`。全局约束见根 [`AGENTS.md`](../../AGENTS.md)，CI
 触发与发布流程见 [`docs/release-model.md`](../../docs/release-model.md)。
 
 ## 设计
@@ -57,7 +57,8 @@ v1-<snapshot-prefix>-<system>-<run-id>-<random-id>
 `org.nixos.store.hash` annotation 对应一个 metadata entry。
 
 读取 segment 时 fail-closed 校验 tag、metadata、store hash、narinfo、NAR URL、
-digest、size、media type 和 annotation 一致。
+digest、size、media type 和 annotation 一致。Manifest 和 metadata 正文先用 ORAS 校验
+实际 size/digest，再解析 JSON，单个对象上限 64 MiB；不只信任响应 header。
 
 ## Commands
 
@@ -69,8 +70,10 @@ digest、size、media type 和 annotation 一致。
 metadata，不预下载 NAR payload。每 5 分钟重新列举 tag，仅读取新增 segment，并从内存
 移除已消失的 tag；未变化的不可变 segment 不重复请求 manifest 或 metadata。
 
-每次成功刷新按 `CreatedAt`、tag 升序合并 entries，同一 store hash 选择最新记录，再
-原子替换 narinfo 和 NAR index。删除最新记录后，仍存在的旧 segment 可继续提供该 path。
+每次成功刷新按 `CreatedAt`、tag 升序合并 entries，同一 store hash 选择最新 narinfo；
+NAR index 独立收录所有保留 segment 的 URL，不能只从最新 narinfo 生成，否则客户端刚
+取得的旧 URL 会失效。同一 URL 的 digest/size 冲突直接失败。两个 index 原子替换。
+删除最新记录后，仍存在的旧 segment 可继续提供该 path。
 日志记录 snapshot 数、复用/加载/移除 segment 数和耗时。
 
 首次加载完成前 `/nix-cache-info` 返回 `503`。Repository 不存在视为空 cache；首次加载
@@ -90,18 +93,35 @@ Cache 自身不签名；从其他 cache 复制的 narinfo 可能保留原签名�
 http://127.0.0.1:37515?trusted=true
 ```
 
-清理（retention）只由 `prune` 执行，按 system 独立计算：
+`publication <tag> <system> <out-path> <archive-path>` 独立查询工具 repository 的 OCI
+manifest，校验单 tar.gz layer 和以下 manifest annotations，并确认 layer 存在：
+`dev.curoky.standalone.system`、`dev.curoky.standalone.out-path`、
+`dev.curoky.standalone.archive-path`。退出码与 probe 一致；缺少 annotations 或身份不匹配
+为待发布，认证/网络/协议错误不能当作 miss。Nix cache 命中不是发布完成的证明。
 
-1. 按最新 segment 时间保留最近 `N` 个 snapshot，默认 `N=2`（`--snapshot-keep`）。
-2. 每个保留 snapshot 内按 `packageKey` 分组：保留组内最新 segment 起
-   `--package-retain-days`（默认 2）天滚动窗口内的所有 segment；窗口内不足
-   `--package-keep`（默认 2）个时，按 `CreatedAt` 降序补到该数。择新以
-   `CreatedAt` 为主键，相等时用 tag 字符串做确定性 tie-break。
-3. 保留 snapshot 内空 `packageKey` 的 segment 全部保留（无法安全归属）。
-4. 删除其余 segment。
+清理只由 `prune --roots <JSON>` 执行。Roots 来自 `nix eval --json .#cacheRoots`，包含
+全部三个 system、非空包集合及每包 `out`、`archive`、非空 `sources`；缺参数、平台、
+字段或无效 path 均失败。Workflow 固定读取 master，全平台 eval 失败不执行删除。
 
-- `prune` 必须先解析全部目标 version ID，再进行任何删除；`--dry-run` 不发请求。
-- `size` 只统计 metadata 和 NAR layer payload，并按 digest 去重。
+1. 按 roots 和 narinfo References 遍历 closure，每个 path 选最新 segment 提供者并保护
+   完整 segment。未缓存的 root 只报告；已有 root 的引用缺失则停止。跨 snapshot 命中
+   不需要重新上传才能得到保护。
+2. 对其余数据应用历史保留：按 system 保留最近 `--snapshot-keep`（默认 2）个 snapshot；
+   其中按 package 保留最新 segment 起 `--package-retain-days`（默认 2）天的记录，并至少
+   保留 `--package-keep`（默认 2）份；空 packageKey 仍保留。当前 roots 优先于历史淘汰。
+3. GC 记录位于同 repository 的 `gc-v1-<UTC时间>-<random>` tag；单 metadata layer 的
+   media type 为 `application/vnd.curoky.nixcache.gc.v1+json`。Version 1 记录包含
+   `createdAt` 和 `candidates[tag] = {digest, since}`，与 segment 的 v1 schema 独立。
+4. 候选须在已持久化记录中等待至少 24 小时，此次仍可删除且 manifest digest 未改变，才
+   可删除。重新可达或 digest 变化会重置宽限期；不是按上传时间推算失去引用的时间。
+5. 本次时间必须晚于最新记录，时钟回退停止；删除前解析全部目标 GitHub version ID 并复核
+   segment digest；先发布新的 GC 记录，再
+   回收旧 GC 记录，最后删除合格 segment。失败重试读取最新记录，不恢复已取消的候选。
+
+GC 记录只允许单写者；build/prune 共用 workflow concurrency group，不得与另一个 prune
+或上传流程并发。只保护当前 master；历史分支按上述历史保留规则处理。
+`--dry-run` 会执行只读请求，但不上传记录或发出删除请求。`size` 只统计 segment 的 metadata
+和 NAR layer payload 并按 digest 去重，不包含 GC 记录，也不代表 GHCR 的计费空间。
 
 ## Binary Distribution
 
@@ -124,7 +144,7 @@ bash -n cmd/nixcache/install.sh
 shellcheck cmd/nixcache/install.sh
 ```
 
-真实 Nix round-trip：
+真实 Nix round-trip（环境变量接受空格分隔的多个 path，可同时验证 out/archive/source）：
 
 ```bash
 NIXCACHE_TEST_STORE_PATH=/nix/store/<path> \

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"slices"
 	"sort"
 	"time"
 
@@ -33,12 +34,10 @@ func cacheSize(ctx context.Context, client *registryClient) (int64, error) {
 	return total, nil
 }
 
-// pruneCache keeps the newest snapshots per system. Within a kept snapshot it
-// keeps, per stable package key, every segment pushed within retainDays of that
-// package's newest segment, falling back to the newest packageKeep segments when
-// the window holds fewer. Legacy segments without a package key are retained
-// because they cannot be safely attributed.
-func pruneCache(ctx context.Context, client *registryClient, keep, retainDays, packageKeep int, dryRun bool) error {
+func pruneCache(ctx context.Context, client *registryClient, roots cacheRoots, keep, retainDays, packageKeep int, dryRun bool) error {
+	if err := roots.validate(); err != nil {
+		return err
+	}
 	if keep < 1 {
 		return fmt.Errorf("keep must be at least 1, got %d", keep)
 	}
@@ -57,17 +56,27 @@ func pruneCache(ctx context.Context, client *registryClient, keep, retainDays, p
 		return nil
 	}
 
-	toDelete, retained := segmentsToDelete(segments, keep, retainDays, packageKeep)
-
-	if dryRun {
-		for _, ref := range toDelete {
-			log.Printf("would delete segment %s (snapshot %s, %s)", ref.Tag, shortSnapshot(ref.Snapshot), ref.System)
-		}
-		log.Printf("prune dry-run: would delete %d segment(s), retain %d", len(toDelete), retained)
-		return nil
+	protected, err := protectedSegments(segments, roots)
+	if err != nil {
+		return err
 	}
-	if len(toDelete) == 0 {
-		log.Printf("prune complete: deleted 0 segment(s), retained %d", retained)
+	candidates, _ := segmentsToDelete(segments, keep, retainDays, packageKeep)
+	candidates = slices.DeleteFunc(candidates, func(ref segmentRef) bool { return protected[ref.Tag] })
+	previous, gcTags, err := client.loadGC(ctx)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	if !now.After(previous.CreatedAt) {
+		return fmt.Errorf("GC clock has not advanced beyond the latest record")
+	}
+	next, toDelete := gcPlan(candidates, previous, now)
+	log.Printf("prune plan: root-protected=%d retained=%d waiting=%d eligible=%d", len(protected), len(segments)-len(candidates), len(candidates)-len(toDelete), len(toDelete))
+	for _, ref := range candidates {
+		log.Printf("candidate %s: outside roots and history retention, since %s", ref.Tag, next.Candidates[ref.Tag].Since.Format(time.RFC3339))
+	}
+	if dryRun {
+		log.Printf("prune dry-run: would delete %d segment(s), no registry writes", len(toDelete))
 		return nil
 	}
 
@@ -82,12 +91,41 @@ func pruneCache(ctx context.Context, client *registryClient, keep, retainDays, p
 		return fmt.Errorf("list package versions: %w", err)
 	}
 
-	deleted, err := deleteVersions(ctx, ghcr, toDelete, versionByTag)
+	deleted, err := executeGC(ctx, client, ghcr, next, toDelete, gcTags, versionByTag)
 	if err != nil {
 		return err
 	}
-	log.Printf("prune complete: deleted %d segment(s), retained %d", deleted, retained)
+	log.Printf("prune complete: deleted %d segment(s), retained %d", deleted, len(segments)-deleted)
 	return nil
+}
+
+func executeGC(ctx context.Context, client *registryClient, ghcr versionDeleter, next gcState, toDelete []segmentRef, gcTags []string, versionByTag map[string]int64) (int, error) {
+	oldRecords := make([]segmentRef, 0, len(gcTags))
+	for _, tag := range gcTags {
+		oldRecords = append(oldRecords, segmentRef{Tag: tag})
+	}
+	for _, ref := range append(slices.Clone(toDelete), oldRecords...) {
+		if _, ok := versionByTag[ref.Tag]; !ok {
+			return 0, fmt.Errorf("no package version found for %s", ref.Tag)
+		}
+	}
+	for _, ref := range toDelete {
+		current, err := client.repo.Resolve(ctx, ref.Tag)
+		if err != nil {
+			return 0, err
+		}
+		if current.Digest != ref.Digest {
+			return 0, fmt.Errorf("segment %s changed during prune", ref.Tag)
+		}
+	}
+	// Persist resets before deletion so a failed cleanup cannot resurrect an old grace period.
+	if err := client.saveGC(ctx, next); err != nil {
+		return 0, err
+	}
+	if _, err := deleteVersions(ctx, ghcr, oldRecords, versionByTag); err != nil {
+		return 0, err
+	}
+	return deleteVersions(ctx, ghcr, toDelete, versionByTag)
 }
 
 func segmentsToDelete(segments []segmentRef, keep, retainDays, packageKeep int) ([]segmentRef, int) {

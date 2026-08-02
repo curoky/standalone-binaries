@@ -126,9 +126,7 @@
             # concrete `probe.<channel>.<pkg>` attr is accessed. Non-package or
             # unresolvable attrs simply fail when built, which is acceptable for
             # an exploration entrypoint.
-            lib.genAttrs (builtins.attrNames env.pkgsStatic) (
-              name: makeArtifacts name env.pkgsStatic.${name}
-            );
+            lib.genAttrs (builtins.attrNames env.pkgsStatic) (name: makeArtifacts name env.pkgsStatic.${name});
           probe = lib.mapAttrs (_: mkProbeChannel) probeChannels;
 
           # --- local packages (patched / wrapped / pinned) -----------------
@@ -177,6 +175,11 @@
             all-fast = mkAll "all-standalone-tools-fast" (name: !isSlowLLVM name);
           };
           tarballs = tarballPackages;
+          cacheRoots = lib.mapAttrs (name: artifact: {
+            out = artifact.outPath;
+            archive = artifact.archive.outPath;
+            sources = [ allPackages.${name}.outPath ];
+          }) artifacts;
           probe = probe;
           # Pre-artifact upstream/local derivations (the `--source` inputs to
           # make-artifacts), keyed by package name. Standalone outputs relativize
@@ -195,5 +198,6 @@
       tarballs = lib.mapAttrs (_: o: o.tarballs) perSystemOutputs;
       probe = lib.mapAttrs (_: o: o.probe) perSystemOutputs;
       sources = lib.mapAttrs (_: o: o.sources) perSystemOutputs;
+      cacheRoots = lib.mapAttrs (_: o: o.cacheRoots) perSystemOutputs;
     };
 }

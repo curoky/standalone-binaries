@@ -78,22 +78,49 @@ func run() int {
 	}
 	probe.Flags().StringVar(&cacheURL, "cache", "http://127.0.0.1:37515", "local cache URL")
 
+	publication := &cobra.Command{
+		Use:   "publication <tag> <system> <out-path> <archive-path>",
+		Short: "Check whether the tool artifact matches the current outputs",
+		Args:  cobra.ExactArgs(4),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := newRegistryClient(artifactRepository, false)
+			if err != nil {
+				return &probeCommandError{err: err}
+			}
+			ready, err := publicationReady(cmd.Context(), client, args[0], args[1], args[2], args[3])
+			if err != nil {
+				return &probeCommandError{err: err}
+			}
+			if !ready {
+				return errProbeMiss
+			}
+			return nil
+		},
+	}
+
 	var keep int
 	var packageRetainDays int
 	var packageKeep int
 	var dryRun bool
+	var rootsPath string
 	prune := &cobra.Command{
 		Use:   "prune",
-		Short: "Delete cache segments of old snapshots, keeping the newest per system",
+		Short: "Prune unreachable cache segments after history retention and a grace period",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := newRegistryClient(cacheRepository, false)
 			if err != nil {
 				return err
 			}
-			return pruneCache(cmd.Context(), client, keep, packageRetainDays, packageKeep, dryRun)
+			roots, err := loadRoots(rootsPath)
+			if err != nil {
+				return err
+			}
+			return pruneCache(cmd.Context(), client, roots, keep, packageRetainDays, packageKeep, dryRun)
 		},
 	}
+	prune.Flags().StringVar(&rootsPath, "roots", "", "complete current roots JSON from flake cacheRoots")
+	_ = prune.MarkFlagRequired("roots")
 	prune.Flags().IntVar(&keep, "snapshot-keep", 2, "number of most recent snapshots to keep per system")
 	prune.Flags().IntVar(&packageRetainDays, "package-retain-days", 2, "within a kept snapshot, keep every segment pushed within this many days of each package's newest segment")
 	prune.Flags().IntVar(&packageKeep, "package-keep", 2, "within a kept snapshot, keep at least this many newest segments per package when the day window holds fewer")
@@ -117,7 +144,7 @@ func run() int {
 		},
 	}
 
-	root.AddCommand(push, serve, probe, prune, size)
+	root.AddCommand(push, serve, probe, publication, prune, size)
 	if err := root.Execute(); err != nil {
 		if errors.Is(err, errProbeMiss) {
 			return 1

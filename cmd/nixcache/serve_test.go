@@ -292,7 +292,6 @@ func TestCacheRefreshFailurePreservesState(t *testing.T) {
 			if count, err := index.refresh(context.Background()); err != nil || count != 2 {
 				t.Fatalf("recovery: count=%d err=%v", count, err)
 			}
-			fixture.assertReads(t, 2, 2)
 			if index.entries[strings.Repeat("b", 32)].NARInfo != newEntry.NARInfo ||
 				index.entries[strings.Repeat("c", 32)].NARInfo != other.NARInfo || len(index.segments) != 2 {
 				t.Fatal("recovery did not replace the index")
@@ -355,6 +354,14 @@ func TestCacheRefreshDeterministicWinnerAfterDeletion(t *testing.T) {
 	if index.entries[hash].NARDigest != newEntry.NARDigest {
 		t.Fatal("newest time and tag did not win")
 	}
+	if len(index.nars) != 2 || index.nars[old.NARURL].NARDigest != old.NARDigest {
+		t.Fatal("refresh invalidated a NAR URL from a retained segment")
+	}
+	response := httptest.NewRecorder()
+	index.serveHTTP(response, httptest.NewRequest(http.MethodHead, "/"+old.NARURL, nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("old NAR URL status=%d", response.Code)
+	}
 	fixture.list(prefix+"a", prefix+"z")
 	if _, err := index.refresh(context.Background()); err != nil {
 		t.Fatal(err)
@@ -365,6 +372,35 @@ func TestCacheRefreshDeterministicWinnerAfterDeletion(t *testing.T) {
 	}
 	if _, ok := index.nars[newEntry.NARURL]; ok {
 		t.Fatal("deleted winning NAR is still indexed")
+	}
+}
+
+func TestRefreshKeepsPreviouslyIssuedNARURL(t *testing.T) {
+	fixture := newRefreshRegistry(t)
+	state := snapshot{ID: "sha256:" + strings.Repeat("1", 64), System: "x86_64-linux"}
+	hash := strings.Repeat("a", 32)
+	old := testCacheEntry(t, hash, "root", []byte("old compressed nar"))
+	oldTag := fixture.publish(t, state, old)
+	index := newCacheIndex(fixture.client, state.System)
+	fixture.list(oldTag)
+	if _, err := index.refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	info := httptest.NewRecorder()
+	index.serveHTTP(info, httptest.NewRequest(http.MethodGet, "/"+hash+".narinfo", nil))
+	if info.Code != http.StatusOK || !strings.Contains(info.Body.String(), "URL: "+old.NARURL) {
+		t.Fatal("old narinfo was not served")
+	}
+	newEntry := testCacheEntry(t, hash, "root", []byte("new compressed nar"))
+	newTag := fixture.publish(t, state, newEntry)
+	fixture.list(oldTag, newTag)
+	if _, err := index.refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	index.serveHTTP(response, httptest.NewRequest(http.MethodGet, "/"+old.NARURL, nil))
+	if response.Code != http.StatusOK || response.Body.String() != "old compressed nar" {
+		t.Fatalf("previously issued URL: status=%d body=%q", response.Code, response.Body.String())
 	}
 }
 

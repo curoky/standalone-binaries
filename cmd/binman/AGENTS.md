@@ -24,7 +24,10 @@ ghcr.io/curoky/standalone-binaries:<package>-<architecture>
 ```
 
 Image 的最后一个 layer 是 tar.gz，归档顶层目录是 package 名。Client 使用 anonymous
-auth，不读取 Docker credential config。
+auth，不读取 Docker credential config。发布 workflow 在 manifest 上添加
+`dev.curoky.standalone.system`、`dev.curoky.standalone.out-path`、
+`dev.curoky.standalone.archive-path` 供 CI 判定发布身份；`bm` 仍以 layer digest 判断版本，
+不要求这些 annotations，也不解析 Nix cache。
 
 `bm` 自身使用 `binman-<architecture>` tag，归档路径是 `binman/bm`。
 `install.sh` 是唯一允许依赖宿主 `curl` 和 `tar` 的路径。
