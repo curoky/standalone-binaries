@@ -26,6 +26,10 @@ in
   # Partial-static C packages.
   ffmpeg = pkgsStatic.callPackage ../ffmpeg/darwin.nix { };
   krb5 = pkgsStatic.callPackage ../krb5/darwin.nix { };
+  rsync = pkgsStatic.callPackage ../rsync/darwin.nix {
+    inherit (pkgs) python3 libiconv;
+    nativeCC = pkgs.stdenv.cc;
+  };
   wget = pkgsStatic.callPackage ../wget/darwin-static.nix {
     inherit (pkgs) perlPackages;
   };

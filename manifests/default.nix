@@ -282,7 +282,13 @@
       "x86_64-linux"
     ];
   };
-  rsync = { };
+  # Darwin uses a local override for build/check tools and system libiconv.
+  rsync = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
+  };
   strace = {
     platforms = [
       "x86_64-linux"
