@@ -11,9 +11,9 @@ tasks:
       - nix build .#{{.CLI_ARGS}}
 
   p:
-    desc: 'Probe an upstream package unpatched (usage: task p -- bats [channel], channel defaults to unstable)'
+    desc: 'Probe an upstream package unpatched (usage: task p -- [channel] bats, channel defaults to unstable)'
     vars:
-      PKG: '{{index (splitArgs .CLI_ARGS) 0}}'
-      CHANNEL: '{{if gt (len (splitArgs .CLI_ARGS)) 1}}{{index (splitArgs .CLI_ARGS) 1}}{{else}}unstable{{end}}'
+      PKG: '{{index (splitArgs .CLI_ARGS) (sub (len (splitArgs .CLI_ARGS)) 1)}}'
+      CHANNEL: '{{if gt (len (splitArgs .CLI_ARGS)) 1}}{{index (splitArgs .CLI_ARGS) 0}}{{else}}unstable{{end}}'
     cmds:
       - nix build .#probe.{{.SYSTEM}}.{{.CHANNEL}}.{{.PKG}}
