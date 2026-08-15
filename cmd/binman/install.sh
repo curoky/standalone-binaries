@@ -1,26 +1,8 @@
 #!/usr/bin/env bash
 
-# Bootstrap installer for the `bm` command.
-#
-# `binman` is published as an OCI artifact at
-# ghcr.io/curoky/standalone-binaries under the tag `binman-<arch>` (a single
-# .tar.gz layer containing ./binman/bm). On a fresh, minimal host there is
-# no oras/go/nix, only curl + tar, so this script pulls the layer blob directly
-# over the ghcr registry HTTP API and drops the `bm` binary onto PATH.
-# Afterwards `bm` self-upgrades like any other package.
-#
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/curoky/standalone-binaries/master/cmd/binman/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/curoky/standalone-binaries/master/cmd/binman/install.sh | bash -s -- --prefix /usr/local/bin
-#   curl -fsSL https://raw.githubusercontent.com/curoky/standalone-binaries/master/cmd/binman/install.sh | bash -s -- wget
-#
-# With package arguments the script bootstraps `bm`, then asks it to download
-# and extract those packages into the current directory without installing
-# package-manager state.
-#
-# Overrides (env or flag, flag wins):
-#   BINMAN_INSTALL_DIR / --prefix DIR   install directory (default: ~/.local/bin)
-#   BINMAN_ARCH        / --arch ARCH    arch tag: linux-x86_64 | linux-arm64 | darwin-arm64
+# Bootstrap installer for `bm`; user instructions live in USAGE.md.
+# It pulls the OCI layer directly because a fresh host may only have curl and
+# tar. Afterwards `bm` manages itself like any other package.
 set -euo pipefail
 
 INSTALL_DIR="${BINMAN_INSTALL_DIR:-$HOME/.local/bin}"

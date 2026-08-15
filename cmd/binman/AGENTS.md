@@ -1,7 +1,8 @@
 # Binman Agent Guide
 
-`cmd/binman/` 实现 OCI artifact client `bm`。全局产物约束见根
-[`AGENTS.md`](../../AGENTS.md)；本文件是该组件的设计与修改契约。
+`cmd/binman/` 实现 OCI artifact client `bm`。用户安装与命令说明见
+[`USAGE.md`](USAGE.md)，全局产物约束见根 [`AGENTS.md`](../../AGENTS.md)；本文件是
+该组件的设计与修改契约。
 
 ## 不变量
 
@@ -58,24 +59,10 @@ digest、link 状态和安装时间。Prefix 根目录与 `<prefix>/profile/<pro
 
 ## Manifest
 
-```yaml
-prefix: /opt/binman
-arch: linux-x86_64
-packages:
-  link: [ripgrep]
-  unlink: [python314]
-profiles:
-  go: [gopls, delve]
-```
-
-- YAML 只允许一个 document，未知字段直接报错。
-- 显式 `--prefix` 和 `--arch` 优先于 manifest。
-- 未显式指定 `--prefix` 时，从 `bm` 自身位置推导：linked 后 `bm` 实际位于
-  `<prefix>/store/binman/bm`，据此反推 `<prefix>`；不在该布局（如 bootstrap 到
-  `~/.local/bin`）时回退 `/opt/binman`。
-- 重复 package 合并为一个 install target，root link 优先。
-- Profile tree 每次完整 staged rebuild 后原子替换。
-- `remove` 清理关联 profile link；`sync --prune` 删除未引用的 package。
+Schema、precedence 和命令行为统一维护在 [`USAGE.md`](USAGE.md)。实现必须保持 strict
+single-document decoding、确定性的去重 install plan（root link 优先），并在 sync 时
+按 manifest 完整重建 profile tree。`remove` 必须清理 profile link，prune 只保留
+manifest 引用的 package。
 
 ## 安全边界
 
