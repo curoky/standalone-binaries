@@ -6,6 +6,7 @@
 | 包 | 定制 | 回归 | 原因与保留边界 | 回归判据 | commit | 来源 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `aria2` | 📌 `24.11` | ❌ | 已验证：unstable aria2 1.37.0 静态 darwin 构建链接 `libxml2.a` 时缺 `iconv`/`iconv_open`/`libiconv` 符号，链接失败 | 已确认必要，两平台都无可回归空间 | 624af665418d | `manifests/default.nix` |
+| `atuin` | 🩹 + 📦 本地 | 🟡 | 跨平台本地包：static 构建 `checkFlags += --skip=a_stalled_client_does_not_wedge_the_socket_server`（pty-proxy 终端渲染时序 flaky）；结构性 packaging 随二进制预生成 `share/atuin/init.zsh` 并注入 prologue 用 `${(%):-%x}` 相对定位同包 `bin/atuin`；darwin 未验证 | 上游 pty-proxy 时序稳定后删除 skip；预生成 init 保留 | — | `packages/atuin/` |
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
 | `bats` | 📦 本地 | ❌ | 用 `bats.unresholved`（上游 `install.sh` 产物）替代默认经 resholve 的 `bats`：默认包把 coreutils/findutils/ncurses 等外部命令和自身 `$BATS_ROOT`/`source` 都 baked 成绝对 `/nix/store` 路径，normalize.go 删除 store 片段后会留下空 `BATS_ROOT` 与 `source ""` 而损坏。unresholved 为纯 Bash，运行时从 `$BASH_SOURCE` 推导 `BATS_ROOT`、经 PATH 解析外部命令，唯一 /nix 引用是 Bash shebang，被 normalize.go 改写为 `#!/usr/bin/env bash`。附带 `doInstallCheck=false` | 上游默认 `bats` 不再 baked 绝对 store 路径（可被 normalize 安全处理）时再评估回到 manifest | — | `packages/bats/` |
@@ -47,6 +48,7 @@
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
 | `rsync` | 🩹 本地 | ✅ | unstable rsync 3.5.0 在 `preBuild` 中插值 `python3` 以改写测试脚本；Darwin `pkgsStatic.python3` 被标记 broken，导致 package set 求值失败。启用 `strictDeps` 后测试 `partial-protected-regular-retry-policy` 又因裸 `cc -dynamiclib` 不在 PATH 而失败。静态 Darwin libiconv 还会把 Nix store 下的 i18n 数据目录编入 rsync。保留其余静态依赖，注入 native Python 和 check-only compiler，并把 native libiconv load command 改指系统 `/usr/lib/libiconv.2.dylib` | stock `pkgsStatic.rsync` 不再求值静态 Python、测试依赖完整，且不再内嵌 libiconv store 路径 | dc5d91f84032 | `packages/rsync/`, `packages/local/darwin.nix`, `manifests/default.nix` |
 | `shellcheck` | 📌 `25.11` | ❌ | 已验证：unstable ShellCheck 0.11.0 静态 darwin 构建时 GHC 报 `External interpreter terminated (1)`，构建失败 | 已确认必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
+| `starship` | 📦 本地 | ❌ | 跨平台本地包：随二进制预生成 `share/starship/init.zsh`（native `starship init zsh`）并注入 prologue 用 `${(%):-%x}` 相对定位同包 `bin/starship`，把 baked 绝对二进制路径改写为该相对路径；darwin 未验证 | 预生成 init 与相对定位属产品行为，无上游回归空间 | — | `packages/starship/` |
 | `supercronic` | 🩹 本地 | 🟡 | 仅 darwin 有定制（Linux 走零定制 manifest pkgsStatic 全静态）；native Go 构建的 CGO net resolver 拉入 nix-store libresolv stub，postInstall 用 `install_name_tool` 改指 `/usr/lib/libresolv.9.dylib`，standalone 产物只链系统 dylib | 上游 CGO 构建直接链接系统 libresolv，或 `pkgsStatic` 可直接构建后删除 override | — | `packages/supercronic/` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
 | `uv` | 📌 `25.11` | ❌ | 已验证：unstable uv 0.11.32 静态 darwin 构建时 `aws-lc-sys` 的 `memcmp_invalid_stripped_check` 用 `--target arm64-apple-macosx` 触发 cc-wrapper 多 target 缺陷（`posix_spawn failed`），构建失败 | 已确认必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
