@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -21,6 +23,40 @@ var ociRegistry = defaultRegistry
 
 func ref(packageName, arch string) string {
 	return fmt.Sprintf("%s:%s-%s", ociRegistry, packageName, arch)
+}
+
+func remotePackageNames(arch string) ([]string, error) {
+	if err := validateArch(arch); err != nil {
+		return nil, err
+	}
+	repository, err := name.NewRepository(ociRegistry, name.StrictValidation)
+	if err != nil {
+		return nil, err
+	}
+	tags, err := remote.List(repository, remote.WithAuth(authn.Anonymous))
+	if err != nil {
+		return nil, fmt.Errorf("list packages: %w", err)
+	}
+	return packageNamesFromTags(tags, arch), nil
+}
+
+func packageNamesFromTags(tags []string, arch string) []string {
+	suffix := "-" + arch
+	names := make([]string, 0, len(tags))
+	seen := make(map[string]bool, len(tags))
+	for _, tag := range tags {
+		if !strings.HasSuffix(tag, suffix) {
+			continue
+		}
+		packageName := strings.TrimSuffix(tag, suffix)
+		if validatePackageName(packageName) != nil || seen[packageName] {
+			continue
+		}
+		seen[packageName] = true
+		names = append(names, packageName)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func isNotFound(err error) bool {

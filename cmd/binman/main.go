@@ -117,6 +117,7 @@ func main() {
 		force   bool
 		verbose bool
 		output  string
+		listAll bool
 	)
 	var logCloser io.Closer
 
@@ -136,7 +137,8 @@ func main() {
 			if prefix == "" {
 				prefix = detectPrefix()
 			}
-			if cmd.Name() == "download" {
+			if cmd.Name() == "download" || cmd.Name() == "search" ||
+				(cmd.Name() == "list" && listAll) {
 				return nil
 			}
 			c, err := setupLogger(prefix, verbose)
@@ -222,9 +224,32 @@ func main() {
 
 	list := &cobra.Command{
 		Use:   "list",
-		Short: "List installed packages and their recorded digests",
+		Short: "List installed packages, or all available packages with --all",
 		Args:  cobra.NoArgs,
-		RunE:  func(cmd *cobra.Command, args []string) error { return cmdList(prefix) },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !listAll {
+				return cmdList(prefix)
+			}
+			a, err := resolveArch()
+			if err != nil {
+				return err
+			}
+			return cmdListAvailable(a)
+		},
+	}
+	list.Flags().BoolVarP(&listAll, "all", "a", false, "list all packages available for the selected architecture")
+
+	search := &cobra.Command{
+		Use:   "search <query>",
+		Short: "Search all packages available for the selected architecture",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a, err := resolveArch()
+			if err != nil {
+				return err
+			}
+			return cmdSearch(a, args[0])
+		},
 	}
 
 	outdated := &cobra.Command{
@@ -270,7 +295,7 @@ func main() {
 	sync.Flags().BoolVar(&force, "force", false, "reinstall even if the digest already matches")
 	sync.Flags().BoolVar(&prune, "prune", false, "remove installed packages not listed in the manifest")
 
-	root.AddCommand(install, download, remove, upgrade, info, list, outdated, sync, version)
+	root.AddCommand(install, download, remove, upgrade, info, list, search, outdated, sync, version)
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)

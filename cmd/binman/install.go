@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -272,6 +273,39 @@ func cmdList(prefix string) error {
 			metadata.Name, metadata.Arch, linked, short(metadata.Digest))
 	}
 	return nil
+}
+
+func cmdSearch(arch, query string) error {
+	names, err := remotePackageNames(arch)
+	if err != nil {
+		return err
+	}
+	for _, packageName := range matchingPackageNames(names, query) {
+		fmt.Println(packageName)
+	}
+	return nil
+}
+
+func cmdListAvailable(arch string) error {
+	names, err := remotePackageNames(arch)
+	if err != nil {
+		return err
+	}
+	for _, packageName := range names {
+		fmt.Println(packageName)
+	}
+	return nil
+}
+
+func matchingPackageNames(names []string, query string) []string {
+	query = strings.ToLower(query)
+	matches := make([]string, 0, len(names))
+	for _, packageName := range names {
+		if strings.Contains(strings.ToLower(packageName), query) {
+			matches = append(matches, packageName)
+		}
+	}
+	return matches
 }
 
 func cmdInfo(prefix, arch, packageName string) error {
