@@ -1,0 +1,29 @@
+{
+  "platforms": [
+    {
+      "system": "x86_64-linux",
+      "runner": "ubuntu-latest",
+      "artifact_suffix": "linux-x86_64",
+      "exclude_pkgs": "lld_18 lld_19 lld_20 lld_21 lld_22 clang18 clang19 clang20 clang21 clang22",
+      "push_exclude_pkgs": "nodejs-slim24 nodejs-slim26 markdownlint-cli2 opencommit pnpm prettier nil nixfmt shellcheck gdb clang-tools-18 clang-tools-19 clang-tools-20 clang-tools-21 clang-tools-22"
+    },
+    {
+      "system": "aarch64-linux",
+      "runner": "ubuntu-24.04-arm",
+      "artifact_suffix": "linux-arm64",
+      "exclude_pkgs": "lld_18 lld_19 lld_20 lld_21 lld_22 clang18 clang19 clang20 clang21 clang22",
+      "push_exclude_pkgs": "nodejs-slim24 nodejs-slim26 markdownlint-cli2 opencommit pnpm prettier nil nixfmt shellcheck gdb clang-tools-18 clang-tools-19 clang-tools-20 clang-tools-21 clang-tools-22"
+    },
+    {
+      "system": "aarch64-darwin",
+      "runner": "macos-26",
+      "artifact_suffix": "darwin-arm64",
+      "exclude_pkgs": "inetutils gnupg music-decrypto",
+      "push_exclude_pkgs": "nodejs-slim26 markdownlint-cli2 opencommit pnpm prettier shellcheck gdb"
+    }
+  ],
+  "independent_packages": [
+    "binman",
+    "nixcache"
+  ]
+}
