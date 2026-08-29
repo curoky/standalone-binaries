@@ -4,7 +4,7 @@
 #
 # The binary is published as a single tar.gz OCI layer at
 # ghcr.io/curoky/standalone-binaries:nixcache-<arch>. The archive contains
-# nixcache/nixcache, so a fresh CI runner only needs curl and tar.
+# nixcache/bin/nixcache, so a fresh CI runner only needs curl and tar.
 set -euo pipefail
 
 REGISTRY="ghcr.io"
@@ -104,8 +104,8 @@ curl -fsSL \
   -H "Authorization: Bearer ${token}" \
   "https://${REGISTRY}/v2/${REPOSITORY}/blobs/${digest}" |
   tar -xz -C "$tmp"
-[ -f "$tmp/nixcache/nixcache" ] || die "archive did not contain nixcache/nixcache"
-mv -f "$tmp/nixcache/nixcache" "$INSTALL_DIR/nixcache"
+[ -f "$tmp/nixcache/bin/nixcache" ] || die "archive did not contain nixcache/bin/nixcache"
+mv -f "$tmp/nixcache/bin/nixcache" "$INSTALL_DIR/nixcache"
 chmod +x "$INSTALL_DIR/nixcache"
 
 echo "> Installed: $INSTALL_DIR/nixcache"

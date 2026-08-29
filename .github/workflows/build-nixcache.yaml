@@ -41,8 +41,8 @@ jobs:
         run: |
           go vet ./...
           go test ./...
-          mkdir -p ./nixcache
-          go build -trimpath -ldflags="-s -w" -o ./nixcache/nixcache .
+          mkdir -p ./nixcache/bin
+          go build -trimpath -ldflags="-s -w" -o ./nixcache/bin/nixcache .
           tar -czvf ./nixcache.${{ matrix.tag }}.tar.gz ./nixcache
 
       - uses: oras-project/setup-oras@v2

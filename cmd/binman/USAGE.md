@@ -44,7 +44,7 @@ store、profile 和聚合链接的根目录，两者含义不同。
 ```
 
 当 `bm` 已由自身管理时，`--prefix` 默认从
-`<prefix>/store/binman/bm` 推导；bootstrap binary 不在该布局中时默认使用
+`<prefix>/store/binman/bin/bm` 推导；bootstrap binary 不在该布局中时默认使用
 `/opt/bm`。普通用户通常应显式设置可写目录，例如：
 
 ```bash

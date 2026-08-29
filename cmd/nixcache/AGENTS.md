@@ -127,7 +127,7 @@ GC 记录只允许单写者；build/prune 共用 workflow concurrency group，�
 
 `.github/workflows/build-nixcache.yaml` 发布 `nixcache-linux-x86_64`、
 `nixcache-linux-arm64` 和 `nixcache-darwin-arm64`。Artifact 只有一个 tar.gz
-layer，归档布局为 `nixcache/nixcache`；`install.sh` 只依赖 `curl` 和 `tar`。
+layer，归档布局为 `nixcache/bin/nixcache`；`install.sh` 只依赖 `curl` 和 `tar`。
 
 - 修改 repository、tag、media type、segment metadata、retention identity 或归档布局时，
   同步 workflow、installer 和 `docs/release-model.md`。
