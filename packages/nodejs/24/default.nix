@@ -41,32 +41,16 @@ let
   #     inside the Nix build sandbox (ada's `basic_fuzzer` exe isn't built in
   #     the static toolchain; libuv's `udp_try_send` fails with -98/EADDRINUSE
   #     due to the sandbox's restricted network).
-  #   - hdrhistogram_c: its CMakeLists builds a SHARED `hdr_histogram` target by
-  #     default; under the static toolchain linking that .so fails (R_X86_64_32
-  #     against crtbeginT.o). Disable the shared target via the
-  #     upstream CMake option, which leaves only the static archive — but CMake
-  #     names it `libhdr_histogram_static.a`, whereas node's gyp link line uses
-  #     plain `-lhdr_histogram` (the shared lib's name). With the shared lib gone
-  #     the link fails ("cannot find -lhdr_histogram"), so add a
-  #     `libhdr_histogram.a` symlink pointing at the static archive. Also disable
-  #     the bundled tests/examples (HDR_HISTOGRAM_BUILD_PROGRAMS): the examples
-  #     (`hdr_decoder`, `hiccup`) fail to compile (`#include <hdr/hdr_histogram.h>`
-  #     not on the include path) and node doesn't need them; disabling them also
-  #     removes the check phase, so doCheck is turned off to match.
+  #
+  # hdrhistogram_c no longer needs a local override: unstable nixpkgs already
+  # disables the shared target (HDR_HISTOGRAM_BUILD_SHARED / BUILD_PROGRAMS) and
+  # installs the `libhdr_histogram.a` -> `libhdr_histogram_static.a` symlink node
+  # links against. Re-adding those here produced a duplicate `ln -s` that failed
+  # with "File exists".
   pkgsStaticNode = pkgsStatic.extend (
     _: prev: {
       ada = prev.ada.overrideAttrs { doCheck = false; };
       libuv = prev.libuv.overrideAttrs { doCheck = false; };
-      hdrhistogram_c = prev.hdrhistogram_c.overrideAttrs (old: {
-        cmakeFlags = (old.cmakeFlags or [ ]) ++ [
-          "-DHDR_HISTOGRAM_BUILD_SHARED=OFF"
-          "-DHDR_HISTOGRAM_BUILD_PROGRAMS=OFF"
-        ];
-        postInstall = (old.postInstall or "") + ''
-          ln -s $out/lib/libhdr_histogram_static.a $out/lib/libhdr_histogram.a
-        '';
-        doCheck = false;
-      });
     }
   );
 
