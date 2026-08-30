@@ -219,6 +219,12 @@ jobs:
               exit 1
             }
 
+      # Guarded Darwin CGO relocation re-signs changed Mach-O files with
+      # Apple's codesign to preserve entitlements; sigtool is not equivalent.
+      - name: Check Darwin signing tool
+        if: ${{ inputs.system == 'aarch64-darwin' }}
+        run: test -x /usr/bin/codesign
+
       - name: Build package and source closure
         env:
           SYSTEM: ${{ inputs.system }}

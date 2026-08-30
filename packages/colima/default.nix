@@ -7,10 +7,8 @@
 # wrapper and let colima resolve them from the user's ambient PATH. Shell
 # completions are preserved.
 #
-# CGO stays on (upstream env.CGO_ENABLED = 1). The build links only against
-# system libraries except one: the CGO net resolver pulls in a nix-store
-# libresolv stub. libresolv.9.dylib ships in macOS /usr/lib, so rewrite that
-# load command to the system copy to keep the binary /nix/store-free.
+# CGO stays on. Artifact's guarded Darwin Go/CGO normalization handles the
+# Nix libresolv dependency; this override only changes runtime packaging.
 {
   colima,
 }:
@@ -21,10 +19,5 @@ colima.overrideAttrs (_oldAttrs: {
       --bash <($out/bin/colima completion bash) \
       --fish <($out/bin/colima completion fish) \
       --zsh <($out/bin/colima completion zsh)
-
-    oldResolv=$(otool -L "$out/bin/colima" | awk '/libresolv/ {print $1}')
-    if [ -n "$oldResolv" ]; then
-      install_name_tool -change "$oldResolv" /usr/lib/libresolv.9.dylib "$out/bin/colima"
-    fi
   '';
 })

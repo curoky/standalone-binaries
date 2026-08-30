@@ -11,24 +11,14 @@
 # the sibling *.lima helper scripts, shell completions and the bundled guest
 # agents / templates under share/lima all stay intact and relocatable.
 #
-# CGO stays on; like colima the only non-system dependency is a nix-store
-# libresolv stub, pulled into every Mach-O binary lima ships (limactl plus the
-# libexec helpers limactl-mcp and lima-driver-krunkit). libresolv.9.dylib ships
-# in macOS /usr/lib, so rewrite that load command to the system copy in each to
-# keep the output /nix/store-free.
-#
-# limactl is adhoc-codesigned with vz.entitlements (com.apple.security.
-# virtualization) so the VZ backend works; that is also why upstream sets
-# dontStrip on darwin. install_name_tool voids the signature, so after each
-# rewrite we re-sign adhoc: limactl with the source's vz.entitlements (the same
-# file upstream's Makefile signs with; postInstall still runs in the unpacked
-# source dir), the helpers with a plain adhoc signature. codesign comes from
-# darwin.sigtool (nativeBuildInputs).
+# Artifact's guarded Darwin Go/CGO normalization relocates libresolv only in
+# matching host executables, leaving guest ELF files alone. It preserves the
+# upstream limactl signature's virtualization entitlement when re-signing.
 {
   lima,
 }:
 
-lima.overrideAttrs (oldAttrs: {
+lima.overrideAttrs (_oldAttrs: {
   installPhase = ''
     runHook preInstall
     mkdir -p $out
@@ -38,20 +28,5 @@ lima.overrideAttrs (oldAttrs: {
       --fish <($out/bin/limactl completion fish) \
       --zsh <($out/bin/limactl completion zsh)
     runHook postInstall
-  '';
-
-  postInstall = (oldAttrs.postInstall or "") + ''
-    entitlements="$PWD/vz.entitlements"
-    for bin in "$out/bin/limactl" "$out/libexec/lima/limactl-mcp" "$out/libexec/lima/lima-driver-krunkit"; do
-      [ -f "$bin" ] || continue
-      oldResolv=$(otool -L "$bin" | awk '/\/nix\/store\/.*libresolv/ {print $1}')
-      [ -n "$oldResolv" ] || continue
-      install_name_tool -change "$oldResolv" /usr/lib/libresolv.9.dylib "$bin"
-      if [ "$bin" = "$out/bin/limactl" ]; then
-        codesign -f --entitlements "$entitlements" -s - "$bin"
-      else
-        codesign -f -s - "$bin"
-      fi
-    done
   '';
 })

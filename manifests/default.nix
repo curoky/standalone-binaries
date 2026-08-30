@@ -421,14 +421,12 @@
       isStatic = false;
     };
   };
-  # docker-buildx: Linux only here (pkgsStatic musl static). darwin uses the
-  # local package (packages/docker-buildx/darwin.nix) which redirects the Nix
-  # libresolv load command to /usr/lib.
+  # Darwin Go/CGO resolver relocation is guarded in cmd/artifact/binary.go.
+  # Native selection avoids the pkgsStatic Go toolchain build failure.
   docker-buildx = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
+    "aarch64-darwin" = {
+      isStatic = false;
+    };
   };
   cmakeMinimal = {
     alias = "cmake";
@@ -499,10 +497,9 @@
     };
   };
   golangci-lint = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
+    "aarch64-darwin" = {
+      isStatic = false;
+    };
   };
   golint = {
     "aarch64-darwin" = {
@@ -519,14 +516,10 @@
       isStatic = false;
     };
   };
-  # gost: Linux only here (pkgsStatic musl static). darwin uses the local
-  # package (packages/gost/darwin.nix) which redirects the Nix libresolv load
-  # command to /usr/lib.
   gost = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
+    "aarch64-darwin" = {
+      isStatic = false;
+    };
   };
   gotests = {
     "aarch64-darwin" = {
@@ -583,14 +576,10 @@
       isStatic = false;
     };
   };
-  # supercronic: Linux only here (pkgsStatic musl static). darwin uses the local
-  # package (packages/supercronic/darwin.nix) which redirects the Nix libresolv
-  # load command to /usr/lib.
   supercronic = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
+    "aarch64-darwin" = {
+      isStatic = false;
+    };
   };
   lark-cli = {
     # Linux: default isStatic = true -> pkgsStatic musl static.

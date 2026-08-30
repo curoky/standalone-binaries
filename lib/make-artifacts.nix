@@ -20,6 +20,9 @@ pkgs.runCommand "${name}-standalone"
       artifactTool
     ]
     ++ pkgs.lib.optional (!isDarwin) pkgs.buildPackages.binutils
+    # artifact uses cctools for guarded Mach-O relocation and the Darwin
+    # host's /usr/bin/codesign to preserve existing signature entitlements.
+    # sigtool 0.1.3 cannot preserve signature metadata.
     ++ pkgs.lib.optional isDarwin pkgs.darwin.cctools;
   }
   ''
