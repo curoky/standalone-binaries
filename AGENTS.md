@@ -31,6 +31,11 @@ macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`
 必须匹配 Go build info 和完整库路径，不泛化到其他 Mach-O。门禁和构建期签名规则见
 [`cmd/artifact/AGENTS.md`](cmd/artifact/AGENTS.md#darwin-cgo-resolver)。
 
+经用户确认，Darwin Rclone 先取消 Go 资源 hash 清理，暂时保留已知的
+`tzdata/mailcap/iana-etc` store 引用；这是待修复缺口，不是完整 portability 回归成功。
+该边界仅限上述资源，不放宽动态库或其他包的校验；详情见
+[Go 资源路径](docs/package-strategies/go.md#go-资源路径)。
+
 ## 包集合
 
 支持的平台是 `x86_64-linux`、`aarch64-linux` 和 `aarch64-darwin`。`flake.nix`

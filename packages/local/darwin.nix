@@ -11,15 +11,6 @@ let
   };
 in
 {
-  # colima binary only; runtime deps (lima, docker, ...) are installed
-  # separately. Artifact normalizes eligible native CGO resolver dependencies.
-  colima = pkgs.callPackage ../colima { };
-
-  # lima: hostside limactl + helpers + bundled guest agents. qemu PATH wrapper
-  # dropped (darwin defaults to the VZ backend); runtime deps installed
-  # separately. Artifact preserves entitlements during CGO resolver relocation.
-  lima = pkgs.callPackage ../lima { };
-
   # Partial-static C packages.
   ffmpeg = pkgsStatic.callPackage ../ffmpeg/darwin.nix { };
   krb5 = pkgsStatic.callPackage ../krb5/darwin.nix { };
@@ -30,9 +21,6 @@ in
   wget = pkgsStatic.callPackage ../wget/darwin-static.nix {
     inherit (pkgs) perlPackages;
   };
-
-  # rclone clears only known Go resource references; artifact relocates libresolv.
-  rclone = pkgs.callPackage ../rclone/darwin.nix { };
 
   # Perl.
   perl = pkgs.callPackage ../perl/darwin.nix {
