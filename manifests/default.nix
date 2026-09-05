@@ -476,11 +476,6 @@
       isStatic = false;
     };
   };
-  go-outline = {
-    "aarch64-darwin" = {
-      isStatic = false;
-    };
-  };
   go-task = {
     "aarch64-darwin" = {
       isStatic = false;
@@ -497,11 +492,6 @@
     };
   };
   golangci-lint = {
-    "aarch64-darwin" = {
-      isStatic = false;
-    };
-  };
-  golint = {
     "aarch64-darwin" = {
       isStatic = false;
     };
