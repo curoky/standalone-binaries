@@ -1,18 +1,28 @@
 {
-  nukeReferences,
+  iana-etc,
+  mailcap,
+  removeReferencesTo,
   rclone,
+  tzdata,
 }:
 
 rclone.overrideAttrs (oldAttrs: {
-  nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [ nukeReferences ];
+  nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [ removeReferencesTo ];
+  disallowedReferences = (oldAttrs.disallowedReferences or [ ]) ++ [
+    tzdata
+    mailcap
+    iana-etc
+  ];
 
   postInstall = (oldAttrs.postInstall or "") + ''
-    oldResolv=$(otool -L "$out/bin/rclone" | awk '/\/nix\/store\/.*libresolv/ { print $1 }')
-    if [ -n "$oldResolv" ]; then
-      install_name_tool \
-        -change "$oldResolv" /usr/lib/libresolv.9.dylib \
-        "$out/bin/rclone"
-    fi
-    nuke-refs "$out/bin/rclone"
+    # Nix's Go stdlib embeds these resource paths. Remove only their references,
+    # retaining the existing host/built-in lookup behavior. Preserve the original
+    # libresolv load command so artifact can apply its guarded CGO relocation.
+    # Do not use nuke-refs: it would also destroy the resolver's matching hash.
+    remove-references-to \
+      -t ${tzdata} \
+      -t ${mailcap} \
+      -t ${iana-etc} \
+      "$out/bin/rclone"
   '';
 })
