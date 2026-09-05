@@ -84,6 +84,7 @@ func extractTarGz(src, dst string) error {
 	}
 	defer gzipReader.Close()
 	tarReader := tar.NewReader(gzipReader)
+	buffer := make([]byte, 32*1024)
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -112,7 +113,7 @@ func extractTarGz(src, dst string) error {
 			} else if statErr != nil && !os.IsNotExist(statErr) {
 				return statErr
 			}
-			err = writeFile(target, tarReader, os.FileMode(header.Mode)&0o777)
+			err = writeFile(target, tarReader, os.FileMode(header.Mode)&0o777, buffer)
 		case tar.TypeSymlink:
 			linkTarget, linkErr := safeSymlinkTarget(dst, target, header.Linkname)
 			if linkErr != nil {
@@ -206,7 +207,7 @@ func rejectSymlinkParents(root, target string) error {
 	return nil
 }
 
-func writeFile(target string, reader io.Reader, mode os.FileMode) error {
+func writeFile(target string, reader io.Reader, mode os.FileMode, buffer []byte) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
 	}
@@ -214,9 +215,13 @@ func writeFile(target string, reader io.Reader, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-	_, err = io.Copy(file, reader)
-	return err
+	// Hide ReadFrom so io.CopyBuffer uses the archive's shared buffer.
+	_, copyErr := io.CopyBuffer(struct{ io.Writer }{file}, reader, buffer)
+	closeErr := file.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	return closeErr
 }
 
 func stripFirstComponent(name string) string {
@@ -233,6 +238,20 @@ type pkgLink struct {
 	rel string
 }
 
+type packageFiles map[string][]pkgLink
+
+func (cache packageFiles) get(store string) ([]pkgLink, error) {
+	if files, ok := cache[store]; ok {
+		return files, nil
+	}
+	files, err := collectPkgFiles(store)
+	if err != nil {
+		return nil, err
+	}
+	cache[store] = files
+	return files, nil
+}
+
 func collectPkgFiles(store string) ([]pkgLink, error) {
 	var files []pkgLink
 	resolvedStore, err := filepath.EvalSymlinks(store)
@@ -240,12 +259,8 @@ func collectPkgFiles(store string) ([]pkgLink, error) {
 		return nil, err
 	}
 	active := make(map[string]bool)
-	var walkDir func(string, string) error
-	walkDir = func(path, rel string) error {
-		resolved, err := filepath.EvalSymlinks(path)
-		if err != nil {
-			return err
-		}
+	var walkDir func(string, string, string) error
+	walkDir = func(path, rel, resolved string) error {
 		if resolved != resolvedStore && !withinRoot(resolvedStore, resolved) {
 			return fmt.Errorf("directory link %s escapes package store", path)
 		}
@@ -265,14 +280,14 @@ func collectPkgFiles(store string) ([]pkgLink, error) {
 			if childRel == metaFile {
 				continue
 			}
-			info, err := os.Lstat(childAbs)
-			if err != nil {
-				return err
-			}
-			if info.Mode()&os.ModeSymlink != 0 {
+			if entry.Type()&os.ModeSymlink != 0 {
 				targetInfo, statErr := os.Stat(childAbs)
 				if statErr == nil && targetInfo.IsDir() {
-					if err := walkDir(childAbs, childRel); err != nil {
+					target, err := filepath.EvalSymlinks(childAbs)
+					if err != nil {
+						return err
+					}
+					if err := walkDir(childAbs, childRel, target); err != nil {
 						return err
 					}
 					continue
@@ -280,8 +295,8 @@ func collectPkgFiles(store string) ([]pkgLink, error) {
 				if statErr != nil && !os.IsNotExist(statErr) {
 					return statErr
 				}
-			} else if info.IsDir() {
-				if err := walkDir(childAbs, childRel); err != nil {
+			} else if entry.IsDir() {
+				if err := walkDir(childAbs, childRel, filepath.Join(resolved, entry.Name())); err != nil {
 					return err
 				}
 				continue
@@ -290,7 +305,7 @@ func collectPkgFiles(store string) ([]pkgLink, error) {
 		}
 		return nil
 	}
-	if err := walkDir(store, ""); err != nil {
+	if err := walkDir(store, "", resolvedStore); err != nil {
 		return nil, err
 	}
 	return files, nil
@@ -305,10 +320,19 @@ func linkPkgInto(prefix, name, root string) error {
 	if err != nil {
 		return err
 	}
+	return linkFilesInto(files, root)
+}
+
+func linkFilesInto(files []pkgLink, root string) error {
+	var previousDir string
 	for _, file := range files {
 		dest := filepath.Join(root, file.rel)
-		if err := ensureAggregateDir(root, filepath.Dir(dest)); err != nil {
-			return err
+		dir := filepath.Dir(dest)
+		if dir != previousDir {
+			if err := ensureAggregateDir(root, dir); err != nil {
+				return err
+			}
+			previousDir = dir
 		}
 		relativeTarget, err := filepath.Rel(filepath.Dir(dest), file.abs)
 		if err != nil {
@@ -320,6 +344,15 @@ func linkPkgInto(prefix, name, root string) error {
 		}
 		if err != nil && !os.IsNotExist(err) {
 			return err
+		}
+		if err == nil && info.Mode()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(dest)
+			if err != nil {
+				return err
+			}
+			if target == relativeTarget {
+				continue
+			}
 		}
 		if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
 			return err
@@ -380,10 +413,19 @@ func unlinkPkgFrom(prefix, name, root string) error {
 	if err != nil {
 		return err
 	}
+	return unlinkFilesFrom(files, root)
+}
+
+func unlinkFilesFrom(files []pkgLink, root string) error {
+	var previousDir string
 	for _, file := range files {
 		dest := filepath.Join(root, file.rel)
-		if err := rejectSymlinkParents(root, dest); err != nil {
-			return fmt.Errorf("%s has unsafe parent: %w", dest, err)
+		dir := filepath.Dir(dest)
+		if dir != previousDir {
+			if err := rejectSymlinkParents(root, dest); err != nil {
+				return fmt.Errorf("%s has unsafe parent: %w", dest, err)
+			}
+			previousDir = dir
 		}
 		owned, err := symlinkPointsTo(dest, file.abs)
 		if os.IsNotExist(err) {
