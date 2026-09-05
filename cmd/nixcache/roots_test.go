@@ -53,7 +53,11 @@ func TestLoadRootsRejectsOversizedFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer file.Close()
+	t.Cleanup(func() {
+		if err := file.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 	if err := file.Truncate(maxMetadataSize + 1); err != nil {
 		t.Fatal(err)
 	}

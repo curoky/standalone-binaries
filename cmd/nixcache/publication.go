@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/errdef"
 )
 
@@ -24,20 +22,11 @@ func publicationReady(ctx context.Context, client *registryClient, tag, system, 
 		return false, err
 	}
 	return registryRequest(ctx, "check publication "+tag, func(ctx context.Context) (bool, error) {
-		descriptor, reader, err := client.repo.FetchReference(ctx, tag)
+		_, manifest, err := client.fetchManifest(ctx, tag)
 		if errors.Is(err, errdef.ErrNotFound) || isNameUnknown(err) {
 			return false, nil
 		}
 		if err != nil {
-			return false, err
-		}
-		defer reader.Close()
-		body, err := readMetadata(reader, descriptor)
-		if err != nil {
-			return false, err
-		}
-		var manifest ocispec.Manifest
-		if err := json.Unmarshal(body, &manifest); err != nil {
 			return false, err
 		}
 		if manifest.SchemaVersion != 2 || len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != archiveMediaType || manifest.Layers[0].Size <= 0 || manifest.Layers[0].Digest.Validate() != nil {

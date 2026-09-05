@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -10,18 +9,50 @@ import (
 	"net"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/felixge/httpsnoop"
 )
 
 const (
-	defaultListen = "127.0.0.1:37515"
+	defaultHost   = "127.0.0.1"
+	defaultPort   = 37515
 	refreshEvery  = 5 * time.Minute
 	nixCacheInfo  = "StoreDir: /nix/store\nWantMassQuery: 1\nPriority: 30\n"
 	narInfoSuffix = ".narinfo"
 )
+
+type serveConfig struct {
+	host string
+	port int
+}
+
+func (config serveConfig) listen() (net.Listener, error) {
+	if config.port < 0 || config.port > 65535 {
+		return nil, fmt.Errorf("port must be between 0 and 65535, got %d", config.port)
+	}
+	address := net.JoinHostPort(config.host, strconv.Itoa(config.port))
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return nil, fmt.Errorf("listen on %s: %w", address, err)
+	}
+	return listener, nil
+}
+
+type narBlob struct {
+	digest string
+	size   int64
+}
+
+type indexSnapshot struct {
+	entries   map[string]string
+	nars      map[string]narBlob
+	snapshots int
+}
 
 type cacheIndex struct {
 	client *registryClient
@@ -29,32 +60,17 @@ type cacheIndex struct {
 
 	refreshMu sync.Mutex
 	segments  map[string]segmentRef
-
-	// ready flips to true after the first successful index load. The
-	// nix-cache-info readiness endpoint reports 503 until then so a probe only
-	// passes once entries are queryable, without keeping the port closed.
-	ready atomic.Bool
-
-	mu      sync.RWMutex
-	entries map[string]cacheEntry
-	nars    map[string]cacheEntry
+	current   atomic.Pointer[indexSnapshot]
 }
 
 func newCacheIndex(client *registryClient, system string) *cacheIndex {
-	return &cacheIndex{
-		client:   client,
-		system:   system,
-		segments: make(map[string]segmentRef),
-		entries:  make(map[string]cacheEntry),
-		nars:     make(map[string]cacheEntry),
-	}
+	return &cacheIndex{client: client, system: system, segments: make(map[string]segmentRef)}
 }
 
 func (index *cacheIndex) refresh(ctx context.Context) (int, error) {
 	index.refreshMu.Lock()
 	defer index.refreshMu.Unlock()
 
-	log.Printf("refreshing cache index for %s", index.system)
 	started := time.Now()
 	tags, err := index.client.listTags(ctx, index.system)
 	if err != nil {
@@ -82,29 +98,36 @@ func (index *cacheIndex) refresh(ctx context.Context) (int, error) {
 		segments[ref.Tag] = ref
 	}
 
-	ordered := slices.SortedFunc(maps.Values(segments), compareSegments)
-	entries := make(map[string]cacheEntry)
+	current := index.current.Load()
+	if current == nil || len(loaded) != 0 || removed != 0 {
+		current, err = mergeSegments(segments)
+		if err != nil {
+			return 0, err
+		}
+		index.segments = segments
+		index.current.Store(current)
+	}
+	log.Printf("cache index refreshed: %d entries across %d snapshots; segments reused=%d loaded=%d removed=%d in %s",
+		len(current.entries), current.snapshots, reused, len(loaded), removed, time.Since(started).Round(time.Millisecond))
+	return len(current.entries), nil
+}
+
+func mergeSegments(segments map[string]segmentRef) (*indexSnapshot, error) {
+	current := &indexSnapshot{entries: make(map[string]string), nars: make(map[string]narBlob)}
 	snapshots := make(map[string]struct{})
-	nars := make(map[string]cacheEntry)
-	for _, ref := range ordered {
+	for _, ref := range slices.SortedFunc(maps.Values(segments), compareSegments) {
 		snapshots[ref.Snapshot] = struct{}{}
-		maps.Copy(entries, ref.Entries)
-		for _, entry := range ref.Entries {
-			if previous, ok := nars[entry.NARURL]; ok && (previous.NARDigest != entry.NARDigest || previous.NARSize != entry.NARSize) {
-				return 0, fmt.Errorf("conflicting NAR URL %s", entry.NARURL)
+		for hash, entry := range ref.Entries {
+			blob := narBlob{digest: entry.NARDigest, size: entry.NARSize}
+			if previous, ok := current.nars[entry.NARURL]; ok && previous != blob {
+				return nil, fmt.Errorf("conflicting NAR URL %s", entry.NARURL)
 			}
-			nars[entry.NARURL] = entry
+			current.entries[hash] = entry.NARInfo
+			current.nars[entry.NARURL] = blob
 		}
 	}
-
-	index.mu.Lock()
-	index.entries = entries
-	index.nars = nars
-	index.mu.Unlock()
-	index.segments = segments
-	log.Printf("cache index refreshed: %d entries across %d snapshots; segments reused=%d loaded=%d removed=%d in %s",
-		len(entries), len(snapshots), reused, len(loaded), removed, time.Since(started).Round(time.Millisecond))
-	return len(entries), nil
+	current.snapshots = len(snapshots)
+	return current, nil
 }
 
 func (index *cacheIndex) serveHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -113,50 +136,51 @@ func (index *cacheIndex) serveHTTP(writer http.ResponseWriter, request *http.Req
 		return
 	}
 
+	current := index.current.Load()
 	path := strings.TrimPrefix(request.URL.Path, "/")
 	switch {
 	case path == "nix-cache-info":
-		// Report not-ready until the first index load finishes, so a readiness
-		// probe waits for a queryable index rather than passing against an
-		// empty one (which would misreport every cache hit as a miss).
-		if !index.ready.Load() {
+		if current == nil {
 			http.Error(writer, "cache index not ready", http.StatusServiceUnavailable)
 			return
 		}
 		serveBytes(writer, request, "text/x-nix-cache-info", nixCacheInfo)
 	case strings.HasSuffix(path, narInfoSuffix):
 		hash := strings.TrimSuffix(path, narInfoSuffix)
-		index.mu.RLock()
-		entry, ok := index.entries[hash]
-		size := len(index.entries)
-		index.mu.RUnlock()
-		if !ok {
-			log.Printf("narinfo miss: %s (index has %d entries)", hash, size)
+		if current == nil {
 			http.NotFound(writer, request)
 			return
 		}
-		serveBytes(writer, request, "text/x-nix-narinfo", entry.NARInfo)
+		info, ok := current.entries[hash]
+		if !ok {
+			log.Printf("narinfo miss: %s (index has %d entries)", hash, len(current.entries))
+			http.NotFound(writer, request)
+			return
+		}
+		serveBytes(writer, request, "text/x-nix-narinfo", info)
 	case strings.HasPrefix(path, "nar/"):
-		index.mu.RLock()
-		entry, ok := index.nars[path]
-		index.mu.RUnlock()
+		if current == nil {
+			http.NotFound(writer, request)
+			return
+		}
+		blob, ok := current.nars[path]
 		if !ok {
 			http.NotFound(writer, request)
 			return
 		}
 		if request.Method == http.MethodHead {
-			setNARHeaders(writer, entry)
+			setNARHeaders(writer, blob)
 			writer.WriteHeader(http.StatusOK)
 			return
 		}
-		reader, err := index.client.blobReader(request.Context(), entry.NARDigest)
+		reader, err := index.client.blobReader(request.Context(), blob.digest)
 		if err != nil {
-			log.Printf("read cache blob %s: %v", entry.NARDigest, err)
+			log.Printf("read cache blob %s: %v", blob.digest, err)
 			http.Error(writer, "read cache blob", http.StatusBadGateway)
 			return
 		}
-		defer func() { _ = reader.Close() }()
-		setNARHeaders(writer, entry)
+		defer func() { _ = reader.Close() }() // The response is committed before stream cleanup.
+		setNARHeaders(writer, blob)
 		if _, err := io.Copy(writer, reader); err != nil {
 			log.Printf("stream %s: %v", path, err)
 		}
@@ -167,27 +191,21 @@ func (index *cacheIndex) serveHTTP(writer http.ResponseWriter, request *http.Req
 
 func serveBytes(writer http.ResponseWriter, request *http.Request, contentType, body string) {
 	writer.Header().Set("Content-Type", contentType)
-	http.ServeContent(writer, request, "", time.Time{}, bytes.NewReader([]byte(body)))
+	http.ServeContent(writer, request, "", time.Time{}, strings.NewReader(body))
 }
 
-func setNARHeaders(writer http.ResponseWriter, entry cacheEntry) {
+func setNARHeaders(writer http.ResponseWriter, blob narBlob) {
 	writer.Header().Set("Content-Type", "application/x-nix-nar")
-	writer.Header().Set("Content-Length", fmt.Sprintf("%d", entry.NARSize))
-	writer.Header().Set("ETag", `"`+entry.NARDigest+`"`)
+	writer.Header().Set("Content-Length", strconv.FormatInt(blob.size, 10))
+	writer.Header().Set("ETag", `"`+blob.digest+`"`)
 }
 
-func serveCache(ctx context.Context, client *registryClient, system string) error {
+func serveCache(ctx context.Context, client *registryClient, system string, config serveConfig) error {
 	index := newCacheIndex(client, system)
-
-	// Open the listener first so the port is immediately connectable: the CI
-	// readiness probe polls nix-cache-info, which reports 503 until the first
-	// index load completes. Blocking the listen on that load instead (a full
-	// GHCR segment fetch) would keep the port closed past the probe's retry
-	// window, so every connection is refused and the job fails before the
-	// cache is ever usable.
-	listener, err := net.Listen("tcp", defaultListen)
+	// Listen before loading so readiness reports 503 instead of refusing connections.
+	listener, err := config.listen()
 	if err != nil {
-		return fmt.Errorf("listen on %s: %w", defaultListen, err)
+		return err
 	}
 
 	server := &http.Server{
@@ -197,15 +215,12 @@ func serveCache(ctx context.Context, client *registryClient, system string) erro
 	}
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- server.Serve(listener) }()
-	log.Printf("serving Nix cache at http://%s", defaultListen)
+	log.Printf("serving Nix cache at http://%s", listener.Addr())
 
-	count, err := index.refresh(ctx)
-	if err != nil {
+	if _, err := index.refresh(ctx); err != nil {
 		_ = server.Close()
 		return fmt.Errorf("load initial cache index: %w", err)
 	}
-	log.Printf("loaded cache index: %d entries", count)
-	index.ready.Store(true)
 
 	go func() {
 		ticker := time.NewTicker(refreshEvery)
@@ -215,10 +230,8 @@ func serveCache(ctx context.Context, client *registryClient, system string) erro
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if count, err := index.refresh(ctx); err != nil {
+				if _, err := index.refresh(ctx); err != nil {
 					log.Printf("refresh cache index: %v", err)
-				} else {
-					log.Printf("refreshed cache index: %d entries", count)
 				}
 			}
 		}
@@ -227,25 +240,9 @@ func serveCache(ctx context.Context, client *registryClient, system string) erro
 	return <-serveErr
 }
 
-// statusRecorder captures the response status so the access log can report it;
-// net/http does not expose the code written to a ResponseWriter otherwise.
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (recorder *statusRecorder) WriteHeader(status int) {
-	recorder.status = status
-	recorder.ResponseWriter.WriteHeader(status)
-}
-
-// withAccessLog logs one line per request so cache hits and misses are visible
-// in CI logs, which is the main signal for confirming the substituter works.
 func withAccessLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		recorder := &statusRecorder{ResponseWriter: writer, status: http.StatusOK}
-		start := time.Now()
-		next.ServeHTTP(recorder, request)
-		log.Printf("%s %s -> %d (%s)", request.Method, request.URL.Path, recorder.status, time.Since(start).Round(time.Millisecond))
+		metrics := httpsnoop.CaptureMetrics(next, writer, request)
+		log.Printf("%s %s -> %d (%s)", request.Method, request.URL.Path, metrics.Code, metrics.Duration.Round(time.Millisecond))
 	})
 }

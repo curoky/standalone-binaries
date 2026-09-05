@@ -1,17 +1,26 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/registry"
+	"github.com/opencontainers/go-digest"
 )
 
 func TestServeCache(t *testing.T) {
@@ -31,7 +40,6 @@ func TestServeCache(t *testing.T) {
 	if _, err := index.refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	index.ready.Store(true)
 	server := httptest.NewServer(http.HandlerFunc(index.serveHTTP))
 	t.Cleanup(server.Close)
 
@@ -86,7 +94,7 @@ type refreshRegistry struct {
 	publishedTag string
 }
 
-func newRefreshRegistry(t *testing.T) *refreshRegistry {
+func newRefreshRegistry(t testing.TB) *refreshRegistry {
 	t.Helper()
 	fixture := &refreshRegistry{requests: make(map[string]int)}
 	backend := registry.New()
@@ -221,7 +229,7 @@ func TestCacheRefreshIncrementalAcrossSnapshots(t *testing.T) {
 		t.Fatalf("deletion refresh: count=%d err=%v", count, err)
 	}
 	fixture.assertReads(t, 0, 0)
-	if _, ok := index.nars[old.NARURL]; ok {
+	if _, ok := index.current.Load().nars[old.NARURL]; ok {
 		t.Fatal("deleted segment NAR is still indexed")
 	}
 	if hit, err := probeStorePath(context.Background(), http.DefaultClient, server.URL, old.StorePath); err != nil || hit {
@@ -232,7 +240,7 @@ func TestCacheRefreshIncrementalAcrossSnapshots(t *testing.T) {
 	if _, err := index.refresh(context.Background()); err == nil {
 		t.Fatal("expected mismatched platform metadata to fail")
 	}
-	if len(index.segments) != 1 || len(index.entries) != 1 {
+	if len(index.segments) != 1 || len(index.current.Load().entries) != 1 {
 		t.Fatal("platform mismatch changed the index")
 	}
 
@@ -241,7 +249,7 @@ func TestCacheRefreshIncrementalAcrossSnapshots(t *testing.T) {
 		t.Fatalf("empty refresh: count=%d err=%v", count, err)
 	}
 	fixture.assertReads(t, 0, 0)
-	if len(index.segments) != 0 || len(index.nars) != 0 {
+	if len(index.segments) != 0 || len(index.current.Load().nars) != 0 {
 		t.Fatal("deleted segments remain cached")
 	}
 }
@@ -281,8 +289,8 @@ func TestCacheRefreshFailurePreservesState(t *testing.T) {
 				t.Fatal("expected refresh failure")
 			}
 			if len(index.segments) != 1 || index.segments[oldTag].Tag != oldTag ||
-				len(index.entries) != 1 || index.entries[strings.Repeat("a", 32)].NARInfo != old.NARInfo ||
-				len(index.nars) != 1 || index.nars[old.NARURL].NARDigest != old.NARDigest {
+				len(index.current.Load().entries) != 1 || index.current.Load().entries[strings.Repeat("a", 32)] != old.NARInfo ||
+				len(index.current.Load().nars) != 1 || index.current.Load().nars[old.NARURL].digest != old.NARDigest {
 				t.Fatal("failed refresh changed committed state")
 			}
 			fixture.mu.Lock()
@@ -292,8 +300,8 @@ func TestCacheRefreshFailurePreservesState(t *testing.T) {
 			if count, err := index.refresh(context.Background()); err != nil || count != 2 {
 				t.Fatalf("recovery: count=%d err=%v", count, err)
 			}
-			if index.entries[strings.Repeat("b", 32)].NARInfo != newEntry.NARInfo ||
-				index.entries[strings.Repeat("c", 32)].NARInfo != other.NARInfo || len(index.segments) != 2 {
+			if index.current.Load().entries[strings.Repeat("b", 32)] != newEntry.NARInfo ||
+				index.current.Load().entries[strings.Repeat("c", 32)] != other.NARInfo || len(index.segments) != 2 {
 				t.Fatal("recovery did not replace the index")
 			}
 		})
@@ -351,10 +359,10 @@ func TestCacheRefreshDeterministicWinnerAfterDeletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixture.assertReads(t, 0, 0)
-	if index.entries[hash].NARDigest != newEntry.NARDigest {
+	if index.current.Load().entries[hash] != newEntry.NARInfo {
 		t.Fatal("newest time and tag did not win")
 	}
-	if len(index.nars) != 2 || index.nars[old.NARURL].NARDigest != old.NARDigest {
+	if len(index.current.Load().nars) != 2 || index.current.Load().nars[old.NARURL].digest != old.NARDigest {
 		t.Fatal("refresh invalidated a NAR URL from a retained segment")
 	}
 	response := httptest.NewRecorder()
@@ -367,10 +375,10 @@ func TestCacheRefreshDeterministicWinnerAfterDeletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixture.assertReads(t, 0, 0)
-	if index.entries[hash].NARDigest != old.NARDigest || len(index.nars) != 1 {
+	if index.current.Load().entries[hash] != old.NARInfo || len(index.current.Load().nars) != 1 {
 		t.Fatal("remaining older entry was not restored")
 	}
-	if _, ok := index.nars[newEntry.NARURL]; ok {
+	if _, ok := index.current.Load().nars[newEntry.NARURL]; ok {
 		t.Fatal("deleted winning NAR is still indexed")
 	}
 }
@@ -404,14 +412,308 @@ func TestRefreshKeepsPreviouslyIssuedNARURL(t *testing.T) {
 	}
 }
 
+func TestServeListen(t *testing.T) {
+	for _, host := range []string{"127.0.0.1", "::1"} {
+		t.Run(host, func(t *testing.T) {
+			listener, err := (serveConfig{host: host, port: 0}).listen()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = listener.Close() }() // Server.Serve also closes the listener.
+			address := listener.Addr().(*net.TCPAddr)
+			if !address.IP.Equal(net.ParseIP(host)) || address.Port == 0 {
+				t.Fatalf("address=%v", address)
+			}
+			server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })}
+			done := make(chan error, 1)
+			go func() { done <- server.Serve(listener) }()
+			defer func() {
+				if err := server.Close(); err != nil {
+					t.Error(err)
+				}
+				if err := <-done; !errors.Is(err, http.ErrServerClosed) {
+					t.Errorf("serve: %v", err)
+				}
+			}()
+			response, err := http.Get("http://" + listener.Addr().String())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := response.Body.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if response.StatusCode != http.StatusNoContent {
+				t.Fatalf("status=%d", response.StatusCode)
+			}
+			command := newCommand()
+			command.SetArgs([]string{"serve", "--host", host, "--port", strconv.Itoa(address.Port)})
+			if err := command.Execute(); err == nil || !strings.Contains(err.Error(), listener.Addr().String()) {
+				t.Fatalf("CLI did not bind requested address: %v", err)
+			}
+		})
+	}
+	for _, port := range []int{-1, 65536} {
+		command := newCommand()
+		command.SetArgs([]string{"serve", "--port", strconv.Itoa(port)})
+		if err := command.Execute(); err == nil || !strings.Contains(err.Error(), "port must be") {
+			t.Fatalf("invalid port %d: %v", port, err)
+		}
+	}
+	command, _, err := newCommand().Find([]string{"serve"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if command.Flags().Lookup("host").DefValue != "127.0.0.1" || command.Flags().Lookup("port").DefValue != "37515" {
+		t.Fatal("default listen address changed")
+	}
+}
+
+func TestCacheReadinessAndConcurrentRefresh(t *testing.T) {
+	fixture := newRefreshRegistry(t)
+	index := newCacheIndex(fixture.client, "x86_64-linux")
+	response := httptest.NewRecorder()
+	index.serveHTTP(response, httptest.NewRequest(http.MethodGet, "/nix-cache-info", nil))
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("initial readiness=%d", response.Code)
+	}
+	if _, err := index.refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	response = httptest.NewRecorder()
+	index.serveHTTP(response, httptest.NewRequest(http.MethodGet, "/nix-cache-info", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("empty cache readiness=%d", response.Code)
+	}
+	state := snapshot{ID: "sha256:" + strings.Repeat("1", 64), System: index.system}
+	entry := testCacheEntry(t, strings.Repeat("a", 32), "root", []byte("nar"))
+	tag := fixture.publish(t, state, entry)
+	var readers sync.WaitGroup
+	for range 8 {
+		readers.Go(func() {
+			for range 100 {
+				for _, path := range []string{"/nix-cache-info", "/" + strings.Repeat("a", 32) + ".narinfo", "/" + entry.NARURL} {
+					response := httptest.NewRecorder()
+					index.serveHTTP(response, httptest.NewRequest(http.MethodHead, path, nil))
+					if response.Code != http.StatusOK && (path == "/nix-cache-info" || response.Code != http.StatusNotFound) {
+						t.Errorf("%s status=%d", path, response.Code)
+					}
+				}
+			}
+		})
+	}
+	defer readers.Wait()
+	for i := range 20 {
+		if i%2 == 0 {
+			fixture.list(tag)
+		} else {
+			fixture.list()
+		}
+		if _, err := index.refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		current := index.current.Load()
+		if _, err := index.refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if index.current.Load() != current {
+			t.Fatal("unchanged refresh rebuilt snapshot")
+		}
+	}
+}
+
+func TestServeMetadataHTTPBehavior(t *testing.T) {
+	index := newCacheIndex(nil, "x86_64-linux")
+	index.current.Store(&indexSnapshot{entries: map[string]string{"hash": "0123456789"}})
+	for _, test := range []struct {
+		method, path, rangeHeader, body string
+		status                          int
+	}{
+		{http.MethodGet, "/hash.narinfo", "", "0123456789", 200},
+		{http.MethodHead, "/hash.narinfo", "", "", 200},
+		{http.MethodHead, "/nix-cache-info", "", "", 200},
+		{http.MethodGet, "/hash.narinfo", "bytes=2-4", "234", 206},
+		{http.MethodPost, "/hash.narinfo", "", "method not allowed\n", 405},
+		{http.MethodGet, "/unknown", "", "404 page not found\n", 404},
+	} {
+		request := httptest.NewRequest(test.method, test.path, nil)
+		request.Header.Set("Range", test.rangeHeader)
+		response := httptest.NewRecorder()
+		index.serveHTTP(response, request)
+		if response.Code != test.status || response.Body.String() != test.body {
+			t.Fatalf("%s %s: %d %q", test.method, test.path, response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestAccessLogPreservesStreamingInterfaces(t *testing.T) {
+	output := log.Writer()
+	var logs bytes.Buffer
+	log.SetOutput(&logs)
+	defer log.SetOutput(output)
+	server := httptest.NewServer(withAccessLog(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := w.(io.ReaderFrom); !ok {
+			t.Error("ReaderFrom hidden by access logger")
+		}
+		if _, ok := w.(http.Flusher); !ok {
+			t.Error("Flusher hidden by access logger")
+		}
+		w.WriteHeader(http.StatusAccepted)
+		if _, err := io.Copy(w, struct{ io.Reader }{strings.NewReader("streamed")}); err != nil {
+			t.Error(err)
+		}
+	})))
+	response, err := http.Get(server.URL)
+	if err != nil {
+		server.Close()
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(response.Body)
+	if closeErr := response.Body.Close(); closeErr != nil {
+		t.Error(closeErr)
+	}
+	server.Close()
+	if err != nil || response.StatusCode != http.StatusAccepted || string(body) != "streamed" {
+		t.Fatalf("stream: %d %q %v", response.StatusCode, body, err)
+	}
+	if !strings.Contains(logs.String(), "-> 202") {
+		t.Fatalf("log=%q", logs.String())
+	}
+}
+
+func TestProbeCommandExitCodes(t *testing.T) {
+	if os.Getenv("NIXCACHE_TEST_CLI") == "1" {
+		os.Args = append([]string{"nixcache"}, strings.Split(os.Getenv("NIXCACHE_TEST_ARGS"), "\n")...)
+		os.Exit(run())
+	}
+	entry := testCacheEntry(t, strings.Repeat("a", 32), "root", []byte("nar"))
+	for _, test := range []struct{ status, exit int }{{200, 0}, {404, 1}, {403, 2}} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(test.status)
+			_, _ = io.WriteString(w, entry.NARInfo)
+		}))
+		command := exec.Command(os.Args[0], "-test.run=^TestProbeCommandExitCodes$")
+		command.Env = append(os.Environ(), "NIXCACHE_TEST_CLI=1", "NIXCACHE_TEST_ARGS=probe\n--cache\n"+server.URL+"\n"+entry.StorePath)
+		output, err := command.CombinedOutput()
+		server.Close()
+		if command.ProcessState.ExitCode() != test.exit {
+			t.Fatalf("status=%d exit=%d err=%v output=%s", test.status, command.ProcessState.ExitCode(), err, output)
+		}
+	}
+}
+
+func BenchmarkNARStream(b *testing.B) {
+	body := bytes.Repeat([]byte("nar"), 1<<18)
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		_, _ = w.Write(body)
+	}))
+	defer backend.Close()
+	client, err := newRegistryClient(backend.Listener.Addr().String()+"/cache", true)
+	if err != nil {
+		b.Fatal(err)
+	}
+	index := newCacheIndex(client, "x86_64-linux")
+	index.current.Store(&indexSnapshot{nars: map[string]narBlob{"nar/test": {digest: digest.FromBytes(body).String(), size: int64(len(body))}}})
+	server := httptest.NewServer(withAccessLog(http.HandlerFunc(index.serveHTTP)))
+	defer server.Close()
+	output := log.Writer()
+	log.SetOutput(io.Discard)
+	defer log.SetOutput(output)
+	b.SetBytes(int64(len(body)))
+	b.ReportAllocs()
+	for b.Loop() {
+		response, err := http.Get(server.URL + "/nar/test")
+		if err != nil {
+			b.Fatal(err)
+		}
+		n, err := io.Copy(io.Discard, response.Body)
+		closeErr := response.Body.Close()
+		if err != nil || closeErr != nil || n != int64(len(body)) || response.StatusCode != http.StatusOK {
+			b.Fatalf("stream: bytes=%d status=%d err=%v close=%v", n, response.StatusCode, err, closeErr)
+		}
+	}
+}
+
+func BenchmarkCacheRefresh(b *testing.B) {
+	output := log.Writer()
+	log.SetOutput(io.Discard)
+	b.Cleanup(func() { log.SetOutput(output) })
+	for _, changed := range []bool{false, true} {
+		b.Run(fmt.Sprintf("changed=%t", changed), func(b *testing.B) {
+			fixture := newRefreshRegistry(b)
+			index := newCacheIndex(fixture.client, "x86_64-linux")
+			tags := make([]string, 256)
+			for i := range tags {
+				tags[i] = fmt.Sprintf("v1-snapshot-x86_64-linux-%d", i)
+				entries := make(map[string]cacheEntry, 256)
+				for j := range 256 {
+					hash := fmt.Sprintf("%032x", i*64+j)
+					entries[hash] = cacheEntry{StorePath: "/nix/store/" + hash + "-pkg", NARURL: "nar/" + hash, NARDigest: "sha256:" + hash + hash, NARSize: 1024, NARInfo: strings.Repeat("x", 512)}
+				}
+				index.segments[tags[i]] = segmentRef{Tag: tags[i], segment: segment{System: index.system, Snapshot: "snapshot", CreatedAt: time.Unix(int64(i), 0), Entries: entries}}
+			}
+			fixture.list(tags...)
+			if _, err := index.refresh(context.Background()); err != nil {
+				b.Fatal(err)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				if changed {
+					index.segments["removed"] = segmentRef{Tag: "removed"}
+				}
+				if _, err := index.refresh(context.Background()); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkServeNarInfo(b *testing.B) {
+	index := newCacheIndex(nil, "x86_64-linux")
+	hash := strings.Repeat("a", 32)
+	index.current.Store(&indexSnapshot{entries: map[string]string{hash: strings.Repeat("x", 1024)}})
+	request := httptest.NewRequest(http.MethodGet, "/"+hash+".narinfo", nil)
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			index.serveHTTP(httptest.NewRecorder(), request)
+		}
+	})
+}
+
+func TestRefreshRejectsConflictingNARURL(t *testing.T) {
+	fixture := newRefreshRegistry(t)
+	state := snapshot{ID: "sha256:" + strings.Repeat("1", 64), System: "x86_64-linux"}
+	entry := testCacheEntry(t, strings.Repeat("a", 32), "root", []byte("nar"))
+	tag := fixture.publish(t, state, entry)
+	fixture.list(tag)
+	index := newCacheIndex(fixture.client, state.System)
+	if _, err := index.refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	other := testCacheEntry(t, strings.Repeat("b", 32), "other", []byte("other"))
+	other.NARInfo = strings.ReplaceAll(other.NARInfo, other.NARURL, entry.NARURL)
+	other.NARURL = entry.NARURL
+	otherTag := fixture.publish(t, state, other)
+	fixture.list(tag, otherTag)
+	if _, err := index.refresh(context.Background()); err == nil || !strings.Contains(err.Error(), "conflicting NAR URL") {
+		t.Fatalf("expected conflicting URL error, got %v", err)
+	}
+	response := httptest.NewRecorder()
+	index.serveHTTP(response, httptest.NewRequest(http.MethodGet, "/"+entry.NARURL, nil))
+	if response.Code != http.StatusOK || response.Body.String() != "nar" {
+		t.Fatalf("previous index changed: %d %q", response.Code, response.Body.String())
+	}
+}
+
 func TestServeCacheReturnsBadGatewayBeforeWritingNARHeaders(t *testing.T) {
 	client := testRegistryClient(t)
 	index := newCacheIndex(client, "x86_64-linux")
-	index.nars["nar/missing.nar.zst"] = cacheEntry{
-		NARURL:    "nar/missing.nar.zst",
-		NARDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		NARSize:   42,
-	}
+	index.current.Store(&indexSnapshot{nars: map[string]narBlob{
+		"nar/missing.nar.zst": {digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", size: 42},
+	}})
 
 	request := httptest.NewRequest(http.MethodGet, "/nar/missing.nar.zst", nil)
 	response := httptest.NewRecorder()

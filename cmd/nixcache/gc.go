@@ -13,11 +13,9 @@ import (
 	"time"
 
 	"github.com/opencontainers/go-digest"
-	"github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/content"
 	"oras.land/oras-go/v2/errdef"
-	"oras.land/oras-go/v2/registry"
 )
 
 const gcPrefix = "gc-v1-"
@@ -35,43 +33,22 @@ type gcState struct {
 	Candidates map[string]gcCandidate `json:"candidates"`
 }
 
-func (client *registryClient) loadGC(ctx context.Context) (gcState, []string, error) {
+func (client *registryClient) loadGC(ctx context.Context, tags []string) (gcState, []string, error) {
 	state := gcState{Version: 1, Candidates: make(map[string]gcCandidate)}
-	tags, err := registryRequest(ctx, "list GC records", func(ctx context.Context) ([]string, error) { return registry.Tags(ctx, client.repo) })
-	if errors.Is(err, errdef.ErrNotFound) || isNameUnknown(err) {
-		return state, nil, nil
-	}
-	if err != nil {
-		return state, nil, err
-	}
-	tags = slices.DeleteFunc(tags, func(tag string) bool { return !strings.HasPrefix(tag, gcPrefix) })
+	tags = slices.DeleteFunc(slices.Clone(tags), func(tag string) bool { return !strings.HasPrefix(tag, gcPrefix) })
 	slices.Sort(tags)
 	if len(tags) == 0 {
 		return state, nil, nil
 	}
-	_, err = registryRequest(ctx, "read GC record", func(ctx context.Context) (bool, error) {
-		descriptor, reader, err := client.repo.FetchReference(ctx, tags[len(tags)-1])
+	_, err := registryRequest(ctx, "read GC record", func(ctx context.Context) (bool, error) {
+		_, manifest, err := client.fetchManifest(ctx, tags[len(tags)-1])
 		if err != nil {
-			return false, err
-		}
-		defer reader.Close()
-		body, err := readMetadata(reader, descriptor)
-		if err != nil {
-			return false, err
-		}
-		var manifest ocispec.Manifest
-		if err := json.Unmarshal(body, &manifest); err != nil {
 			return false, err
 		}
 		if manifest.SchemaVersion != 2 || len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != gcMediaType {
 			return false, fmt.Errorf("invalid GC manifest")
 		}
-		blob, err := client.repo.Fetch(ctx, manifest.Layers[0])
-		if err != nil {
-			return false, err
-		}
-		defer blob.Close()
-		body, err = readMetadata(blob, manifest.Layers[0])
+		body, err := client.fetchMetadata(ctx, manifest.Layers[0])
 		if err != nil {
 			return false, err
 		}
@@ -129,13 +106,6 @@ func (client *registryClient) saveGC(ctx context.Context, state gcState) error {
 	if err := client.repo.Blobs().Push(ctx, descriptor, bytes.NewReader(body)); err != nil && !errors.Is(err, errdef.ErrAlreadyExists) {
 		return err
 	}
-	manifest, err := json.Marshal(ocispec.Manifest{
-		Versioned: specs.Versioned{SchemaVersion: 2}, MediaType: ocispec.MediaTypeImageManifest,
-		Config: descriptor, Layers: []ocispec.Descriptor{descriptor},
-	})
-	if err != nil {
-		return err
-	}
 	tag := gcPrefix + state.CreatedAt.UTC().Format("20060102T150405.000000000Z") + "-" + rand.Text()
-	return client.repo.PushReference(ctx, content.NewDescriptorFromBytes(ocispec.MediaTypeImageManifest, manifest), bytes.NewReader(manifest), tag)
+	return client.pushManifest(ctx, tag, []ocispec.Descriptor{descriptor})
 }

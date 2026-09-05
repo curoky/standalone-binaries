@@ -91,8 +91,7 @@ func TestNixRoundTrip(t *testing.T) {
 	if _, err := index.refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	index.ready.Store(true)
-	server := httptest.NewServer(http.HandlerFunc(index.serveHTTP))
+	server := httptest.NewServer(withAccessLog(http.HandlerFunc(index.serveHTTP)))
 	t.Cleanup(server.Close)
 
 	destination := "file://" + filepath.Join(t.TempDir(), "cache")

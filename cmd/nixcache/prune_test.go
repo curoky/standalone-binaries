@@ -106,7 +106,7 @@ func TestPruneDryRunDeletesNothing(t *testing.T) {
 	if len(segments) != 3 {
 		t.Fatalf("dry-run must not delete, got %d tags", len(segments))
 	}
-	if _, tags, err := client.loadGC(context.Background()); err != nil || len(tags) != 0 {
+	if _, tags, err := loadTestGC(t, client); err != nil || len(tags) != 0 {
 		t.Fatalf("dry-run wrote GC records: %v %v", tags, err)
 	}
 }
