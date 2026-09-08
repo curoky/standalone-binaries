@@ -9,7 +9,7 @@
   libseccomp,
   python3,
   systemd,
-  yajl,
+  json_c,
   argp-standalone,
   nixosTests,
   criu,
@@ -27,7 +27,7 @@
       libcap
       libseccomp
       # gperf
-      yajl
+      json_c
       argp-standalone
     ];
     env = {
@@ -39,7 +39,6 @@
     configureFlags = [
       "--enable-static"
       "--disable-systemd"
-      "--enable-embedded-yajl"
       "--without-python-bindings"
     ];
 
