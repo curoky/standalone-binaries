@@ -324,11 +324,16 @@
   };
 
   # s6 stack
+  #
+  # Pinned to the nixpkgs-s6 env (a fixed unstable revision) because a later
+  # unstable bump broke these builds. The local s6 packages (execline / s6 /
+  # s6-linux-init / s6-rc) are pinned to the same revision via flake.nix.
   s6-dns = {
     platforms = [
       "x86_64-linux"
       "aarch64-linux"
     ];
+    version = "s6-pin";
     output = [ "bin" ];
   };
   s6-linux-utils = {
@@ -336,6 +341,7 @@
       "x86_64-linux"
       "aarch64-linux"
     ];
+    version = "s6-pin";
     output = [ "bin" ];
   };
   s6-networking = {
@@ -343,6 +349,7 @@
       "x86_64-linux"
       "aarch64-linux"
     ];
+    version = "s6-pin";
     output = [ "bin" ];
   };
   s6-portable-utils = {
@@ -350,6 +357,7 @@
       "x86_64-linux"
       "aarch64-linux"
     ];
+    version = "s6-pin";
     output = [ "bin" ];
   };
   skalibs = {
@@ -357,6 +365,7 @@
       "x86_64-linux"
       "aarch64-linux"
     ];
+    version = "s6-pin";
   };
 
   # go pkgs
