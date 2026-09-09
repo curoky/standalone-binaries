@@ -317,7 +317,7 @@ in
       # network_config_dir 不做环境变量展开，故用运行时真实路径经 --network-config-dir
       # 直接指向 conf/networks（包目录可写、原地执行，软链接即时切换）。
       grep -F 'network_backend = "netavark"' "$install_root/conf/containers.conf"
-      grep -F '--network-config-dir="$PODMAN_NET_DIR"' "$install_root/bin/podman-server"
+      grep -F -- '--network-config-dir="$PODMAN_NET_DIR"' "$install_root/bin/podman-server"
       grep -F 'PODMAN_NET_DIR=$root/../conf/networks' "$install_root/bin/podman-server"
       grep -F '/proc/sys/net/ipv6/conf/all/disable_ipv6' "$install_root/bin/podman-server"
       grep -F 'ln -sf ../networks.d/dualstack.json' "$install_root/bin/podman-server"
