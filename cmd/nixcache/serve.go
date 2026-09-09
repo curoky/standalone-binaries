@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,12 +25,10 @@ const (
 
 type cacheIndex struct {
 	client *registryClient
+	system string
 
-	// tagPrefix restricts which segment tags are loaded to the current
-	// snapshot+system namespace (`v1-<snapshot16>-<system>-`). Only those tags
-	// can be cache hits, so filtering here avoids fetching every historical
-	// run's manifest. Empty loads all segments.
-	tagPrefix string
+	refreshMu sync.Mutex
+	segments  map[string]segmentRef
 
 	// ready flips to true after the first successful index load. The
 	// nix-cache-info readiness endpoint reports 503 until then so a probe only
@@ -40,21 +40,54 @@ type cacheIndex struct {
 	nars    map[string]cacheEntry
 }
 
-func newCacheIndex(client *registryClient, tagPrefix string) *cacheIndex {
+func newCacheIndex(client *registryClient, system string) *cacheIndex {
 	return &cacheIndex{
-		client:    client,
-		tagPrefix: tagPrefix,
-		entries:   make(map[string]cacheEntry),
-		nars:      make(map[string]cacheEntry),
+		client:   client,
+		system:   system,
+		segments: make(map[string]segmentRef),
+		entries:  make(map[string]cacheEntry),
+		nars:     make(map[string]cacheEntry),
 	}
 }
 
 func (index *cacheIndex) refresh(ctx context.Context) (int, error) {
-	log.Printf("refreshing cache index")
+	index.refreshMu.Lock()
+	defer index.refreshMu.Unlock()
+
+	log.Printf("refreshing cache index for %s", index.system)
 	started := time.Now()
-	entries, err := index.client.loadEntries(ctx, index.tagPrefix)
+	tags, err := index.client.listTags(ctx, index.system)
 	if err != nil {
 		return 0, err
+	}
+	segments := make(map[string]segmentRef, len(tags))
+	var missing []string
+	for _, tag := range tags {
+		if ref, ok := index.segments[tag]; ok {
+			segments[tag] = ref
+		} else {
+			missing = append(missing, tag)
+		}
+	}
+	reused := len(segments)
+	removed := len(index.segments) - reused
+	loaded, err := index.client.fetchSegments(ctx, missing)
+	if err != nil {
+		return 0, err
+	}
+	for _, ref := range loaded {
+		if ref.System != index.system {
+			return 0, fmt.Errorf("segment %s has system %q, want %q", ref.Tag, ref.System, index.system)
+		}
+		segments[ref.Tag] = ref
+	}
+
+	ordered := slices.SortedFunc(maps.Values(segments), compareSegments)
+	entries := make(map[string]cacheEntry)
+	snapshots := make(map[string]struct{})
+	for _, ref := range ordered {
+		snapshots[ref.Snapshot] = struct{}{}
+		maps.Copy(entries, ref.Entries)
 	}
 	nars := make(map[string]cacheEntry, len(entries))
 	for _, entry := range entries {
@@ -65,7 +98,9 @@ func (index *cacheIndex) refresh(ctx context.Context) (int, error) {
 	index.entries = entries
 	index.nars = nars
 	index.mu.Unlock()
-	log.Printf("cache index refreshed: %d entries in %s", len(entries), time.Since(started).Round(time.Millisecond))
+	index.segments = segments
+	log.Printf("cache index refreshed: %d entries across %d snapshots; segments reused=%d loaded=%d removed=%d in %s",
+		len(entries), len(snapshots), reused, len(loaded), removed, time.Since(started).Round(time.Millisecond))
 	return len(entries), nil
 }
 
@@ -138,8 +173,8 @@ func setNARHeaders(writer http.ResponseWriter, entry cacheEntry) {
 	writer.Header().Set("ETag", `"`+entry.NARDigest+`"`)
 }
 
-func serveCache(ctx context.Context, client *registryClient, tagPrefix string) error {
-	index := newCacheIndex(client, tagPrefix)
+func serveCache(ctx context.Context, client *registryClient, system string) error {
+	index := newCacheIndex(client, system)
 
 	// Open the listener first so the port is immediately connectable: the CI
 	// readiness probe polls nix-cache-info, which reports 503 until the first

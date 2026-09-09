@@ -36,10 +36,11 @@ func TestMissingRepositoryIsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, err := client.loadEntries(context.Background(), "")
-	if err != nil {
+	index := newCacheIndex(client, "x86_64-linux")
+	if _, err := index.refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+	entries := index.entries
 	if len(entries) != 0 {
 		t.Fatalf("entries=%v", entries)
 	}
@@ -104,11 +105,11 @@ func TestRegistryRoundTrip(t *testing.T) {
 	if err := client.pushSegment(context.Background(), state, "root", entries); err != nil {
 		t.Fatal(err)
 	}
-	loaded, err := client.loadEntries(context.Background(), "")
-	if err != nil {
+	index := newCacheIndex(client, state.System)
+	if _, err := index.refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := loaded[hash]; got.NARInfo != entry.NARInfo || got.NARDigest != entry.NARDigest {
+	if got := index.entries[hash]; got.NARInfo != entry.NARInfo || got.NARDigest != entry.NARDigest {
 		t.Fatalf("loaded entry=%#v", got)
 	}
 
@@ -149,10 +150,11 @@ func TestNewestSegmentWins(t *testing.T) {
 	push("1", "old")
 	push("2", "new")
 
-	entries, err := client.loadEntries(context.Background(), "")
-	if err != nil {
+	index := newCacheIndex(client, "x86_64-linux")
+	if _, err := index.refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+	entries := index.entries
 	if !strings.Contains(entries[hash].NARInfo, "System: new") {
 		t.Fatalf("newest entry=%q", entries[hash].NARInfo)
 	}

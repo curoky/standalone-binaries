@@ -52,19 +52,11 @@ func run() int {
 		Short: "Serve the cache as a local Nix substituter",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoRoot, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-			state, err := loadSnapshot(repoRoot)
-			if err != nil {
-				return fmt.Errorf("load cache snapshot: %w", err)
-			}
 			client, err := newRegistryClient(cacheRepository, false)
 			if err != nil {
 				return err
 			}
-			return serveCache(cmd.Context(), client, segmentTagPrefix(state.ID, state.System))
+			return serveCache(cmd.Context(), client, currentSystem())
 		},
 	}
 

@@ -17,9 +17,9 @@
 
 ## 核心概念
 
-- **snapshot**：原始 `flake.lock` 的 SHA-256，代表一整套锁定的 nixpkgs channel
-  版本，即一个依赖世界。`flake.lock` 一变 snapshot 就变；它是 cache 复用的边界，
-  不同 snapshot 的 segment 互不复用。
+- **snapshot**：原始 `flake.lock` 的 SHA-256，记录一整套锁定的 nixpkgs channel
+  版本，用于上传归属和 retention 分组，不是 cache 读取边界。同平台不同 snapshot
+  的 segment 可以按确切 store path 复用；lock 改变不应让未改变的 store path 不可见。
 - **segment**：一次 `push` 产出的不可变单元，一个 OCI image manifest，包含某个包在
   某 snapshot、某 system 下的完整 closure（metadata layer 加若干 NAR layer）。同一包
   重跑只新增 segment，不覆盖旧的。
@@ -30,12 +30,12 @@ segment tag 编码了前两者：
 
 ```text
 v1-<snapshot前16位>-<system>-<runId>-<random>
-└──────── 共享前缀（serve 按此过滤）────────┘└── 每次 push 唯一 ──┘
+└──────── snapshot 与 system ──────────┘└── 每次 push 唯一 ──┘
 ```
 
-`serve` 用共享前缀只加载当前 snapshot+system 的 segment；`runId`+`random` 保证并发
-matrix job 的 tag 不相撞。无法读取当前 checkout 的 `flake.lock` 时直接失败，不回退加载
-其他 snapshot。
+`serve` 按 tag 中的 system 筛选所有现存 snapshot，再校验 metadata 的 system 一致；
+它只依赖宿主平台，不读取 checkout 的 `flake.lock`。`runId`+`random` 保证并发 matrix
+job 的 tag 不相撞；tag 发布后不可修改，否则进程内已缓存的 metadata 不会重新读取。
 
 ## OCI Schema
 
@@ -65,10 +65,18 @@ digest、size、media type 和 annotation 一致。
 发布 metadata 和按 store hash 排序的 layer。`--key` 或
 `NIXCACHE_PACKAGE_KEY` 必填；`NIX_SIGNING_KEY_FILE` 传给 Nix。
 
-`serve` 监听 `127.0.0.1:37515`，按当前 snapshot 和 system 的 tag prefix 并发加载
-index，每 5 分钟刷新。首次加载完成前 `/nix-cache-info` 返回 `503`。Repository
-不存在视为空 cache；首次加载错误终止服务，周期刷新错误保留上一份 index。`serve`
-只读，不删除任何 segment。
+`serve` 监听 `127.0.0.1:37515`，首次并发加载同平台所有现存 segment 的 manifest 和
+metadata，不预下载 NAR payload。每 5 分钟重新列举 tag，仅读取新增 segment，并从内存
+移除已消失的 tag；未变化的不可变 segment 不重复请求 manifest 或 metadata。
+
+每次成功刷新按 `CreatedAt`、tag 升序合并 entries，同一 store hash 选择最新记录，再
+原子替换 narinfo 和 NAR index。删除最新记录后，仍存在的旧 segment 可继续提供该 path。
+日志记录 snapshot 数、复用/加载/移除 segment 数和耗时。
+
+首次加载完成前 `/nix-cache-info` 返回 `503`。Repository 不存在视为空 cache；首次加载
+错误终止服务，周期刷新错误保留完整的上一份 index 和 segment 缓存，不提交部分结果。
+列举后读取时消失的 segment 跳过，不记入缓存，后续重新出现时会再次读取。`serve` 只读，
+不删除任何远端 segment。
 
 `probe <store-path>` 查询本地 `serve` 的确切 narinfo，并验证其中的 `StorePath`。退出码
 `0` 表示命中，`1` 表示明确的 `404` miss，`2` 表示连接、HTTP 或 narinfo 协议错误。CI
