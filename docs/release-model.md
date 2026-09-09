@@ -20,14 +20,17 @@ Nix cache 的 segment schema、serving 和 retention 细节见
 
 ## 发布流程
 
-1. `discover` eval 当前平台的包名和 `outPath`，排除聚合输出。
-2. 本地 `nixcache serve` 作为 GHCR-backed substituter，按 `outPath` 检查 cache。
-3. 未命中的包进入 build matrix。
+1. `discover` eval 当前平台的 `cacheRoots`，包含各包 out、archive 和 source roots，排除聚合输出。
+2. 本地 `nixcache serve` 作为 GHCR-backed substituter，分别检查当前 out、archive、source
+   roots；另用 `nixcache publication` 核对工具 artifact 的输出身份。
+3. 仅当缓存 roots 和发布状态都匹配时跳过；任一缺失的包进入 build matrix。
 4. 每个包构建 `packages.<system>.<name>` 和
    `tarballs.<system>.<name>`。两者是同一 multi-output derivation 的 `out` 与
    `archive` output。
-5. standalone closure 推送到 cache repository；归档发布为
-   `ghcr.io/curoky/standalone-binaries:<name>-<arch>`。
+5. standalone、archive 和 source 输出的 closure 推送到 cache repository；归档另发布为
+   `ghcr.io/curoky/standalone-binaries:<name>-<arch>`，单 layer 布局不变。工具 manifest 标注
+   `dev.curoky.standalone.system`、`dev.curoky.standalone.out-path` 和
+   `dev.curoky.standalone.archive-path`，精确关联当前输出。
 6. `summary` 汇总发现数量和各 matrix leg 的最终状态。
 
 归档必须由 `lib/make-artifacts.nix` 在 Nix build 内生成。workflow 不得自行重新打包或修改
@@ -46,7 +49,12 @@ identity。
 每个 `serve` 进程在内存中复用已验证的不可变 segment，每 5 分钟列举 tag，只读取新增项，
 移除已删除项并原子更新索引。刷新失败保留完整旧索引；NAR payload 仍按需下载。
 
-探测成功则跳过，探测明确未命中则构建。以下情形跳过 cache 探测并强制构建候选范围：
+缓存命中不代表发布成功：cache 上传成功但 artifact 发布失败时，下次仍进入 job，用缓存
+补发。旧 artifact 缺少身份 annotations 也进入发布；远端查询错误终止 discovery。Archive
+进入 Nix cache 以避免补发时重新打包，代价是跨两个 repository 的额外存储，不能假设去重。
+
+仅缓存和发布均就绪才跳过。以下情形跳过两类探测并强制构建候选范围（summary 显示
+`not-checked`，不是 0 命中）：
 
 - `schedule` 触发（每周定时全量刷新）；
 - `workflow_dispatch` 且 `skip_discover=true`。
@@ -88,4 +96,10 @@ Node.js 运行时和同级 runtime 工具（`nodejs-slim*`、`markdownlint-cli2`
 LLVM/clang 大型构建，build job 仅对 `clang-tools-*` 的 matrix leg 额外执行释放磁盘和
 配置 swap 的准备步骤，且已随上文列入 `PUSH_EXCLUDE_PKGS`（push 时跳过）。`lld_*` 与
 `clang*` 仍通过 `EXCLUDE_PKGS` 排除（只作为构建输入暴露，不单独发布）。
-`.github/workflows/prune-nix-cache.yaml` 只允许手动触发。
+`.github/workflows/prune-nix-cache.yaml` 只允许手动触发，固定 checkout master 并完整 eval
+`.#cacheRoots`（全部平台和全部包，含慢包，排除聚合输出），任一失败不执行删除。当前
+roots 的可达 closure 优先保护，历史规则之外的候选至少等待 24 小时并再次确认才删除。
+
+Build 和 prune 共用 `nix-cache-lifecycle` concurrency group，`cancel-in-progress: false`，
+整次运行互斥、matrix 内仍并行。GitHub concurrency 不保证 pending run 的 FIFO 排队，新
+pending 可能替换旧 pending；这不是持久任务队列。手动本地上传/清理也必须遵守单写者边界。

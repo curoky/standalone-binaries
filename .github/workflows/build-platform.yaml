@@ -43,6 +43,7 @@ jobs:
       count: ${{ steps.set.outputs.count }}
       candidates: ${{ steps.set.outputs.candidates }}
       hits: ${{ steps.set.outputs.hits }}
+      published: ${{ steps.set.outputs.published }}
     steps:
       - name: Set up Homebrew
         if: ${{ inputs.system == 'aarch64-darwin' }}
@@ -91,18 +92,14 @@ jobs:
           SYSTEM: ${{ inputs.system }}
           EXCLUDE_PKGS: ${{ inputs.exclude_pkgs }}
           PUSH_EXCLUDE_PKGS: ${{ inputs.push_exclude_pkgs }}
+          ARTIFACT_SUFFIX: ${{ inputs.artifact_suffix }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          # shellcheck disable=SC2016
-          nix eval --accept-flake-config --raw ".#packages.${SYSTEM}" --apply '
-            pkgs: builtins.concatStringsSep "\n" (
-              builtins.filter (s: s != "") (builtins.attrValues (builtins.mapAttrs
-                (name: drv:
-                  if name == "all" || name == "all-fast" then "" else "${name}\t${drv.outPath}")
-                pkgs))
-            )
-          ' >pkgs.tsv
+          nix eval --accept-flake-config --json ".#cacheRoots.${SYSTEM}" >roots.json
+          jq -r 'to_entries[] | [.key, .value.out, .value.archive, (.value.sources | join(" "))] | @tsv' roots.json >pkgs.tsv
 
           for name in $EXCLUDE_PKGS; do
             grep -vP "^${name}\t" pkgs.tsv >pkgs.tsv.tmp && mv pkgs.tsv.tmp pkgs.tsv
@@ -115,50 +112,60 @@ jobs:
           fi
 
           check() {
-            local name="${1%%$'\t'*}"
-            local out_path="${1#*$'\t'}"
-            local status
-            if "$RUNNER_TEMP/bin/nixcache" probe "$out_path"; then
-              echo "cache hit : $name" >&2
+            local name out_path archive_path sources status path
+            local cache_ready=1 published=1
+            local -a source_paths
+            IFS=$'\t' read -r name out_path archive_path sources <<<"$1"
+            read -r -a source_paths <<<"$sources"
+            for path in "$out_path" "$archive_path" "${source_paths[@]}"; do
+              if "$RUNNER_TEMP/bin/nixcache" probe "$path"; then
+                :
+              else
+                status=$?
+                [[ "$status" == 1 ]] || return "$status"
+                cache_ready=0
+              fi
+            done
+            if "$RUNNER_TEMP/bin/nixcache" publication "${name}-${ARTIFACT_SUFFIX}" "$SYSTEM" "$out_path" "$archive_path"; then
+              :
             else
               status=$?
-              case "$status" in
-                1)
-                  echo "need build: $name" >&2
-                  echo "$name"
-                  ;;
-                *)
-                  echo "::error::cache probe failed for $name with status $status" >&2
-                  return "$status"
-                  ;;
-              esac
+              [[ "$status" == 1 ]] || return "$status"
+              published=0
             fi
+            printf '%s\t%s\t%s\n' "$name" "$cache_ready" "$published"
           }
           export -f check
-          export RUNNER_TEMP
+          export RUNNER_TEMP SYSTEM ARTIFACT_SUFFIX
           if [[ "$SKIP_DISCOVER" == "true" || "$EVENT_NAME" == "schedule" ]]; then
             cut -f1 pkgs.tsv >selected.txt
+            hits=not-checked
+            published=not-checked
           else
-            if ! xargs -P 16 -d '\n' -I {} bash -c 'check "$@"' _ {} <pkgs.tsv >selected.txt; then
-              echo "::error::cache discovery aborted because at least one probe failed"
+            if ! xargs -P 16 -d '\n' -I {} bash -c 'check "$@"' _ {} <pkgs.tsv >status.tsv; then
+              echo "::error::discovery aborted because a cache or publication query failed"
               exit 1
             fi
+            jq -R -s '[split("\n")[] | select(length > 0) | split("\t")]' status.tsv >status.json
+            jq -r '.[] | select(.[1] != "1" or .[2] != "1") | .[0]' status.json >selected.txt
+            hits=$(jq '[.[] | select(.[1] == "1")] | length' status.json)
+            published=$(jq '[.[] | select(.[2] == "1")] | length' status.json)
           fi
 
-          matrix=$(nix run nixpkgs#jq -- -R -s -c \
+          matrix=$(jq -R -s -c \
             'split("\n") | map(select(length > 0)) | {include: map({name: .})}' \
             <selected.txt)
           candidates=$(grep -c . pkgs.tsv || true)
           count=$(grep -c . selected.txt || true)
-          hits=$((candidates - count))
 
           {
             echo "count=$count"
             echo "candidates=$candidates"
             echo "hits=$hits"
+            echo "published=$published"
             echo "matrix=$matrix"
           } >>"$GITHUB_OUTPUT"
-          echo "selected packages ($count of $candidates candidates, $hits cache hits):"
+          echo "selected packages ($count of $candidates candidates, cache=$hits, published=$published):"
           cat selected.txt
 
       - name: Dump Nix cache log
@@ -246,7 +253,7 @@ jobs:
             fi
           done <<<"$SOURCE_STORE_PATHS"
           "$RUNNER_TEMP/bin/nixcache" push \
-            "$(readlink -f ./standalone)" "${source_paths[@]}"
+            "$(readlink -f ./standalone)" "$(readlink -f ./tarball-archive)" "${source_paths[@]}"
 
       - uses: oras-project/setup-oras@v2
 
@@ -256,8 +263,12 @@ jobs:
       - name: Push artifact to GHCR
         env:
           ARTIFACT_SUFFIX: ${{ inputs.artifact_suffix }}
+          SYSTEM: ${{ inputs.system }}
         run: |
           oras push \
+            --annotation "dev.curoky.standalone.system=$SYSTEM" \
+            --annotation "dev.curoky.standalone.out-path=$(readlink -f ./standalone)" \
+            --annotation "dev.curoky.standalone.archive-path=$(readlink -f ./tarball-archive)" \
             "ghcr.io/curoky/standalone-binaries:${{ matrix.name }}-${ARTIFACT_SUFFIX}" \
             "./${{ matrix.name }}.${ARTIFACT_SUFFIX}.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip"
 
@@ -295,6 +306,7 @@ jobs:
       BUILD_RESULT: ${{ needs.build.result }}
       CANDIDATES: ${{ needs.discover.outputs.candidates }}
       HITS: ${{ needs.discover.outputs.hits }}
+      PUBLISHED: ${{ needs.discover.outputs.published }}
       SELECTED: ${{ needs.discover.outputs.count }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
@@ -351,7 +363,8 @@ jobs:
               echo "| metric | count |"
               echo "| --- | --- |"
               echo "| candidates | ${CANDIDATES:-0} |"
-              echo "| cache hits | ${HITS:-0} |"
+              echo "| complete cache roots | ${HITS:-not-checked} |"
+              echo "| matching publications | ${PUBLISHED:-not-checked} |"
               echo "| selected for build | ${SELECTED:-0} |"
             fi
             echo

@@ -1,12 +1,11 @@
 name: Prune Nix Cache
 
 on:
-  push:
-    paths:
-      - '.github/workflows/prune-nix-cache.yaml'
-  schedule:
-    - cron: '0 3 * * *'
   workflow_dispatch:
+
+concurrency:
+  group: nix-cache-lifecycle
+  cancel-in-progress: false
 
 jobs:
   cache-prune:
@@ -19,6 +18,17 @@ jobs:
       GITHUB_ACTOR: ${{ github.actor }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: master
+
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          summarize: false
+
+      - name: Evaluate all current cache roots
+        run: |
+          nix eval --accept-flake-config --json .#cacheRoots >"$RUNNER_TEMP/roots.json.tmp"
+          mv "$RUNNER_TEMP/roots.json.tmp" "$RUNNER_TEMP/roots.json"
 
       - uses: actions/setup-go@v7
         with:
@@ -38,8 +48,8 @@ jobs:
           echo "before=$before" >>"$GITHUB_ENV"
           echo "Cache size before prune: $before" | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Prune old snapshots
-        run: $RUNNER_TEMP/bin/nixcache prune --snapshot-keep 2 --package-retain-days 2 --package-keep 2
+      - name: Prune unreachable cache segments
+        run: $RUNNER_TEMP/bin/nixcache prune --roots "$RUNNER_TEMP/roots.json" --snapshot-keep 2 --package-retain-days 2 --package-keep 2
 
       - name: Report cache size after prune
         run: |

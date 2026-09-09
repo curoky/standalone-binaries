@@ -75,11 +75,13 @@ func newRegistryClient(repository string, insecure bool) (*registryClient, error
 
 type segmentRef struct {
 	segment
-	Tag string
+	Tag    string
+	Digest digest.Digest
 }
 
 type manifestRef struct {
 	Tag       string
+	Digest    digest.Digest
 	Metadata  ocispec.Descriptor
 	NARLayers map[string]ocispec.Descriptor
 }
@@ -255,14 +257,18 @@ func isNameUnknown(err error) bool {
 
 func (client *registryClient) getManifest(ctx context.Context, tag string) (manifestRef, error) {
 	return registryRequest(ctx, "fetch manifest "+tag, func(requestCtx context.Context) (manifestRef, error) {
-		_, reader, err := client.repo.FetchReference(requestCtx, tag)
+		descriptor, reader, err := client.repo.FetchReference(requestCtx, tag)
 		if err != nil {
 			return manifestRef{}, err
 		}
 		defer func() { _ = reader.Close() }()
 
+		body, err := readMetadata(reader, descriptor)
+		if err != nil {
+			return manifestRef{}, err
+		}
 		var manifest ocispec.Manifest
-		if err := json.NewDecoder(reader).Decode(&manifest); err != nil {
+		if err := json.Unmarshal(body, &manifest); err != nil {
 			return manifestRef{}, err
 		}
 		if len(manifest.Layers) == 0 {
@@ -293,7 +299,7 @@ func (client *registryClient) getManifest(ctx context.Context, tag string) (mani
 			}
 			narLayers[hash] = layer
 		}
-		return manifestRef{Tag: tag, Metadata: metadata, NARLayers: narLayers}, nil
+		return manifestRef{Tag: tag, Digest: descriptor.Digest, Metadata: metadata, NARLayers: narLayers}, nil
 	})
 }
 
@@ -310,8 +316,12 @@ func (client *registryClient) getSegment(ctx context.Context, tag string) (segme
 		}
 		defer func() { _ = reader.Close() }()
 
+		body, err := readMetadata(reader, manifest.Metadata)
+		if err != nil {
+			return segmentRef{}, err
+		}
 		var item segment
-		if err := json.NewDecoder(reader).Decode(&item); err != nil {
+		if err := json.Unmarshal(body, &item); err != nil {
 			return segmentRef{}, fmt.Errorf("decode segment metadata: %w", err)
 		}
 		if item.Version != segmentVersion {
@@ -320,7 +330,7 @@ func (client *registryClient) getSegment(ctx context.Context, tag string) (segme
 		if err := validateSegment(tag, item, manifest); err != nil {
 			return segmentRef{}, err
 		}
-		return segmentRef{segment: item, Tag: tag}, nil
+		return segmentRef{segment: item, Tag: tag, Digest: manifest.Digest}, nil
 	})
 }
 
@@ -369,6 +379,15 @@ func validateSegment(tag string, item segment, manifest manifestRef) error {
 		}
 	}
 	return nil
+}
+
+const maxMetadataSize = 64 << 20
+
+func readMetadata(reader io.Reader, descriptor ocispec.Descriptor) ([]byte, error) {
+	if descriptor.Size < 0 || descriptor.Size > maxMetadataSize {
+		return nil, fmt.Errorf("metadata size %d exceeds allowed range", descriptor.Size)
+	}
+	return content.ReadAll(io.LimitReader(reader, maxMetadataSize+1), descriptor)
 }
 
 func compareSegments(a, b segmentRef) int {

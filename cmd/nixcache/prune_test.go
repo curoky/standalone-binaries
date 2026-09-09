@@ -96,7 +96,7 @@ func TestPruneDryRunDeletesNothing(t *testing.T) {
 	pushTestSegment(t, client, "sha256:2222222222222222000000000000000000000000000000000000000000000000", "x86_64-linux", "two", "2", "two")
 	pushTestSegment(t, client, "sha256:3333333333333333000000000000000000000000000000000000000000000000", "x86_64-linux", "three", "3", "three")
 
-	if err := pruneCache(context.Background(), client, 1, 2, 2, true); err != nil {
+	if err := pruneCache(context.Background(), client, testRoots(), 1, 2, 2, true); err != nil {
 		t.Fatal(err)
 	}
 	segments, err := client.listSegments(context.Background(), "")
@@ -105,6 +105,9 @@ func TestPruneDryRunDeletesNothing(t *testing.T) {
 	}
 	if len(segments) != 3 {
 		t.Fatalf("dry-run must not delete, got %d tags", len(segments))
+	}
+	if _, tags, err := client.loadGC(context.Background()); err != nil || len(tags) != 0 {
+		t.Fatalf("dry-run wrote GC records: %v %v", tags, err)
 	}
 }
 
@@ -212,7 +215,7 @@ func TestCacheSizeDeduplicatesBlobs(t *testing.T) {
 
 func TestPruneRejectsKeepZero(t *testing.T) {
 	client := testRegistryClient(t)
-	if err := pruneCache(context.Background(), client, 0, 2, 2, false); err == nil {
+	if err := pruneCache(context.Background(), client, testRoots(), 0, 2, 2, false); err == nil {
 		t.Fatal("expected error for keep=0")
 	}
 }

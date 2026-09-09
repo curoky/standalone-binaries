@@ -66,9 +66,10 @@ macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`
 
 ## 发布边界
 
-普通 workflow 构建同一 derivation 的 `out` 与 `archive` output。Standalone closure
-进入 `ghcr.io/curoky/standalone-binaries-cache`，tar.gz 进入
-`ghcr.io/curoky/standalone-binaries:<package>-<architecture>`。
+普通 workflow 构建同一 derivation 的 `out` 与 `archive` output。两者及 source 输出的
+closure 进入 `ghcr.io/curoky/standalone-binaries-cache`，tar.gz 另发布到
+`ghcr.io/curoky/standalone-binaries:<package>-<architecture>`。缓存可用与发布完成分别判断；
+`cacheRoots` 暴露全平台当前目标，手动清理优先保护 master roots 并采用 24 小时候选宽限期。
 
 `bm` 消费 tar.gz artifact，不解析包依赖；包与 runtime 必须分别安装。发布触发、
 cache segment 和 retention 规则见[发布与 cache 模型](docs/release-model.md)。组件协议见
