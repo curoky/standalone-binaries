@@ -516,10 +516,14 @@
       isStatic = false;
     };
   };
+  # gost: Linux only here (pkgsStatic musl static). darwin uses the local
+  # package (packages/gost/darwin.nix) which redirects the Nix libresolv load
+  # command to /usr/lib.
   gost = {
-    "aarch64-darwin" = {
-      isStatic = false;
-    };
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
   };
   gotests = {
     "aarch64-darwin" = {
