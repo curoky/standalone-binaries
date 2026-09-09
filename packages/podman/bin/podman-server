@@ -11,6 +11,12 @@ export CONTAINERS_POLICY_JSON=$root/../conf/policy.json
 export PODMAN_DATA_DIR=$root/../data
 export TMPDIR=$PODMAN_DATA_DIR/tmpdir
 
+# network_config_dir 不做环境变量展开，故网络定义目录用运行时真实路径通过
+# --network-config-dir 注入。目录里只放一个软链接 podman.json，指向 networks.d 下按
+# 宿主机 IPv6 能力选出的候选定义（内部网络名均为 podman，即 podman 内建默认网络名，
+# 因此无需设置 default_network，也无需 CONTAINERS_CONF_OVERRIDE）。
+PODMAN_NET_DIR=$root/../conf/networks
+
 # export PATH=$PATH:$root
 
 # --imagestore=$root/storage \
@@ -24,8 +30,18 @@ export TMPDIR=$PODMAN_DATA_DIR/tmpdir
 mkdir -p "$TMPDIR"
 mkdir -p /run/podman
 
+# 运行时探测宿主机 IPv6 能力，自适应选择默认网络（保证 dual-stack / IPv4-only /
+# IPv6-disabled 机器都能起）：IPv6 未被内核禁用用 dualstack，否则用 ipv4（避免 netavark
+# 配 IPv6 bridge 失败连带 podman run 报错）。切换只是把 podman.json 软链到对应候选。
+if [ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null || echo 1)" = "0" ]; then
+  ln -sf ../networks.d/dualstack.json "$PODMAN_NET_DIR/podman.json"
+else
+  ln -sf ../networks.d/ipv4.json "$PODMAN_NET_DIR/podman.json"
+fi
+
 # --out=$root/../podman.log \
 exec -a "$0" "$root/_podman" \
+  --network-config-dir="$PODMAN_NET_DIR" \
   --log-level=info \
   system service --time=0 unix:///run/podman/podman.sock \
   "$@" >>"$root/../podman.log" 2>&1

@@ -100,7 +100,7 @@ in
 
       mkdir -p $out/conf
       cp ${podman_bin}/* $out/bin/
-      cp ${podman_conf}/* $out/conf/
+      cp -r ${podman_conf}/* $out/conf/
     ";
 
     doInstallCheck = true;
@@ -308,6 +308,47 @@ in
       grep -F 'runroot = "$PODMAN_DATA_DIR/runroot"' "$install_root/conf/storage.conf"
       if grep -F '/opt/podmanx/data' "$install_root/conf/storage.conf"; then
         echo "storage.conf contains a fixed installation path" >&2
+        exit 1
+      fi
+
+      # 自适应默认网络：沿用 podman 内建网络名 "podman"，故 containers.conf 不设
+      # default_network、无需 override。podman-server 探测宿主机 IPv6 能力后，把
+      # conf/networks/podman.json 软链到 conf/networks.d/{dualstack,ipv4}.json。
+      # network_config_dir 不做环境变量展开，故用运行时真实路径经 --network-config-dir
+      # 直接指向 conf/networks（包目录可写、原地执行，软链接即时切换）。
+      grep -F 'network_backend = "netavark"' "$install_root/conf/containers.conf"
+      grep -F '--network-config-dir="$PODMAN_NET_DIR"' "$install_root/bin/podman-server"
+      grep -F 'PODMAN_NET_DIR=$root/../conf/networks' "$install_root/bin/podman-server"
+      grep -F '/proc/sys/net/ipv6/conf/all/disable_ipv6' "$install_root/bin/podman-server"
+      grep -F 'ln -sf ../networks.d/dualstack.json' "$install_root/bin/podman-server"
+      grep -F 'ln -sf ../networks.d/ipv4.json' "$install_root/bin/podman-server"
+      # 软链接目标目录随包预建（podman-server 不再运行时 mkdir），确保原地执行即可软链。
+      test -d "$install_root/conf/networks"
+      if grep -E '^[[:space:]]*default_network' "$install_root/conf/containers.conf"; then
+        echo "containers.conf must not set default_network (uses built-in name podman)" >&2
+        exit 1
+      fi
+      if grep -E '^[[:space:]]*network_config_dir' "$install_root/conf/containers.conf"; then
+        echo "containers.conf must not set an unexpanded network_config_dir" >&2
+        exit 1
+      fi
+
+      # 两组候选网络定义都必须存在、内部 name 为 podman（须与软链接文件名 podman.json
+      # 匹配，否则 netavark 会跳过）、带合法 id（省略会被判为 invalid network ID）、
+      # IPv6 开关与各自 case 一致，且不含安装绝对路径。
+      ds_json="$install_root/conf/networks.d/dualstack.json"
+      v4_json="$install_root/conf/networks.d/ipv4.json"
+      test -f "$ds_json"
+      test -f "$v4_json"
+      grep -F '"name": "podman"' "$ds_json"
+      grep -F '"name": "podman"' "$v4_json"
+      grep -F '"ipv6_enabled": true' "$ds_json"
+      grep -F 'fd4e:9a7c:5b2e::/64' "$ds_json"
+      grep -F '"ipv6_enabled": false' "$v4_json"
+      grep -E '"id":[[:space:]]*"[0-9a-f]{64}"' "$ds_json"
+      grep -E '"id":[[:space:]]*"[0-9a-f]{64}"' "$v4_json"
+      if grep -F "$install_root" "$ds_json" "$v4_json"; then
+        echo "static network definition contains a fixed installation path" >&2
         exit 1
       fi
     '';

@@ -70,6 +70,67 @@ helper bundle 里的 `aardvark-dns` 由两个 `.nix` 文件通过
 `data`。它只创建 sibling `data`，并从 `conf/podmanxd.service` 模板渲染当前包根目录
 的真实路径后注册 systemd unit。
 
+## IPv6 / dual-stack 网络
+
+默认网络在运行时自适应选择，保证在任意宿主机（dual-stack / IPv4-only /
+IPv6-disabled）上都能起：`bin/podman-server` 启动时读
+`/proc/sys/net/ipv6/conf/all/disable_ipv6`，为 `0` 时把 `conf/networks/podman.json`
+软链到 dual-stack 候选 `conf/networks.d/dualstack.json`（IPv4 `10.89.0.0/24` +
+IPv6 ULA `fd4e:9a7c:5b2e::/64`），否则软链到纯 IPv4 候选
+`conf/networks.d/ipv4.json`（避免在禁用 IPv6 的机器上 netavark 配 IPv6 bridge 失败、
+连带 `podman run` 整体报错）。网络后端固定 netavark，容器 DNS 由 bundle 的
+aardvark-dns 提供。
+
+`containers.conf` 只声明 `network_backend = "netavark"`，**不写死 `default_network`**
+——两份候选内网络名都叫 `podman`，即 podman 的内建默认网络名，故无需 override，也无需
+写 `default_network`。`network_config_dir` **不做环境变量展开**（不同于
+`storage.conf` 的 `graphroot`/`runroot` 由 containers/storage 主动 `os.ExpandEnv`），
+故扫描目录 `conf/networks` 由 `podman-server` 按自身位置解析真实路径，经
+`--network-config-dir` 注入。
+
+网络定义用「扫描目录 + 候选目录」两级布局：
+
+- `conf/networks/` 是 netavark 实际扫描的目录，随包预建（内含 `.gitkeep` 占位），
+  运行时只放一个软链接 `podman.json`。netavark 强制要求文件名与其内网络名一致，
+  否则告警跳过；软链接名 `podman.json` 正好匹配内网络名 `podman`。
+- `conf/networks.d/` 是两份候选定义 `dualstack.json`、`ipv4.json`，**不被扫描**
+  （避免文件名 `dualstack.json` 与内网络名 `podman` 不符触发告警跳过）。
+
+使用场景是原地执行且包目录可写，故软链接直接建在 `conf/networks` 下、指向同包的
+`conf/networks.d/`（相对软链，不含安装绝对路径）。`bin/podman` 是 `--remote` 客户端，
+网络配置由 server 端决定，不接受 `--network-config-dir`，无需改动。
+
+静态 JSON 有两个必须遵守的约束（实测得出）：
+
+- 必须带合法 `id`（64 位 hex）。省略 `id` 会被 netavark 判为 `invalid network ID`
+  并跳过整份网络定义。当前 `id` 取 `sha256(<候选名>)`，稳定可复现。
+- `created` 可省略，podman 读取时补零值 `0001-01-01T00:00:00Z`；未写的运行期字段也会
+  自动补齐。两份候选同一时刻只有一份经软链接生效，故共用 `network_interface`
+  `podman0` 不会冲突。
+
+网段不绑定具体宿主机；仅当宿主机已占用该 IPv4 网段或该具体 ULA `/64`（概率极低）时才
+需改网段。IPv6 **转发**只影响容器出网、不影响建网，故不单独建网络，仍由用户按需开启
+（见下），`podman-server` 不修改宿主内核。
+
+维护提示：netavark 磁盘 schema 随版本演进。每次 bump podman5/podman6 时须重新核对两组
+JSON 能被新版本正确加载（`_podman --network-config-dir=<dir> --network-backend=netavark
+network inspect <name>`，非 root 需先处理 store 初始化），schema 漂移只在运行时暴露、
+build 期发现不了。此约束已记入回归清单。
+
+宿主 IPv6 转发不由本包设置（install.sh 不碰宿主内核参数）。要让容器 IPv6 出网/
+互通，用户须手动开启转发：
+
+```bash
+sudo sysctl -w net.ipv6.conf.all.forwarding=1
+# 持久化
+echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee /etc/sysctl.d/99-podman-ipv6.conf
+sudo sysctl --system
+```
+
+若上联网卡靠 RA/SLAAC 取址，开转发后还需 `net.ipv6.conf.<uplink>.accept_ra=2`。
+ULA 地址出公网需要 NAT66，宿主内核须支持 `ip6table_nat`（netavark 6.x 用
+nftables，主流内核已内置）。
+
 `installCheckPhase` 应聚焦 resolver 行为，验证 relocation、sibling 目录查找成功，以及
 无法逃逸到外部二进制。至少覆盖 conmon 专用 resolver、OCI runtime resolver 和通用
 helper resolver。检查应直接调用 resolver，不得通过启动完整 Podman runtime 间接触发；
