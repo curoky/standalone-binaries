@@ -9,6 +9,11 @@
   vim-plugins = pkgs.callPackage ../vim-plugins { };
   zsh-plugins = pkgsStatic.callPackage ../zsh-plugins { };
 
+  # Rust tools shipping a pre-generated zsh init script (relocatable, resolves
+  # the co-located binary relative to the sourced script).
+  atuin = pkgsStatic.callPackage ../atuin { nativeAtuin = pkgs.atuin; };
+  starship = pkgsStatic.callPackage ../starship { nativeStarship = pkgs.starship; };
+
   # C / autotools.
   autoconf = pkgsStatic.callPackage ../autoconf { };
   automake = pkgsStatic.callPackage ../automake { };

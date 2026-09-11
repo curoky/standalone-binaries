@@ -147,7 +147,8 @@
   };
 
   # rust pkgs
-  atuin = { };
+  # atuin and starship are local packages (packages/atuin, packages/starship):
+  # they ship a pre-generated zsh init script alongside the binary.
   bat = { };
   # biome = { };
   dprint = { };
@@ -158,7 +159,6 @@
   procs = { };
   ripgrep = { };
   ruff = { };
-  starship = { };
   tokei = { };
   yazi-unwrapped = {
     alias = "yazi";
