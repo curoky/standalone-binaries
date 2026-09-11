@@ -1,10 +1,15 @@
 # atuin
 #
-# Upstream static `atuin` plus a pre-generated zsh init script so shells do not
-# have to shell out to `atuin init zsh ...` on every startup.
+# The whole upstream static `atuin` output plus a pre-generated zsh init script
+# so shells do not have to shell out to `atuin init zsh ...` on every startup.
+#
+# The upstream output (bin/atuin, bin/atuin-daemon, bin/atuin-pty-proxy, shell
+# completions, ...) is copied verbatim; this package only *adds* the init
+# script, it does not select or drop any of the binaries upstream ships.
 #
 #   $store/atuin/
 #     bin/atuin            (the static binary, from pkgsStatic.atuin)
+#     bin/atuin-daemon     (and any other binaries upstream ships)
 #     share/atuin/init.zsh (pre-generated; source it from ~/.zshrc)
 #
 # `atuin init zsh` emits a script that calls the bare command name `atuin`,
@@ -39,9 +44,12 @@ stdenvNoCC.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/bin $out/share/atuin
-    cp ${lib.getExe atuin} $out/bin/atuin
-    chmod +x $out/bin/atuin
+    # Copy the upstream output verbatim (atuin, atuin-daemon, atuin-pty-proxy,
+    # shell completions, ...); this package only *adds* the init script below,
+    # it must not pick or drop any of the binaries upstream ships.
+    cp -R ${atuin}/. $out
+    chmod -R u+w $out
+    mkdir -p $out/share/atuin
 
     # `atuin init` loads client settings, which wants a writable config dir;
     # the sandbox HOME (/homeless-shelter) is read-only, so point it at $TMPDIR.
