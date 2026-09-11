@@ -30,22 +30,6 @@
   nativeAtuin,
 }:
 
-let
-  # The musl-static cross build's checkPhase flakes on a pty-proxy screen-paint
-  # timing test (`a_stalled_client_does_not_wedge_the_socket_server`: "screen
-  # never painted"). It is a terminal-rendering timing assertion unrelated to
-  # the shipped functionality, so skip just that test on the static build.
-  atuinBin =
-    if atuin.stdenv.hostPlatform.isStatic then
-      atuin.overrideAttrs (old: {
-        checkFlags = (old.checkFlags or [ ]) ++ [
-          "--skip=a_stalled_client_does_not_wedge_the_socket_server"
-        ];
-      })
-    else
-      atuin;
-in
-
 stdenvNoCC.mkDerivation {
   pname = "atuin";
   inherit (atuin) version;
@@ -56,7 +40,7 @@ stdenvNoCC.mkDerivation {
     runHook preInstall
 
     mkdir -p $out/bin $out/share/atuin
-    cp ${lib.getExe atuinBin} $out/bin/atuin
+    cp ${lib.getExe atuin} $out/bin/atuin
     chmod +x $out/bin/atuin
 
     # `atuin init` loads client settings, which wants a writable config dir;
