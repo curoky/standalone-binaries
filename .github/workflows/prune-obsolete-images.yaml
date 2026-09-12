@@ -1,13 +1,17 @@
 name: Prune Obsolete Package Images
 
 on:
+  push:
+    paths:
+      - '.github/release-platforms.json'
+      - '.github/workflows/prune-obsolete-images.yaml'
+      - 'packages/**'
+      - 'manifests/**'
+      - 'lib/**'
+      - 'flake*'
   workflow_dispatch:
-    inputs:
-      apply:
-        description: 'delete obsolete tagged package versions'
-        default: false
-        required: true
-        type: boolean
+  schedule:
+    - cron: '0 6 * * 0'
 
 concurrency:
   group: nix-cache-lifecycle
@@ -59,7 +63,6 @@ jobs:
       - name: Find and prune obsolete package versions
         uses: actions/github-script@v8
         env:
-          APPLY: ${{ inputs.apply }}
           EXPECTED_TAGS_PATH: ${{ runner.temp }}/expected-tags.json
           RELEASE_CONFIG_PATH: .github/release-platforms.json
         with:
@@ -67,7 +70,6 @@ jobs:
           script: |
             const fs = require("fs");
 
-            const apply = process.env.APPLY === "true";
             const expected = new Set(
               JSON.parse(fs.readFileSync(process.env.EXPECTED_TAGS_PATH, "utf8")),
             );
@@ -118,7 +120,7 @@ jobs:
             }
 
             await core.summary
-              .addHeading(apply ? "Obsolete image deletion" : "Obsolete image audit")
+              .addHeading("Obsolete image deletion")
               .addRaw(`Expected tags: ${expected.size}\n\n`)
               .addRaw(`Obsolete versions: ${obsolete.length}\n\n`)
               .addTable([
@@ -130,7 +132,7 @@ jobs:
                 ...obsolete.map((version) => [
                   String(version.id),
                   version.tags.map((tag) => `\`${tag}\``).join(", "),
-                  apply ? "delete" : "would delete",
+                  "delete",
                 ]),
               ]);
 
@@ -156,14 +158,12 @@ jobs:
 
             for (const version of obsolete) {
               core.info(
-                `${apply ? "Deleting" : "Would delete"} version ${version.id}: ${version.tags.join(", ")}`,
+                `Deleting version ${version.id}: ${version.tags.join(", ")}`,
               );
-              if (apply) {
-                await remove({
-                  ...ownerParameter,
-                  package_type: "container",
-                  package_name: packageName,
-                  package_version_id: version.id,
-                });
-              }
+              await remove({
+                ...ownerParameter,
+                package_type: "container",
+                package_name: packageName,
+                package_version_id: version.id,
+              });
             }

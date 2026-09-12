@@ -116,7 +116,7 @@ pending 可能替换旧 pending；这不是持久任务队列。手动本地上�
 只有全部 tag 都带受管平台 suffix、且全部不在当前集合中的 package version 才是删除候选；
 无 tag、非标准 tag、同时包含新旧 tag 的 version 均不由该 workflow 删除。
 
-该 workflow 仅允许手动触发，`apply=false`（默认）只把候选写入 job summary；
-`apply=true` 才通过 GitHub Packages API 删除。`cacheRoots` eval、当前 tag 集合生成或远端
-查询任一步失败都不得执行删除。无 tag 版本仍由
+该 workflow 在包定义、发布配置或 artifact 实现发生 push 时运行，并在每周日 06:00 UTC
+定时运行，也允许手动触发；三类触发都会直接删除候选，并把结果写入 job summary。
+`cacheRoots` eval、当前 tag 集合生成或远端查询任一步失败都不得执行删除。无 tag 版本仍由
 `.github/workflows/delete-untagged-images.yaml` 独立清理。
