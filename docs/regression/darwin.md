@@ -44,6 +44,7 @@ Go/CGO 的公共 resolver 路径修正由
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/parallel/` |
 | `perl` | 🩹 + 📦 本地 | 🟡 | macOS 静态替换与 install-name relocation；wrapper 必须保留，darwin 未验证 | 只删除 stock 已覆盖的依赖/link patch | — | `packages/perl/` |
 | `pnpm` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/pnpm/` |
+| `postgresql` | 🩹 + 📦 本地 | 🟡 | stock `pkgsStatic.postgresql` 的 server 路径不支持 static host；本地基于官方 `pkgsStatic.libpq` client derivation，仅追加 psql build/install hook，并将 OpenSSL 运行时目录改为 macOS 系统路径。18.6 out/archive 已构建，最终 Mach-O 仅依赖系统 `libSystem`，无 Nix store 字符串或 references；version、连接、基础交互及 TLS `verify-full` smoke test 通过 | `pkgsStatic.libpq` 上游提供 psql 且不再嵌入依赖 output 路径 | dc5d91f84032 | `packages/postgresql/` |
 | `prettier` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/prettier/` |
 | `protobuf_3_8_0` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.8.0 | 版本化产品，不回到最新 upstream | — | `packages/protobuf/3_8_0/` |
 | `protobuf_3_9_2` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.9.2 | 版本化产品，不回到最新 upstream | — | `packages/protobuf/3_9_2/` |
