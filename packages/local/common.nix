@@ -29,6 +29,12 @@
   pkgconf = pkgsStatic.callPackage ../pkgconf { };
   protobuf_3_8_0 = pkgsStatic.callPackage ../protobuf/3_8_0 { };
   protobuf_3_9_2 = pkgsStatic.callPackage ../protobuf/3_9_2 { };
+  # radare2/rizin patch bundled meson subprojects (sdb / libdemangle) that force
+  # a shared object under our pure musl-static build, and swap in local libewf /
+  # tree-sitter overrides that survive the same-arch musl-static cross. See
+  # docs/regression/linux.md.
+  radare2 = pkgsStatic.callPackage ../radare2 { };
+  rizin = pkgsStatic.callPackage ../rizin { };
   vim = pkgsStatic.callPackage ../vim { };
   watchexec = pkgsStatic.callPackage ../watchexec { };
   zsh = pkgsStatic.callPackage ../zsh { };
