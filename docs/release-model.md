@@ -12,6 +12,10 @@ standalone 目录及归档，再分别发布 Nix cache 和工具 OCI artifact。
 | `aarch64-linux` | `ubuntu-24.04-arm` | `linux-arm64` |
 | `aarch64-darwin` | `macos-26` | `darwin-arm64` |
 
+平台、artifact suffix、发布排除项和独立工具包名统一定义在
+`.github/release-platforms.json`。构建和过期 artifact 清理都读取该文件，修改发布平台或
+排除项时不得在 workflow 内另建一份配置。
+
 每个平台使用独立的动态 package matrix，不能把多个平台的包展开到同一个 matrix。这样既让
 平台失败相互独立，也避免触及 GitHub Actions 单个 matrix 的 256 job 上限。
 
@@ -89,7 +93,7 @@ Node.js 运行时和同级 runtime 工具（`nodejs-slim*`、`markdownlint-cli2`
 编译慢，仅在 `push` 触发时通过平台配置的 `push_exclude_pkgs` 从候选中排除，避免拖慢普通
 代码 push。其中 `nil`、`nixfmt`、`clang-tools-*` 只在 Linux 暴露，Darwin 的排除列表相应
 更短。`schedule` 和 `workflow_dispatch` 不受此排除影响，仍会构建并发布它们。改动
-`push_exclude_pkgs` 时须同步入口 workflow 和本说明。
+`push_exclude_pkgs` 时须同步 `.github/release-platforms.json` 和本说明。
 
 `clang-tools-{18..22}`（原 `build-llvm-tools.yaml`）已并入 Linux workflow 的普通
 `discover` / build matrix，与其他包共用 cache 命中过滤和 artifact 发布契约。它们是
@@ -103,3 +107,16 @@ roots 的可达 closure 优先保护，历史规则之外的候选至少等待 2
 Build 和 prune 共用 `nix-cache-lifecycle` concurrency group，`cancel-in-progress: false`，
 整次运行互斥、matrix 内仍并行。GitHub concurrency 不保证 pending run 的 FIFO 排队，新
 pending 可能替换旧 pending；这不是持久任务队列。手动本地上传/清理也必须遵守单写者边界。
+
+## Artifact 清理
+
+`.github/workflows/prune-obsolete-images.yaml` 清理由改名或删除遗留的工具 OCI artifact。
+它固定 checkout master，按 `.github/release-platforms.json` 的平台 suffix 和发布排除项从
+`cacheRoots` 生成当前 tag 集合，并额外保留 `binman`、`nixcache` 等独立 workflow 产物。
+只有全部 tag 都带受管平台 suffix、且全部不在当前集合中的 package version 才是删除候选；
+无 tag、非标准 tag、同时包含新旧 tag 的 version 均不由该 workflow 删除。
+
+该 workflow 仅允许手动触发，`apply=false`（默认）只把候选写入 job summary；
+`apply=true` 才通过 GitHub Packages API 删除。`cacheRoots` eval、当前 tag 集合生成或远端
+查询任一步失败都不得执行删除。无 tag 版本仍由
+`.github/workflows/delete-untagged-images.yaml` 独立清理。

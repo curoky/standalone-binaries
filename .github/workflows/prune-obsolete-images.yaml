@@ -1,0 +1,169 @@
+name: Prune Obsolete Package Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'delete obsolete tagged package versions'
+        default: false
+        required: true
+        type: boolean
+
+concurrency:
+  group: nix-cache-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: master
+
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          summarize: false
+
+      - name: Evaluate current package tags
+        run: |
+          set -euo pipefail
+
+          nix eval --accept-flake-config --json .#cacheRoots >"$RUNNER_TEMP/roots.json"
+          jq -n \
+            --slurpfile config .github/release-platforms.json \
+            --slurpfile roots "$RUNNER_TEMP/roots.json" \
+            '
+              [
+                $config[0].platforms[] as $platform
+                | $roots[0][$platform.system] | keys[] as $name
+                | select(
+                    ($platform.exclude_pkgs | split(" ") | index($name)) == null
+                  )
+                | "\($name)-\($platform.artifact_suffix)"
+              ]
+              + [
+                $config[0].platforms[].artifact_suffix as $suffix
+                | $config[0].independent_packages[]
+                | "\(.)-\($suffix)"
+              ]
+              | unique
+            ' >"$RUNNER_TEMP/expected-tags.json"
+
+          jq -e 'length > 0' "$RUNNER_TEMP/expected-tags.json" >/dev/null
+          echo "Expected $(jq length "$RUNNER_TEMP/expected-tags.json") package tags"
+
+      - name: Find and prune obsolete package versions
+        uses: actions/github-script@v8
+        env:
+          APPLY: ${{ inputs.apply }}
+          EXPECTED_TAGS_PATH: ${{ runner.temp }}/expected-tags.json
+          RELEASE_CONFIG_PATH: .github/release-platforms.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require("fs");
+
+            const apply = process.env.APPLY === "true";
+            const expected = new Set(
+              JSON.parse(fs.readFileSync(process.env.EXPECTED_TAGS_PATH, "utf8")),
+            );
+            const releaseConfig = JSON.parse(
+              fs.readFileSync(process.env.RELEASE_CONFIG_PATH, "utf8"),
+            );
+            const managedSuffixes = releaseConfig.platforms.map(
+              (platform) => `-${platform.artifact_suffix}`,
+            );
+            const isManagedTag = (tag) =>
+              managedSuffixes.some((suffix) => tag.endsWith(suffix));
+            const packageName = context.repo.repo;
+            const owner = context.repo.owner;
+            const repository = await github.rest.repos.get({
+              owner,
+              repo: context.repo.repo,
+            });
+            const isOrganization = repository.data.owner.type === "Organization";
+            const list = isOrganization
+              ? github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg
+              : github.rest.packages.getAllPackageVersionsForPackageOwnedByUser;
+            const remove = isOrganization
+              ? github.rest.packages.deletePackageVersionForOrg
+              : github.rest.packages.deletePackageVersionForUser;
+            const ownerParameter = isOrganization
+              ? { org: owner }
+              : { username: owner };
+            const versions = await github.paginate(list, {
+              ...ownerParameter,
+              package_type: "container",
+              package_name: packageName,
+              per_page: 100,
+            });
+
+            const obsolete = [];
+            const mixed = [];
+            for (const version of versions) {
+              const tags = version.metadata?.container?.tags ?? [];
+              if (tags.length === 0 || !tags.every(isManagedTag)) {
+                continue;
+              }
+              const currentTags = tags.filter((tag) => expected.has(tag));
+              if (currentTags.length === 0) {
+                obsolete.push({ id: version.id, tags });
+              } else if (currentTags.length !== tags.length) {
+                mixed.push({ id: version.id, tags });
+              }
+            }
+
+            await core.summary
+              .addHeading(apply ? "Obsolete image deletion" : "Obsolete image audit")
+              .addRaw(`Expected tags: ${expected.size}\n\n`)
+              .addRaw(`Obsolete versions: ${obsolete.length}\n\n`)
+              .addTable([
+                [
+                  { data: "version", header: true },
+                  { data: "tags", header: true },
+                  { data: "action", header: true },
+                ],
+                ...obsolete.map((version) => [
+                  String(version.id),
+                  version.tags.map((tag) => `\`${tag}\``).join(", "),
+                  apply ? "delete" : "would delete",
+                ]),
+              ]);
+
+            if (mixed.length > 0) {
+              core.warning(
+                `Skipped ${mixed.length} versions containing both current and obsolete tags`,
+              );
+              core.summary
+                .addHeading("Skipped mixed-tag versions", 2)
+                .addTable([
+                  [
+                    { data: "version", header: true },
+                    { data: "tags", header: true },
+                  ],
+                  ...mixed.map((version) => [
+                    String(version.id),
+                    version.tags.map((tag) => `\`${tag}\``).join(", "),
+                  ]),
+                ]);
+            }
+
+            await core.summary.write();
+
+            for (const version of obsolete) {
+              core.info(
+                `${apply ? "Deleting" : "Would delete"} version ${version.id}: ${version.tags.join(", ")}`,
+              );
+              if (apply) {
+                await remove({
+                  ...ownerParameter,
+                  package_type: "container",
+                  package_name: packageName,
+                  package_version_id: version.id,
+                });
+              }
+            }
