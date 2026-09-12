@@ -34,6 +34,9 @@
       "aarch64-darwin"
     ];
   };
+  "bats.unresholved" = {
+    alias = "bats";
+  };
   binutils-unwrapped = {
     alias = "binutils";
   };

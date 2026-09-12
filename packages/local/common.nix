@@ -34,9 +34,6 @@
   watchexec = pkgsStatic.callPackage ../watchexec { };
   zsh = pkgsStatic.callPackage ../zsh { };
 
-  # Pure-Bash tool (upstream unresholved build; shebang normalized to env).
-  bats = pkgs.callPackage ../bats { };
-
   # Sibling-runtime wrappers.
   git-filter-repo = pkgs.callPackage ../git-filter-repo { };
   netron = pkgs.callPackage ../netron { };
