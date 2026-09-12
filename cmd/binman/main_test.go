@@ -176,6 +176,44 @@ func TestBinmanNaming(t *testing.T) {
 	}
 }
 
+func TestPackageNamesFromTags(t *testing.T) {
+	tags := []string{
+		"ripgrep-linux-x86_64",
+		"fd-linux-arm64",
+		"binman-linux-x86_64",
+		"ripgrep-linux-x86_64",
+		"-linux-x86_64",
+		"release",
+	}
+	want := []string{"binman", "ripgrep"}
+	got := packageNamesFromTags(tags, "linux-x86_64")
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("packageNamesFromTags()=%v want %v", got, want)
+	}
+}
+
+func TestRemotePackageNames(t *testing.T) {
+	const arch = "linux-x86_64"
+	startRegistry(t, arch, "ripgrep", "binman", "fd")
+
+	got, err := remotePackageNames(arch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"binman", "fd", "ripgrep"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("remotePackageNames()=%v want %v", got, want)
+	}
+}
+
+func TestMatchingPackageNames(t *testing.T) {
+	names := []string{"bat", "git-filter-repo", "ripgrep"}
+	got := matchingPackageNames(names, "GIT")
+	if len(got) != 1 || got[0] != "git-filter-repo" {
+		t.Fatalf("matchingPackageNames()=%v want [git-filter-repo]", got)
+	}
+}
+
 func TestDownloadPackagesExtractsWithoutInstallState(t *testing.T) {
 	const arch = "linux-x86_64"
 	startRegistry(t, arch, "wget", "ripgrep")

@@ -32,6 +32,10 @@ auth，不读取 Docker credential config。发布 workflow 在 manifest 上添�
 `bm` 自身使用 `binman-<architecture>` tag，归档路径是 `binman/bm`。
 `install.sh` 是唯一允许依赖宿主 `curl` 和 `tar` 的路径。
 
+`search <query>` 和 `list --all` 通过 OCI tags API 分页读取完整 tag 列表，只保留
+`-<architecture>` 后缀对应的合法 package 名并稳定排序。Search 使用不区分大小写的
+子串匹配；`list --all` 列出当前架构的全部远端 package。
+
 `bm version` 打印 link 时注入的构建信息：`buildCommit`、`buildCommitDate`、
 `buildDate`、`buildHost`。这些是 `main` 包级变量，默认 `"unknown"`，由发布 workflow
 通过 `-ldflags -X main.<var>=...` 填充；`go build`/`go test` 无需注入。改变变量名或
