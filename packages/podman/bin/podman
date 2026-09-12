@@ -1,17 +1,18 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+# Remote client: no writes to the root-owned server data directory.
+set -eu
 
-script_path="$(readlink -f "$0")"
-root=$(cd "$(dirname "$script_path")" && pwd)
+root=$(readlink -f -- "$0")
+root=$(CDPATH="" cd -- "${root%/*}/.." && pwd)
+export PATH="$root/libexec/podman"
+export CONTAINERS_CONF="$root/conf/containers.conf"
+export CONTAINERS_STORAGE_CONF="$root/conf/storage.conf"
+export CONTAINERS_REGISTRIES_CONF="$root/conf/registries.conf"
+export CONTAINERS_POLICY_JSON="$root/conf/policy.json"
+export PODMAN_DATA_DIR="$root/data"
+export SSL_CERT_FILE="$root/conf/ca-bundle.crt"
+export SSL_CERT_DIR="$root/conf/certs"
+unset CONTAINERS_CONF_OVERRIDE CONTAINERS_REGISTRIES_CONF_OVERRIDE REGISTRIES_CONFIG_PATH
+unset CONTAINER_CONNECTION CONTAINER_HOST CONTAINER_SSHKEY STORAGE_DRIVER STORAGE_OPTS
 
-export CONTAINERS_CONF=$root/../conf/containers.conf
-export CONTAINERS_STORAGE_CONF=$root/../conf/storage.conf
-export CONTAINERS_REGISTRIES_CONF=$root/../conf/registries.conf
-export CONTAINERS_POLICY_JSON=$root/../conf/policy.json
-export PODMAN_DATA_DIR=$root/../data
-export TMPDIR=$PODMAN_DATA_DIR/tmpdir
-mkdir -p "$TMPDIR"
-
-export CONTAINER_HOST=unix:///run/podman/podman.sock
-
-exec -a "$0" "$root/_podman" --remote "$@"
+exec "$root/bin/_podman" --remote --url=unix:///run/podman/podman.sock "$@"

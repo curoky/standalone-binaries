@@ -15,3 +15,7 @@
  	userPolicyFilePath := filepath.Join(homeDir, userPolicyFile)
  	if err := fileutils.Exists(userPolicyFilePath); err == nil {
  		return userPolicyFilePath, nil
+--- a/libpod/runtime.go
++++ b/libpod/runtime.go
+@@ -491 +490,0 @@
+-	runtime.imageContext.SignaturePolicyPath = runtime.config.Engine.SignaturePolicyPath

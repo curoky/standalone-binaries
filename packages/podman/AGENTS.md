@@ -1,137 +1,128 @@
-# Podman 包设计
+# Podman Agent Guide
 
-本目录把 Podman 拆成两个并行版本，共享同一套 bin/conf/patch 资源，但每个版本用
-一个完全自包含的 derivation 文件，不抽象公共 nix 逻辑：
+<!-- markdownlint-disable MD013 -->
 
-- [`podman5.nix`](podman5.nix)：跟随上游 nixpkgs pin 的 podman 5.x（当前
-  5.8.4），不 override `version`/`src`/`vendorHash`，复用 nixpkgs 拉取的源码与
-  module 集。
-- [`podman6.nix`](podman6.nix)：把 podman 6.x pin 到具体 release（当前 6.1.0），
-  自行 override `version`/`src` 并把 `vendorHash` 设为 `null`（6.1.0 源码自带
-  committed vendor/）。
+## Layout
 
-两个 `.nix` 文件的 `runcStatic`、`podman.override`、patch、`postInstall` 与
-`installCheckPhase` 目前内容一致，但刻意各自完整维护，改动其一时需手动同步另一个。
+只拆两份独立 derivation：[podman5.nix](podman5.nix) 跟随锁定 nixpkgs 的 5.x，
+[podman6.nix](podman6.nix) 单独选择 6.x release。bin、conf、patch 和 tests 复用；
+不抽象公共 nix builder，也不抽取被入口脚本 source 的函数库。升级分别验证两版。
 
-两个版本各自将 Podman 发布为可整体移动的目录。所有运行时依赖都应尽可能打包到
-`libexec/podman`，而不是从宿主系统获取。以下运行时查找契约与打包约定对两者同时
-适用。
+## Configuration ownership
 
-## 运行时查找契约
+| 内容 | 唯一入口 |
+| --- | --- |
+| runtime、network/firewall、日志、压缩、设备接口 | `conf/containers.conf` |
+| storage 与 pull options | `conf/storage.conf` |
+| registry、signature policy、默认 mounts | `conf/registries.conf`、`policy.json`、`mounts.conf` |
+| 内部双栈 bridge | `conf/networks/podman.json` |
+| 路径定位、进程环境 | `bin/podman-server` |
+| systemd 安装 | `bin/install.sh` |
+| remote client | `bin/podman`、同目录 `docker` 软链 |
 
-运行中的 `_podman` 根据自身位置确定 `BINDIR`，并且只从以下目录解析随包提供的
-二进制：
+Server 固定 crun（runc 可显式选择）、native overlay、sqlite、cgroupfs、k8s-file、
+file events、netavark+nftables；rootless helper 固定 pasta。镜像推送使用 OCI +
+`zstd:chunked` level 3，pull 启用 partial images；实际节省取决于 registry 的 OCI/zstd
+支持与镜像内容。保留 fsync 与持久化 metadata，不启用 transient store 或跨镜像 hardlink。
+容器日志上限 10 MiB，API 日志交给 systemd journal。
 
-```text
-$BINDIR/../libexec/podman
-```
+包携带 crun、runc、conmon、catatonit、netavark、aardvark-dns、pasta、rootlessport、
+quadlet、静态 nft 和 BusyBox；只暴露使用到的 BusyBox applet。随包复制 nixpkgs CA，
+seccomp 使用当前版本编译进二进制的默认 profile。没有 fuse-overlayfs 自动回退。
 
-该规则覆盖 OCI runtime、`conmon`、`conmonrs`、容器 init、网络 helper、Quadlet，
-以及所有通过 Podman helper 查找 API 解析的二进制。
+Server PATH 只包含 sibling `libexec/podman`，HOME、registry auth 和镜像临时文件位于
+sibling `data`。libpod 运行目录沿用 rootful 上游默认 `/run/libpod`，不传 `--tmpdir`；
+其 `alive` 文件随宿主重启清空，由上游刷新运行状态，不能放入持久化 data。
+storage runroot 仍由 storage.conf 指向包内 data/runroot，与 libpod 运行目录分开。
+XDG config/data/cache 沿用 HOME 下的上游默认目录，不单独配置或预创建；
+仅显式设置 XDG runtime，因为其默认路径不在 HOME 下。主配置 env 由 wrapper 覆盖，
+清除额外配置、宿主 XDG 路径和 storage env overrides。网络 backend 与 DNS 端口由
+containers.conf 确定，helper env 已由 patch 忽略，不重复清理。
+保留包内 CA 文件和空证书目录绑定，防止系统 CA 目录参与默认加载。netavark 的 nftables
+backend 仍会尝试 firewalld 联动，通过不可连接的包内 DBus 地址关闭此可选集成。
+Server 和 client 直接读取同一份 `conf/containers.conf`，没有配置模板或启动期渲染。
+配置只保留有效的产品策略；helper/conmon/runtime 路径由 patch 统一限定，不重复配置。
 
-- 整体移动包目录后，查找行为必须保持不变。
-- 用户配置、`CONTAINERS_HELPER_BINARY_DIR`、系统目录和 `PATH` 都不得改变随包
-  二进制的查找位置。
-- 随包二进制缺失时，要求它的调用点必须报错；Podman 不得回退到宿主系统中的同名
-  二进制。
-- 未设置 link-time helper 目录的非本包构建仍应保持上游查找行为。
+不读取宿主默认 mounts、OCI hooks、compose provider、network plugin、AppArmor profile
+或 SELinux policy。AppArmor/SELinux labeling 明确关闭，普通容器启用内置 seccomp；
+显式 `--privileged` 或 `seccomp=unconfined` 遵循上游语义。不能将此行为
+描述为保留了宿主 LSM 隔离。GPU CDI 只使用 `/etc/cdi`；驱动与 CDI generator 属于宿主。
+默认代理不注入容器。Server 和 remote client 均绑定随包 CA；`podman login` 在客户端
+本地访问 registry，同样需要此绑定。显式 `--cert-dir` 仍是用户配置能力；上游
+per-registry certs.d 搜索尚未隔离，不能声称宿主所有证书配置都已封闭。
 
-`strict-helper-search.patch` 在共享 resolver 边界实现该契约。包级 patch 不得重新引入
-系统路径列表。v5.8.x 与 v6.1.0 的 vendor 路径都已是 `go.podman.io/common`，两个版本
-复用同一份 patch。
+## Patch budget
 
-`policy.json` 的定位只用 `bin/podman`/`bin/podman-server` 设置的
-`CONTAINERS_POLICY_JSON=$root/../conf/policy.json`。podman 6.x 上游已原生读取该 env，
-podman 5.x 未支持，故 `podman5.nix` 额外应用 `policy-json-env.patch`，给
-`vendor/go.podman.io/image/v5/signature/policy_config.go` 的 `defaultPolicyPathWithHomeDir`
-backport 同样的 env 覆盖（优先级低于 `sys.SignaturePolicyPath`、高于用户与系统默认路径，
-值原样使用、缺失即报原始 ENOENT 而不回退）。`podman6.nix` 不需要该 patch。
+| Patch | 保留理由与升级检查 |
+| --- | --- |
+| `strict-helper-search.patch` | 沿用上游 `$BINDIR` 展开；conmon、init、OCI runtime 汇入现有 helper resolver，只查 sibling；移除 env/PATH fallback 和 netavark 注入 `/usr/sbin`。不新增 resolver API，不复制上游 runtime 查找算法 |
+| `builtin-seccomp.patch` | 默认直接使用内置 profile，删除宿主 seccomp.json 搜索；显式 profile 仍可使用。无需外置 JSON 和路径渲染 |
+| `policy-json-env.patch` | 仅 5.x backport `CONTAINERS_POLICY_JSON`，并移除 libpod 向 image context 注入宿主默认 policy 路径的赋值，避免绕过 env；6.x 原生支持 |
+| `registries-conf-dir.patch` | 5.x 显式 registry 主配置禁止默认 drop-ins；底层补齐环境变量入口，覆盖 remote client 传空 SystemContext 的调用 |
+| `registries-conf-dir-v6.patch` | 6.x 使用现有 `DoNotLoadDropInFiles`；libimage 把 env 转成 SystemContext 显式路径，会重新启用 drop-ins，不能只测试 env 分支 |
 
-## 打包约定
+runc 保留 upstream installPhase，只在 postInstall 还原真实静态 ELF，避免动态 wrapper。
+Podman 构建依赖沿用上游，只排除 musl-static 不支持且当前配置不需要的 libsystemd；
+gpgme 与 container helpers 通过 override 注入本仓库静态版本。
+本地 aardvark-dns 的 musl close_range 修正仍由两版显式注入，独立登记在回归表。
 
-两个 `.nix` 文件都将上游 helper bundle 复制到 `libexec/podman`，并把字面量
-`$BINDIR/../libexec/podman` 作为查找模板链接进 Podman。新增运行时依赖时，应尽可能
-把它加入该 bundle，并复用已有共享 resolver，不要增加面向宿主系统的包级查找逻辑。
+helper/配置 patch 是 packaging 边界，不因 stock build 成功就能删除；上游必须提供等价
+相对路径与封闭查找接口才能替换。`_podman` 是内部二进制；wrapper 才是产品入口。
 
-helper bundle 里的 `aardvark-dns` 由两个 `.nix` 文件通过
-`podman.override { aardvark-dns = ...; }` 换成本地 patch 版
-（[`packages/aardvark-dns/`](../aardvark-dns/)）。上游 aardvark-dns 2.1.0 在
-`src/main.rs` 无条件调用 `libc::close_range`，musl 的 libc 绑定只导出
-`SYS_close_range` 常量而没有该 wrapper 函数，musl-static 构建会失败；patch 改用
-`libc::syscall(libc::SYS_close_range, ...)`，仅动 crate 自身源码、不动 vendor，故不
-需要 cargoHash override。改动其一时需同步另一个。
+## Installation and network
 
-`bin/podman` 和 `bin/podman-server` 必须根据自身位置设置配置文件路径、
-`PODMAN_DATA_DIR` 及 `data/tmpdir` 下的 `TMPDIR`。`storage.conf` 通过
-`PODMAN_DATA_DIR` 把 `graphroot` 和 `runroot` 定位到 sibling `data` 目录；
-配置文件不得写死安装前缀。
+原地运行 `sudo ./bin/install.sh`，不复制 runtime 或搬迁 data。没有安装或启动期网卡、
+firewall、GPU、storage 探测。Server 通过 `--network-config-dir` 直接读取 `conf/networks`，
+不复制配置、不创建软链，也不依赖 installer 初始化网络目录。通过 API 创建或删除网络时，
+配置直接写入此目录，因此该目录需可写。installer 只安装 systemd units 并启用 socket。
+同一份内部双栈 bridge 同时用于双栈和 IPv6-only 宿主：
 
-`bin/install.sh` 原地安装当前包目录，不得复制或移动 `bin`、`conf`、`libexec` 和
-`data`。它只创建 sibling `data`，并从 `conf/podmanxd.service` 模板渲染当前包根目录
-的真实路径后注册 systemd unit。
+- 内部网段为 `10.89.0.0/24` + `fd4e:9a7c:5b2e::/64`，启用 aardvark DNS。
+- 双栈宿主通过 IPv4 NAT 和 IPv6 NAT66 出网；IPv6-only 宿主使用 IPv6 出网，内部 IPv4
+  仅提供本地通信，不会自动获得 IPv4 公网能力。
+- 不提供 NAT64/DNS64；访问纯 IPv4 目标需部署环境提供转换。双栈 DNS 回答的连接
+  体验取决于应用的 IPv6/Happy Eyeballs 支持。
+- 宿主需要 IPv6 forwarding、IPv6 NAT 和 nftables kernel 支持；RA/SLAAC uplink
+  需要正确的 `accept_ra=2`。本包不修改宿主 sysctl；网段冲突由部署方明确配置。
+- 宿主 resolver 是 DNS 上游，属于网络接口。JSON name 固定 `podman`、ID 为合法稳定
+  64 位 hex；active 文件必须叫 `podman.json`，否则 netavark 会跳过。
 
-## IPv6 / dual-stack 网络
+系统前提是 Linux kernel、native overlay、本地可写 filesystem 和 systemd。Podman 6
+要求 cgroup v2；不降级到 v5 或其他 backend。bootstrap 仍需宿主 POSIX sh、readlink；
+server 后续命令来自 bundle。installer 优先使用随包工具，并保留宿主 PATH，
+直接调用宿主 systemctl，不做存在性探测。Unit 固定安装到已有的 `/etc/systemd/system`，
+不提供安装目录配置。所有常规 ELF 必须 musl 全静态。
+入口直接使用确定的包文件与标准 systemd 安装，不预检命令、包文件或安装路径。
+路径支持空格和 `&`；部署路径约定不含 TOML/systemd 特殊字符（双引号、反斜线、
+百分号、美元符号、换行）。不迁移已有容器网络或数据库，应使用匹配的新 data 目录。
+libpod 数据库会记录运行目录；删除 wrapper 参数或 storage.conf 配置项不会迁移已记录的路径。
 
-默认网络在运行时自适应选择，保证在任意宿主机（dual-stack / IPv4-only /
-IPv6-disabled）上都能起：`bin/podman-server` 启动时读
-`/proc/sys/net/ipv6/conf/all/disable_ipv6`，为 `0` 时把 `conf/networks/podman.json`
-软链到 dual-stack 候选 `conf/networks.d/dualstack.json`（IPv4 `10.89.0.0/24` +
-IPv6 ULA `fd4e:9a7c:5b2e::/64`），否则软链到纯 IPv4 候选
-`conf/networks.d/ipv4.json`（避免在禁用 IPv6 的机器上 netavark 配 IPv6 bridge 失败、
-连带 `podman run` 整体报错）。网络后端固定 netavark，容器 DNS 由 bundle 的
-aardvark-dns 提供。
+## API service and devices
 
-`containers.conf` 只声明 `network_backend = "netavark"`，**不写死 `default_network`**
-——两份候选内网络名都叫 `podman`，即 podman 的内建默认网络名，故无需 override，也无需
-写 `default_network`。`network_config_dir` **不做环境变量展开**（不同于
-`storage.conf` 的 `graphroot`/`runroot` 由 containers/storage 主动 `os.ExpandEnv`），
-故扫描目录 `conf/networks` 由 `podman-server` 按自身位置解析真实路径，经
-`--network-config-dir` 注入。
+`podmanxd.socket` 固定 `/run/podman/podman.sock`，root:root、0666，保留已确认的本地
+普通用户可访问边界；rootful API 等价于主机高权限控制面，不扩展 TCP。
+installer 执行 daemon-reload 和 enable --now socket。service 用 Type=exec、Delegate=yes、KillMode=process，
+停止时调用 remote client 停止全部容器。server 不传 URI，只接收 socket activation fd。
+两版共用 socket/unit 名称，不能同时安装激活。
 
-网络定义用「扫描目录 + 候选目录」两级布局：
+Remote client 不创建或要求写入 server data；普通用户可在只读包目录中连接现有 socket。
+整体搬迁后 helper/config/data 仍按包定位，systemd unit 需要重新运行 installer。
+GPU 使用固定 `/etc/cdi`，不安装 legacy hooks；宿主生成 CDI，驱动升级后重新生成。
 
-- `conf/networks/` 是 netavark 实际扫描的目录，随包预建（内含 `.gitkeep` 占位），
-  运行时只放一个软链接 `podman.json`。netavark 强制要求文件名与其内网络名一致，
-  否则告警跳过；软链接名 `podman.json` 正好匹配内网络名 `podman`。
-- `conf/networks.d/` 是两份候选定义 `dualstack.json`、`ipv4.json`，**不被扫描**
-  （避免文件名 `dualstack.json` 与内网络名 `podman` 不符触发告警跳过）。
+## Validation
 
-使用场景是原地执行且包目录可写，故软链接直接建在 `conf/networks` 下、指向同包的
-`conf/networks.d/`（相对软链，不含安装绝对路径）。`bin/podman` 是 `--remote` 客户端，
-网络配置由 server 端决定，不接受 `--network-config-dir`，无需改动。
+两份 nix 的 installCheck 共用 `tests/`，直接使用各自 vendor 编译：
 
-静态 JSON 有两个必须遵守的约束（实测得出）：
+- 搬迁到带空格和 `&` 的目录后执行实际 wrapper，检查配置、storage、policy、registry 隔离；
+- 幂等安装 socket、不创建 data；临时副本替换 systemd 路径并模拟 systemctl，不触碰宿主服务；
+- remote client 无 server data 写入；helper 缺失且 PATH/env 有同名程序时失败；
+- 真实 netavark loader 验证双栈 subnet，避免 JSON 被跳过后默默创建默认 IPv4 网络；
+- libpod 默认 seccomp 路径为空，内置 profile 能生成实际 syscall 限制；server 不生成配置副本；
+- 主要随包二进制的 version smoke；artifact 校验静态链接和禁止的 store 引用。
 
-- 必须带合法 `id`（64 位 hex）。省略 `id` 会被 netavark 判为 `invalid network ID`
-  并跳过整份网络定义。当前 `id` 取 `sha256(<候选名>)`，稳定可复现。
-- `created` 可省略，podman 读取时补零值 `0001-01-01T00:00:00Z`；未写的运行期字段也会
-  自动补齐。两份候选同一时刻只有一份经软链接生效，故共用 `network_interface`
-  `podman0` 不会冲突。
-
-网段不绑定具体宿主机；仅当宿主机已占用该 IPv4 网段或该具体 ULA `/64`（概率极低）时才
-需改网段。IPv6 **转发**只影响容器出网、不影响建网，故不单独建网络，仍由用户按需开启
-（见下），`podman-server` 不修改宿主内核。
-
-维护提示：netavark 磁盘 schema 随版本演进。每次 bump podman5/podman6 时须重新核对两组
-JSON 能被新版本正确加载（`_podman --network-config-dir=<dir> --network-backend=netavark
-network inspect <name>`，非 root 需先处理 store 初始化），schema 漂移只在运行时暴露、
-build 期发现不了。此约束已记入回归清单。
-
-宿主 IPv6 转发不由本包设置（install.sh 不碰宿主内核参数）。要让容器 IPv6 出网/
-互通，用户须手动开启转发：
-
-```bash
-sudo sysctl -w net.ipv6.conf.all.forwarding=1
-# 持久化
-echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee /etc/sysctl.d/99-podman-ipv6.conf
-sudo sysctl --system
-```
-
-若上联网卡靠 RA/SLAAC 取址，开转发后还需 `net.ipv6.conf.<uplink>.accept_ra=2`。
-ULA 地址出公网需要 NAT66，宿主内核须支持 `ip6table_nat`（netavark 6.x 用
-nftables，主流内核已内置）。
-
-`installCheckPhase` 应聚焦 resolver 行为，验证 relocation、sibling 目录查找成功，以及
-无法逃逸到外部二进制。至少覆盖 conmon 专用 resolver、OCI runtime resolver 和通用
-helper resolver。检查应直接调用 resolver，不得通过启动完整 Podman runtime 间接触发；
-build sandbox 的 kernel、namespace、storage 或 cgroup 状态不属于该契约。
+修改后构建两版 package 和 tarballs，两架构分别验证。真实集成验收需要 cgroup v2、
+允许 network namespace/bridge/nftables 的 Linux，覆盖容器启动、容器间 DNS、
+双栈与 IPv6-only 出网、端口发布、停止清理，以及 CDI GPU。config/helper 单测不能替代。
+隔离 smoke 已覆盖 Podman 5 实际 API：隐藏 `/nix` 并提供无效宿主配置后，查询、镜像导入
+和容器创建成功；移走包内 policy 后导入失败。当前 Workspace cgroup v1 不能启动 v6
+service，缺少 CAP_NET_ADMIN，不能据此声称已验证容器运行和网络规则。

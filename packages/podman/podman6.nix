@@ -1,55 +1,38 @@
 {
   lib,
-  stdenv,
   fetchFromGitHub,
   gpgme,
-  lvm2,
-  btrfs-progs,
-  libapparmor,
-  libseccomp,
-  libselinux,
   crun,
   runc,
   conmon,
   catatonit,
   coreutils,
+  busybox,
+  nftables,
+  cacert,
   aardvark-dns,
   podman,
 }:
 let
-  podman_bin = ./bin;
-  podman_conf = ./conf;
-
-  # runc is pulled into podman's helpersBin via the upstream `extraRuntimes`
-  # default. Under pkgsStatic the real runc binary is already fully static, but
-  # the upstream installPhase runs `wrapProgram` on it, which renames the static
-  # binary to `.runc-wrapped` and installs a small *dynamic* launcher named
-  # `runc` (it references a /nix musl interpreter + rpath). podman's helpersBin
-  # ships that launcher, so the copied `runc` ends up dynamic and depends on
-  # /nix, tripping the standalone portability check. (The standalone `.#runc`
-  # output avoids this because artifact assembly restores `.runc-wrapped` over
-  # the launcher.) Drop the wrapper here and install the static binary
-  # directly; the PATH prefix it adds is not needed for the shipped runtime.
-  runcStatic = runc.overrideAttrs (_: {
-    installPhase = ''
-      runHook preInstall
-      install -Dm755 runc $out/bin/runc
-      installManPage man/*/*.[1-9]
-      runHook postInstall
+  # Upstream wraps static runc in a dynamic PATH launcher. Ship the real ELF.
+  runcStatic = runc.overrideAttrs (old: {
+    postInstall = (old.postInstall or "") + ''
+      mv -f "$out/bin/.runc-wrapped" "$out/bin/runc"
     '';
   });
 in
 (podman.override {
-  conmon = conmon;
-  catatonit = catatonit;
-  crun = crun;
+  inherit
+    conmon
+    catatonit
+    crun
+    gpgme
+    aardvark-dns
+    ;
   runc = runcStatic;
-  aardvark-dns = aardvark-dns;
 }).overrideAttrs
   (oldAttrs: rec {
-    # Upstream nixpkgs still pins podman 5.x; bump to the latest release here.
-    # The 5.x -> 6.x jump changed the Go module path to go.podman.io/podman/v6
-    # and reworked config-file parsing, so src + vendorHash must both move.
+    # nixpkgs provides the 5.x derivation; select the 6.x release here.
     version = "6.1.0";
     src = fetchFromGitHub {
       owner = "podman-container-tools";
@@ -57,299 +40,50 @@ in
       rev = "v${version}";
       hash = "sha256-wjqB8sQY7Ovz4bY4dBWfLDD7qvu8EA1KubVp6ocWle8=";
     };
-    # The v6.1.0 source tarball ships a committed vendor/ directory, so
-    # buildGoModule must use it directly (vendorHash = null) instead of
-    # re-fetching modules. Our strict-helper patch edits files under vendor/.
-    vendorHash = null;
-
+    # pkgsStatic propagates upstream build inputs. cgroupfs/file logging need no libsystemd.
     propagatedBuildInputs = [ ];
-    buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
-      btrfs-progs
-      gpgme
-      libapparmor
-      libseccomp
-      libselinux
-      lvm2
-      # systemd
-    ];
+    buildInputs = builtins.filter (dep: lib.getName dep != "systemd") oldAttrs.propagatedBuildInputs;
 
     nativeInstallCheckInputs = [
       coreutils
     ];
 
     patches = [
-      # we intentionally don't build and install the helper so we shouldn't display messages to users about it
-      ./rm-podman-mac-helper-msg.patch
-
       ./strict-helper-search.patch
+      ./builtin-seccomp.patch
+      ./registries-conf-dir-v6.patch
     ];
 
-    postPatch = (oldAttrs.postPatch or "") + ''
-      # Restrict helpers, conmon, and OCI runtimes such as crun and runc to
-      # the sibling libexec/podman directory resolved from $BINDIR at runtime.
-      substituteInPlace Makefile \
-        --replace-fail '$(HELPER_BINARIES_DIR)' '$$BINDIR/../libexec/podman'
+    postFixup = "";
+    postInstall = ''
+      cp -Lf --remove-destination ${oldAttrs.passthru.helpersBin}/bin/* "$out/libexec/podman/"
+      mv "$out/bin/.podman-wrapped" "$out/bin/_podman"
+      rm -f "$out/bin/podmansh"
+      rm -rf "$out/lib/systemd" "$out/share/systemd"
+      # Complete tools for the fixed backend; no inherited host PATH.
+      install -m755 ${lib.getBin nftables}/bin/nft "$out/libexec/podman/nft"
+      install -m755 ${busybox}/bin/busybox "$out/libexec/podman/busybox"
+      for tool in sh readlink mkdir sed cp; do
+        ln -s busybox "$out/libexec/podman/$tool"
+      done
+      mkdir -p "$out/conf/certs"
+      cp -a ${./bin}/. "$out/bin/"
+      cp -r ${./conf}/. "$out/conf/"
+      cp ${cacert}/etc/ssl/certs/ca-bundle.crt "$out/conf/ca-bundle.crt"
     '';
 
-    postFixup = "";
-    postInstall = "
-      cp -Lf --remove-destination ${oldAttrs.passthru.helpersBin}/bin/* ${oldAttrs.env.HELPER_BINARIES_DIR}
-
-      mv $out/bin/.podman-wrapped $out/bin/_podman
-      rm -f $out/bin/podmansh
-
-      mkdir -p $out/conf
-      cp ${podman_bin}/* $out/bin/
-      cp -r ${podman_conf}/* $out/conf/
-    ";
-
-    doInstallCheck = true;
     installCheckPhase = ''
       runHook preInstallCheck
-
-      check_dir=$(mktemp -d)
-      relocated="$check_dir/relocated"
-      host_bin="$check_dir/host-bin"
-      state="$check_dir/state"
-      mkdir -p "$relocated" "$host_bin" \
-        "$state/home"
-      cp -aL $out/. "$relocated/"
-      chmod -R u+w "$relocated"
-
-      # External copies prove each resolver class cannot escape the relocated
-      # sibling directory through config, environment, or PATH.
-      cp "$relocated/libexec/podman/conmon" "$host_bin/conmon"
-      cp "$relocated/libexec/podman/conmon" "$host_bin/conmonrs"
-      cp "$relocated/libexec/podman/crun" "$host_bin/crun"
-      cp "$relocated/libexec/podman/pasta" "$host_bin/pasta"
-      cp "$relocated/libexec/podman/conmon" "$relocated/libexec/podman/conmonrs"
-
-      cat > "$check_dir/resolver-test.go" <<'EOF'
-      package main
-
-      import (
-              "fmt"
-              "os"
-              "path/filepath"
-
-              "go.podman.io/common/pkg/config"
-              storage "go.podman.io/storage/types"
-      )
-
-      func main() {
-              if os.Args[1] == "storage" {
-                      opts, err := storage.DefaultStoreOptions()
-                      if err != nil {
-                              fmt.Fprintln(os.Stderr, err)
-                              os.Exit(1)
-                      }
-                      fmt.Println(filepath.Clean(os.Getenv("PODMAN_DATA_DIR")))
-                      fmt.Println(filepath.Clean(os.Getenv("TMPDIR")))
-                      fmt.Println(opts.GraphRoot)
-                      fmt.Println(opts.RunRoot)
-                      return
-              }
-
-              cfg := new(config.Config)
-              var path string
-              var err error
-              switch os.Args[1] {
-              case "conmon":
-                      path, err = cfg.FindConmon()
-              case "conmonrs":
-                      path, err = cfg.FindConmonRs()
-              case "runtime":
-                      path, err = config.FindOCIRuntime(os.Args[2], []string{os.Args[3]})
-                      if err == nil && path == "" {
-                              err = fmt.Errorf("could not find OCI runtime %q", os.Args[2])
-                      }
-              default:
-                      path, err = cfg.FindHelperBinary(os.Args[1], true)
-              }
-              if err != nil {
-                      fmt.Fprintln(os.Stderr, err)
-                      os.Exit(1)
-              }
-              fmt.Println(path)
-      }
-      EOF
-      HOME="$state/home" \
-        GOCACHE="$state/go-cache" \
-        GOENV=off \
-        GOPATH="$state/go" \
-        GOMODCACHE="$state/go/pkg/mod" \
-        go build -mod=vendor \
-          -ldflags '-X go.podman.io/common/pkg/config.additionalHelperBinariesDir=$BINDIR/../libexec/podman' \
-          -o "$relocated/bin/resolver-test" \
-          "$check_dir/resolver-test.go"
-
-      assert_contains() {
-        case "$1" in
-          *"$2"*) ;;
-          *)
-            echo "missing expected Podman output: $2" >&2
-            echo "$1" >&2
-            return 1
-            ;;
-        esac
-      }
-
-      output=$(PATH="$host_bin" "$relocated/bin/resolver-test" conmon)
-      test "$output" = "$relocated/libexec/podman/conmon"
-
-      mv "$relocated/libexec/podman/conmon" "$relocated/libexec/podman/conmon.disabled"
-      if output=$(PATH="$host_bin" "$relocated/bin/resolver-test" conmon 2>&1); then
-        echo "Podman unexpectedly used conmon outside the sibling directory" >&2
-        exit 1
-      fi
-      assert_contains "$output" "could not find a working conmon binary"
-      mv "$relocated/libexec/podman/conmon.disabled" "$relocated/libexec/podman/conmon"
-
-      output=$(PATH="$host_bin" "$relocated/bin/resolver-test" conmonrs)
-      test "$output" = "$relocated/libexec/podman/conmonrs"
-
-      mv "$relocated/libexec/podman/conmonrs" "$relocated/libexec/podman/conmonrs.disabled"
-      if output=$(PATH="$host_bin" "$relocated/bin/resolver-test" conmonrs 2>&1); then
-        echo "Podman unexpectedly found conmonrs outside the sibling directory" >&2
-        exit 1
-      fi
-      assert_contains "$output" "could not find a working conmon binary"
-
-      output=$(
-        PATH="$host_bin" \
-          "$relocated/bin/resolver-test" runtime crun "$host_bin/crun"
-      )
-      test "$output" = "$relocated/libexec/podman/crun"
-
-      mv "$relocated/libexec/podman/crun" "$relocated/libexec/podman/crun.disabled"
-      if output=$(
-        PATH="$host_bin" \
-          "$relocated/bin/resolver-test" runtime crun "$host_bin/crun" 2>&1
-      ); then
-        echo "Podman unexpectedly used an OCI runtime outside the sibling directory" >&2
-        exit 1
-      fi
-      assert_contains "$output" 'could not find OCI runtime "crun"'
-      mv "$relocated/libexec/podman/crun.disabled" "$relocated/libexec/podman/crun"
-
-      output=$(
-        CONTAINERS_HELPER_BINARY_DIR="$host_bin" \
-          PATH="$host_bin" \
-          "$relocated/bin/resolver-test" pasta
-      )
-      test "$output" = "$relocated/libexec/podman/pasta"
-
-      mv "$relocated/libexec/podman/pasta" "$relocated/libexec/podman/pasta.disabled"
-      if output=$(
-        CONTAINERS_HELPER_BINARY_DIR="$host_bin" \
-          PATH="$host_bin" \
-          "$relocated/bin/resolver-test" pasta 2>&1
-      ); then
-        echo "Podman unexpectedly found a helper outside the sibling directory" >&2
-        exit 1
-      fi
-      assert_contains "$output" "could not find \"pasta\" in packaged helper directory"
-
-      install_root="$check_dir/installed podman"
-      systemd_unit_dir="$check_dir/systemd"
-      systemctl_bin="$check_dir/systemctl-bin"
-      systemctl_log="$check_dir/systemctl.log"
-      mv "$relocated" "$install_root"
-      mkdir -p "$install_root/data" "$systemctl_bin"
-      touch "$install_root/data/keep"
-      cat > "$systemctl_bin/systemctl" <<'EOF'
-      #!/bin/sh
-      printf '%s\n' "$*" >>"$SYSTEMCTL_LOG"
-      EOF
-      chmod +x "$systemctl_bin/systemctl"
-      PODMANX_SYSTEMD_UNIT_DIR="$systemd_unit_dir" \
-        SYSTEMCTL_LOG="$systemctl_log" \
-        PATH="$systemctl_bin:$PATH" \
-        "$install_root/bin/install.sh"
-
-      test -e "$install_root/data/keep"
-      test -x "$install_root/bin/podman"
-      test -x "$install_root/bin/podman-server"
-      test -x "$install_root/libexec/podman/crun"
-      test "$(cat "$systemctl_log")" = "$(printf '%s\n' \
-        "daemon-reload" \
-        "enable podmanxd.service" \
-        "start podmanxd.service" \
-        "status podmanxd.service")"
-      grep -F "ExecStart=\"$install_root/bin/podman-server\"" \
-        "$systemd_unit_dir/podmanxd.service"
-      grep -F "ExecStop=\"$install_root/bin/podman\" stop --all" \
-        "$systemd_unit_dir/podmanxd.service"
-      if grep -F '@PODMANX_ROOT@' "$systemd_unit_dir/podmanxd.service"; then
-        echo "installed systemd unit contains an unresolved path template" >&2
-        exit 1
-      fi
-
-      mv "$install_root/bin/_podman" "$install_root/bin/_podman.real"
-      cat > "$install_root/bin/_podman" <<'EOF'
-      #!/bin/sh
-      exec "$(dirname "$0")/resolver-test" storage
-      EOF
-      chmod +x "$install_root/bin/_podman"
-      output=$(
-        PODMAN_DATA_DIR="$check_dir/external-data" \
-          TMPDIR="$check_dir/external-tmp" \
-          "$install_root/bin/podman"
-      )
-      test "$output" = "$(printf '%s\n' \
-        "$install_root/data" \
-        "$install_root/data/tmpdir" \
-        "$install_root/data/graphroot" \
-        "$install_root/data/runroot")"
-      test -d "$install_root/data/tmpdir"
-      grep -F 'export PODMAN_DATA_DIR=$root/../data' "$install_root/bin/podman"
-      grep -F 'export PODMAN_DATA_DIR=$root/../data' "$install_root/bin/podman-server"
-      grep -F 'graphroot = "$PODMAN_DATA_DIR/graphroot"' "$install_root/conf/storage.conf"
-      grep -F 'runroot = "$PODMAN_DATA_DIR/runroot"' "$install_root/conf/storage.conf"
-      if grep -F '/opt/podmanx/data' "$install_root/conf/storage.conf"; then
-        echo "storage.conf contains a fixed installation path" >&2
-        exit 1
-      fi
-
-      # 自适应默认网络：沿用 podman 内建网络名 "podman"，故 containers.conf 不设
-      # default_network、无需 override。podman-server 探测宿主机 IPv6 能力后，把
-      # conf/networks/podman.json 软链到 conf/networks.d/{dualstack,ipv4}.json。
-      # network_config_dir 不做环境变量展开，故用运行时真实路径经 --network-config-dir
-      # 直接指向 conf/networks（包目录可写、原地执行，软链接即时切换）。
-      grep -F 'network_backend = "netavark"' "$install_root/conf/containers.conf"
-      grep -F -- '--network-config-dir="$PODMAN_NET_DIR"' "$install_root/bin/podman-server"
-      grep -F 'PODMAN_NET_DIR=$root/../conf/networks' "$install_root/bin/podman-server"
-      grep -F '/proc/sys/net/ipv6/conf/all/disable_ipv6' "$install_root/bin/podman-server"
-      grep -F 'ln -sf ../networks.d/dualstack.json' "$install_root/bin/podman-server"
-      grep -F 'ln -sf ../networks.d/ipv4.json' "$install_root/bin/podman-server"
-      # 软链接目标目录随包预建（podman-server 不再运行时 mkdir），确保原地执行即可软链。
-      test -d "$install_root/conf/networks"
-      if grep -E '^[[:space:]]*default_network' "$install_root/conf/containers.conf"; then
-        echo "containers.conf must not set default_network (uses built-in name podman)" >&2
-        exit 1
-      fi
-      if grep -E '^[[:space:]]*network_config_dir' "$install_root/conf/containers.conf"; then
-        echo "containers.conf must not set an unexpanded network_config_dir" >&2
-        exit 1
-      fi
-
-      # 两组候选网络定义都必须存在、内部 name 为 podman（须与软链接文件名 podman.json
-      # 匹配，否则 netavark 会跳过）、带合法 id（省略会被判为 invalid network ID）、
-      # IPv6 开关与各自 case 一致，且不含安装绝对路径。
-      ds_json="$install_root/conf/networks.d/dualstack.json"
-      v4_json="$install_root/conf/networks.d/ipv4.json"
-      test -f "$ds_json"
-      test -f "$v4_json"
-      grep -F '"name": "podman"' "$ds_json"
-      grep -F '"name": "podman"' "$v4_json"
-      grep -F '"ipv6_enabled": true' "$ds_json"
-      grep -F 'fd4e:9a7c:5b2e::/64' "$ds_json"
-      grep -F '"ipv6_enabled": false' "$v4_json"
-      grep -E '"id":[[:space:]]*"[0-9a-f]{64}"' "$ds_json"
-      grep -E '"id":[[:space:]]*"[0-9a-f]{64}"' "$v4_json"
-      if grep -F "$install_root" "$ds_json" "$v4_json"; then
-        echo "static network definition contains a fixed installation path" >&2
-        exit 1
-      fi
+      export GOCACHE=$TMPDIR/go-cache
+      export HOME=$TMPDIR/home
+      mkdir -p "$HOME"
+      go build -mod=vendor -tags containers_image_openpgp,seccomp -o "$out/bin/config-check" ${./tests/config-check.go}
+      cp ${./tests/network_test.go} vendor/go.podman.io/common/libnetwork/netavark/standalone_test.go
+      PODMAN_TEST_NETWORK_DIR=$out/conf/networks go test -mod=vendor -run '^TestStandaloneNetwork$' go.podman.io/common/libnetwork/netavark
+      cp ${./tests/seccomp_test.go} libpod/standalone_seccomp_test.go
+      CONTAINERS_CONF=$out/conf/containers.conf CONTAINERS_STORAGE_CONF=$out/conf/storage.conf PODMAN_DATA_DIR=$TMPDIR/data go test -mod=vendor -tags containers_image_openpgp,seccomp -run '^TestStandaloneSeccomp$' ./libpod
+      bash ${./tests/package.sh} "$out"
+      rm "$out/bin/config-check"
+      runHook postInstallCheck
     '';
   })

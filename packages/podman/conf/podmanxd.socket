@@ -1,0 +1,13 @@
+[Unit]
+Description=Podman API Socket
+
+[Socket]
+ListenStream=/run/podman/podman.sock
+SocketUser=root
+SocketGroup=root
+SocketMode=0666
+DirectoryMode=0755
+Service=podmanxd.service
+
+[Install]
+WantedBy=sockets.target

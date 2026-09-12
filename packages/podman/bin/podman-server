@@ -1,47 +1,31 @@
-#!/usr/bin/env bash
-set -xeuo pipefail
+#!/bin/sh
+# Resolve bundle paths; all backend and network choices are fixed.
+set -eu
+root=$(readlink -f -- "$0")
+root=$(CDPATH="" cd -- "${root%/*}/.." && pwd)
+export PATH="$root/libexec/podman"
+export PODMAN_DATA_DIR="$root/data"
+export HOME="$PODMAN_DATA_DIR/home"
+export XDG_RUNTIME_DIR="$PODMAN_DATA_DIR/runroot"
+export TMPDIR="$PODMAN_DATA_DIR/tmpdir"
+export CONTAINERS_CONF="$root/conf/containers.conf"
+export CONTAINERS_STORAGE_CONF="$root/conf/storage.conf"
+export CONTAINERS_REGISTRIES_CONF="$root/conf/registries.conf"
+export CONTAINERS_POLICY_JSON="$root/conf/policy.json"
+export REGISTRY_AUTH_FILE="$PODMAN_DATA_DIR/auth.json"
+export SSL_CERT_FILE="$root/conf/ca-bundle.crt"
+export SSL_CERT_DIR="$root/conf/certs"
+# netavark's nftables backend still attempts optional firewalld integration.
+export DBUS_SYSTEM_BUS_ADDRESS="unix:path=$PODMAN_DATA_DIR/no-system-bus"
+# Use the upstream config/data/cache defaults under the bundle HOME.
+unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME
+unset CONTAINERS_CONF_OVERRIDE CONTAINERS_REGISTRIES_CONF_OVERRIDE REGISTRIES_CONFIG_PATH
+unset CONTAINER_HOST CONTAINER_CONNECTION CONTAINER_SSHKEY STORAGE_DRIVER STORAGE_OPTS
+unset DOCKER_CONFIG
+umask 077
+mkdir -p "$HOME" "$XDG_RUNTIME_DIR" "$TMPDIR"
 
-script_path="$(readlink -f "$0")"
-root=$(cd "$(dirname "$script_path")" && pwd)
-
-export CONTAINERS_CONF=$root/../conf/containers.conf
-export CONTAINERS_STORAGE_CONF=$root/../conf/storage.conf
-export CONTAINERS_REGISTRIES_CONF=$root/../conf/registries.conf
-export CONTAINERS_POLICY_JSON=$root/../conf/policy.json
-export PODMAN_DATA_DIR=$root/../data
-export TMPDIR=$PODMAN_DATA_DIR/tmpdir
-
-# network_config_dir 不做环境变量展开，故网络定义目录用运行时真实路径通过
-# --network-config-dir 注入。目录里只放一个软链接 podman.json，指向 networks.d 下按
-# 宿主机 IPv6 能力选出的候选定义（内部网络名均为 podman，即 podman 内建默认网络名，
-# 因此无需设置 default_network，也无需 CONTAINERS_CONF_OVERRIDE）。
-PODMAN_NET_DIR=$root/../conf/networks
-
-# export PATH=$PATH:$root
-
-# --imagestore=$root/storage \
-# --runroot=$root/runroot \
-# --network-cmd-path=$root/bin \
-# --log-level=debug \
-
-# export HTTP_PROXY=http://127.0.0.1:7890
-# export HTTPS_PROXY=http://127.0.0.1:7890
-
-mkdir -p "$TMPDIR"
-mkdir -p /run/podman
-
-# 运行时探测宿主机 IPv6 能力，自适应选择默认网络（保证 dual-stack / IPv4-only /
-# IPv6-disabled 机器都能起）：IPv6 未被内核禁用用 dualstack，否则用 ipv4（避免 netavark
-# 配 IPv6 bridge 失败连带 podman run 报错）。切换只是把 podman.json 软链到对应候选。
-if [ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null || echo 1)" = "0" ]; then
-  ln -sf ../networks.d/dualstack.json "$PODMAN_NET_DIR/podman.json"
-else
-  ln -sf ../networks.d/ipv4.json "$PODMAN_NET_DIR/podman.json"
-fi
-
-# --out=$root/../podman.log \
-exec -a "$0" "$root/_podman" \
-  --network-config-dir="$PODMAN_NET_DIR" \
-  --log-level=info \
-  system service --time=0 unix:///run/podman/podman.sock \
-  "$@" >>"$root/../podman.log" 2>&1
+exec "$root/bin/_podman" \
+  --network-config-dir="$root/conf/networks" \
+  --default-mounts-file="$root/conf/mounts.conf" \
+  --log-level=info system service "$@"
