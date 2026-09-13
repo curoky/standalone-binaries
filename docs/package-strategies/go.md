@@ -11,15 +11,25 @@ native Go/CGO 的 Nix `libresolv.9.dylib` 路径统一由
 Go build info 和完整 dependency 路径后改指系统库，并保留 entitlement 重签。
 新包仅有该问题时不再复制包级 `install_name_tool` override。
 
-这不解决 `pkgsStatic` 编译失败，也不清理任意资源路径。`rclone` 在包级使用
-`remove-references-to -t`，仅清理已确认来自 Go stdlib 的 `tzdata`、`mailcap`、
-`iana-etc` 引用，并用 `disallowedReferences` 验证；resolver 原始路径保留给 artifact。
-不得用全量 `nuke-refs` 抹掉 resolver hash，也不得放宽公共匹配规则。
+这不解决 `pkgsStatic` 编译失败，也不清理任意资源路径。不得用全量 `nuke-refs`
+抹掉 resolver hash，也不得放宽公共匹配规则。
 
-定向清理仍是将已知资源 hash 改为不可解析的占位值，并非把资源重定位到系统路径。
-时区和 MIME 保留系统路径查找；IANA 的 Go 补丁直接替换 `/etc/services` 和
-`/etc/protocols`，不能假定也有文件路径 fallback。维持既有清理后的 CGO/内置查询行为，
-回归时需在禁止读取 `/nix` 的环境验证时区、MIME、DNS 和服务名查询。
+## Go 资源路径
+
+nixpkgs 的 Go stdlib 补丁会内嵌 `tzdata`、`mailcap`、`iana-etc` 的 store 路径。
+时区和 MIME 保留系统路径查找；IANA 补丁直接替换 `/etc/services` 和
+`/etc/protocols`，不能假定也有文件路径 fallback。
+
+将资源 hash 改成 `eeee...` 只会断开 Nix reference，不会恢复系统路径，也不能保证
+功能完整。经用户确认，Darwin Rclone 已取消这种包级清理及配套 `disallowedReferences`，
+改用 stock native；资源路径仍是已知缺口，不表示上游已修复或满足完整 portability。
+有对应 Nix 数据的机器可能重新使用这些数据，无 Nix 环境则仍依赖既有系统/内置查询。
+该决定不授权其他包放宽校验，也不改变动态库约束。
+
+后续应在 Go 工具链构建层恢复标准资源路径，再重建 consumer；实施前需核对实际使用的
+版本化 builder 和 build/target 边界。验证应覆盖未规范化的 source 引用，以及禁止读取
+`/nix` 时的时区、MIME、DNS、服务名和协议名查询。当前状态见
+[Rclone 资源路径](../regression/darwin.md#rclone-资源路径)。
 
 ## Podman
 

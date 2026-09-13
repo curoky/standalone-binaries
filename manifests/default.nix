@@ -407,6 +407,12 @@
       isStatic = false;
     };
   };
+  # Artifact removes the upstream PATH wrapper and relocates the CGO resolver;
+  # runtime tools are installed separately and resolved through the user's PATH.
+  colima = {
+    platforms = [ "aarch64-darwin" ];
+    isStatic = false;
+  };
   croc = {
     "aarch64-darwin" = {
       isStatic = false;
@@ -531,19 +537,23 @@
       isStatic = false;
     };
   };
+  # Artifact unwraps limactl and relocates its CGO resolver, preserving
+  # entitlements, helpers and guest resources without a package override.
+  lima = {
+    platforms = [ "aarch64-darwin" ];
+    isStatic = false;
+  };
   oras = {
     "aarch64-darwin" = {
       isStatic = false;
     };
   };
-  # rclone: Linux only here (pkgsStatic musl static). darwin uses the local
-  # package (packages/rclone/darwin.nix) to clear known Go resource references;
-  # artifact handles the original libresolv load command.
+  # Darwin uses native upstream without resource hash rewriting.
+  # Artifact handles the resolver; Go resource paths remain a tracked gap.
   rclone = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
+    "aarch64-darwin" = {
+      isStatic = false;
+    };
   };
   revive = {
     "aarch64-darwin" = {
