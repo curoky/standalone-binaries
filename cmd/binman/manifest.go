@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
-	"strings"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
@@ -25,13 +25,20 @@ type packageSet struct {
 	Unlink []string `yaml:"unlink"`
 }
 
+type syncOpts struct {
+	prefix, arch       string
+	prefixSet, archSet bool
+	force, prune       bool
+}
+
 func loadManifest(path string) (manifest, error) {
 	var config manifest
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return config, err
 	}
-	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
+	defer file.Close()
+	decoder := yaml.NewDecoder(file)
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&config); err != nil {
 		return config, fmt.Errorf("%s: %w", path, err)
@@ -49,11 +56,13 @@ func loadManifest(path string) (manifest, error) {
 		}
 	}
 	count := 0
-	for _, packageName := range append(append([]string{}, config.Packages.Link...), config.Packages.Unlink...) {
-		if err := validatePackageName(packageName); err != nil {
-			return config, fmt.Errorf("%s: %w", path, err)
+	for _, packages := range [][]string{config.Packages.Link, config.Packages.Unlink} {
+		for _, packageName := range packages {
+			if err := validatePackageName(packageName); err != nil {
+				return config, fmt.Errorf("%s: %w", path, err)
+			}
+			count++
 		}
-		count++
 	}
 	for profile, packages := range config.Profiles {
 		if err := validateProfileName(profile); err != nil {
@@ -72,77 +81,49 @@ func loadManifest(path string) (manifest, error) {
 	return config, nil
 }
 
-// installPlan de-duplicates packages while preserving manifest order. A root
-// link wins when a package appears in multiple sections.
+// Root links take precedence when a package appears in multiple sections.
 func (config manifest) installPlan() []installTarget {
 	var plan []installTarget
-	seen := make(map[string]int)
-	add := func(packageName string, linked bool) {
-		if index, ok := seen[packageName]; ok {
-			if linked {
-				plan[index].linked = true
+	seen := make(map[string]bool)
+	add := func(packages []string, linked bool) {
+		for _, packageName := range packages {
+			if !seen[packageName] {
+				seen[packageName] = true
+				plan = append(plan, installTarget{name: packageName, linked: linked})
 			}
-			return
 		}
-		seen[packageName] = len(plan)
-		plan = append(plan, installTarget{name: packageName, linked: linked})
 	}
-	for _, packageName := range config.Packages.Link {
-		add(packageName, true)
-	}
-	for _, packageName := range config.Packages.Unlink {
-		add(packageName, false)
-	}
+	add(config.Packages.Link, true)
+	add(config.Packages.Unlink, false)
 	for _, profile := range sortedProfileNames(config.Profiles) {
-		for _, packageName := range config.Profiles[profile] {
-			add(packageName, false)
-		}
+		add(config.Profiles[profile], false)
 	}
 	return plan
 }
 
-func cmdSync(prefix, arch, file string, prefixSet, archSet, force, prune bool) error {
+func (c *client) cmdSync(file string, options syncOpts) error {
 	config, err := loadManifest(file)
 	if err != nil {
 		return err
 	}
-	if !archSet && config.Arch != "" {
+	prefix, arch := options.prefix, options.arch
+	if !options.archSet && config.Arch != "" {
 		arch = config.Arch
 	}
-	if !prefixSet && config.Prefix != "" {
+	if !options.prefixSet && config.Prefix != "" {
 		prefix = config.Prefix
 	}
 	plan := config.installPlan()
-	logger.Info("sync started", "file", file, "prefix", prefix, "link", config.Packages.Link,
-		"unlink", config.Packages.Unlink, "profiles", len(config.Profiles), "prune", prune)
-	fmt.Printf("> Syncing %d unique package(s) from %s...\n", len(plan), file)
-
-	if len(plan) > 0 {
-		if err := installPackagePlan(plan, prefix, arch, force); err != nil {
-			return err
-		}
-	}
-	profileParent := filepath.Join(prefix, "profile")
-	if err := os.MkdirAll(prefix, 0o755); err != nil {
+	c.logger.Info("sync started", "file", file, "prefix", prefix, "link", config.Packages.Link,
+		"unlink", config.Packages.Unlink, "profiles", len(config.Profiles), "prune", options.prune)
+	fmt.Fprintf(c.output, "> Syncing %d unique package(s) from %s...\n", len(plan), file)
+	if err := c.installPackagePlan(plan, prefix, arch, options.force); err != nil {
 		return err
 	}
-	// Rebuild the profile tree in place: drop the old one, then relink. A
-	// failure mid-rebuild is fixed by re-running sync.
-	if err := os.RemoveAll(profileParent); err != nil {
-		return fmt.Errorf("reset profiles: %w", err)
+	if err := c.rebuildProfiles(prefix, config.Profiles); err != nil {
+		return err
 	}
-	for _, profile := range sortedProfileNames(config.Profiles) {
-		root := filepath.Join(profileParent, profile)
-		fmt.Printf("> Linking profile %s -> %s\n", profile, root)
-		for _, packageName := range config.Profiles[profile] {
-			logger.Info("profile link", "profile", profile, "package", packageName, "root", root)
-			if err := linkPkgInto(prefix, packageName, root); err != nil {
-				return fmt.Errorf("profile %s: %s: %w", profile, packageName, err)
-			}
-		}
-	}
-
-	if !prune {
+	if !options.prune {
 		return nil
 	}
 	wanted := make(map[string]bool, len(plan))
@@ -154,22 +135,42 @@ func cmdSync(prefix, arch, file string, prefixSet, archSet, force, prune bool) e
 		return err
 	}
 	for _, packageName := range installed {
-		if wanted[packageName] {
-			continue
+		if !wanted[packageName] {
+			c.logger.Info("prune removing package not in manifest", "package", packageName)
+			if err := c.cmdRemove(prefix, packageName); err != nil {
+				return err
+			}
 		}
-		logger.Info("prune removing package not in manifest", "package", packageName)
-		if err := cmdRemove(prefix, packageName); err != nil {
-			return err
+	}
+	return nil
+}
+
+func (c *client) rebuildProfiles(prefix string, profiles map[string][]string) error {
+	profileParent := filepath.Join(prefix, "profile")
+	if err := os.MkdirAll(prefix, 0o755); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(profileParent); err != nil {
+		return fmt.Errorf("reset profiles: %w", err)
+	}
+	files := make(packageFiles)
+	for _, profile := range sortedProfileNames(profiles) {
+		root := filepath.Join(profileParent, profile)
+		fmt.Fprintf(c.output, "> Linking profile %s -> %s\n", profile, root)
+		for _, packageName := range profiles[profile] {
+			c.logger.Info("profile link", "profile", profile, "package", packageName, "root", root)
+			entries, err := files.get(storePath(prefix, packageName))
+			if err != nil {
+				return fmt.Errorf("profile %s: %s: %w", profile, packageName, err)
+			}
+			if err := linkFilesInto(entries, root); err != nil {
+				return fmt.Errorf("profile %s: %s: %w", profile, packageName, err)
+			}
 		}
 	}
 	return nil
 }
 
 func sortedProfileNames(profiles map[string][]string) []string {
-	names := make([]string, 0, len(profiles))
-	for name := range profiles {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
+	return slices.Sorted(maps.Keys(profiles))
 }

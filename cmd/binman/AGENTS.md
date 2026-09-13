@@ -80,11 +80,17 @@ manifest 引用的 package。
 
 ## 实现边界
 
-- `registry.go`：OCI resolve、digest 和原子 cache 下载。
-- `store.go`：metadata、安全解压、store 交换和文件聚合。
-- `install.go`：安装状态机及 package 命令。
+- `main.go`：Cobra 命令构造与执行；`client` 持有 registry、输出和日志，测试不替换全局状态。
+- `registry.go`：OCI resolve、digest 和原子 cache 下载；沿用 go-containerregistry 和 errgroup。
+- `store.go`：metadata、安全解压、store 交换和文件聚合；gzip 使用标准库，每次解压复用 copy buffer。
+- `install.go`：安装任务准备、批量下载、按顺序提交，以及 package 命令。
 - `manifest.go`：strict YAML、install plan、profile 和 prune。
+- `download.go`：下载到独立目录，不创建安装状态。
 - `install.sh`：首次安装 bootstrap。
+
+遍历使用 DirEntry，仅对 symlink 解析目标；目录 symlink 仍检查越界和循环。聚合目录仅在
+同目录连续文件间复用检查，正确的相对 link 不重建。Profile 重建与 remove 的文件清单
+只在本次操作内复用，不跨安装提交或命令缓存；store 变化后必须重新收集。
 
 保持同一个 `package main`，不为假设中的 backend、registry 或 package graph 预造
 interface。修改 registry、tag、layer、归档布局或 metadata 格式时，同步
@@ -97,6 +103,7 @@ CGO_ENABLED=0 go test ./cmd/binman
 CGO_ENABLED=1 go test -race ./cmd/binman
 CGO_ENABLED=0 go vet ./cmd/binman
 CGO_ENABLED=0 go build ./cmd/binman
+CGO_ENABLED=0 go test ./cmd/binman -run '^$' -bench . -benchmem -count=3
 bash -n cmd/binman/install.sh
 shellcheck cmd/binman/install.sh
 ```

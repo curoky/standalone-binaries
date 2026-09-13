@@ -8,7 +8,7 @@ import (
 
 // downloadPackages fetches package archives and extracts each one into a
 // package-named directory without creating binman installation state.
-func downloadPackages(names []string, arch, destination string) error {
+func (c *client) downloadPackages(names []string, arch, destination string) error {
 	if err := validateArch(arch); err != nil {
 		return err
 	}
@@ -43,8 +43,8 @@ func downloadPackages(names []string, arch, destination string) error {
 		requests = append(requests, artifactRequest{name: name, arch: arch})
 	}
 
-	fmt.Printf("> Resolving %d package(s)...\n", len(requests))
-	artifacts, err := resolveArtifacts(requests)
+	fmt.Fprintf(c.output, "> Resolving %d package(s)...\n", len(requests))
+	artifacts, err := c.resolveArtifacts(requests)
 	if err != nil {
 		return fmt.Errorf("aborting, some packages could not be resolved:\n%w", err)
 	}
@@ -55,7 +55,7 @@ func downloadPackages(names []string, arch, destination string) error {
 	}
 	defer os.RemoveAll(workspace)
 
-	fmt.Printf("> Downloading %d package(s)...\n", len(artifacts))
+	fmt.Fprintf(c.output, "> Downloading %d package(s)...\n", len(artifacts))
 	downloads := make([]artifactDownload, len(artifacts))
 	for index := range artifacts {
 		downloads[index] = artifactDownload{
@@ -84,7 +84,7 @@ func downloadPackages(names []string, arch, destination string) error {
 		if err := os.Rename(stage, target); err != nil {
 			return fmt.Errorf("%s: place downloaded package: %w", artifact.name, err)
 		}
-		fmt.Printf("> Downloaded %s (%s) -> %s\n", artifact.name, arch, target)
+		fmt.Fprintf(c.output, "> Downloaded %s (%s) -> %s\n", artifact.name, arch, target)
 	}
 	return nil
 }

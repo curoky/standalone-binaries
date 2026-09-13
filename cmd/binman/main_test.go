@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -31,7 +32,7 @@ type archiveEntry struct {
 	mode     int64
 }
 
-func archiveTarGz(t *testing.T, pkg string, entries ...archiveEntry) []byte {
+func archiveTarGz(t testing.TB, pkg string, entries ...archiveEntry) []byte {
 	t.Helper()
 	var buffer bytes.Buffer
 	gzipWriter := gzip.NewWriter(&buffer)
@@ -76,12 +77,9 @@ func pkgTarGz(t *testing.T, pkg string) []byte {
 	})
 }
 
-// startRegistry stands up an in-process OCI registry (go-containerregistry),
-// pushes one single-layer image per package as <name>-<arch>, points
-// ociRegistry at it, and returns nothing (cleanup is registered on t).
-func startRegistry(t *testing.T, arch string, packages ...string) {
+func startRegistry(t *testing.T, arch string, packages ...string) *client {
 	t.Helper()
-	startRegistryWithMiddleware(t, arch, nil, packages...)
+	return startRegistryWithMiddleware(t, arch, nil, packages...)
 }
 
 func startRegistryWithMiddleware(
@@ -89,7 +87,7 @@ func startRegistryWithMiddleware(
 	arch string,
 	middleware func(http.Handler) http.Handler,
 	packages ...string,
-) {
+) *client {
 	t.Helper()
 	var handler http.Handler = registry.New()
 	if middleware != nil {
@@ -121,9 +119,7 @@ func startRegistryWithMiddleware(
 		}
 	}
 
-	old := ociRegistry
-	ociRegistry = repo
-	t.Cleanup(func() { ociRegistry = old })
+	return newClient(repo, io.Discard, io.Discard)
 }
 
 func TestPrefixFromExecutable(t *testing.T) {
@@ -196,15 +192,15 @@ func TestPackageNamesFromTags(t *testing.T) {
 
 func TestRemotePackageNames(t *testing.T) {
 	const arch = "linux-x86_64"
-	startRegistry(t, arch, "ripgrep", "binman", "fd")
+	c := startRegistry(t, arch, "ripgrep", "binman", "fd")
 
-	got, err := remotePackageNames(arch)
+	got, err := c.remotePackageNames(arch)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"binman", "fd", "ripgrep"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Fatalf("remotePackageNames()=%v want %v", got, want)
+		t.Fatalf("c.remotePackageNames()=%v want %v", got, want)
 	}
 }
 
@@ -218,10 +214,10 @@ func TestMatchingPackageNames(t *testing.T) {
 
 func TestDownloadPackagesExtractsWithoutInstallState(t *testing.T) {
 	const arch = "linux-x86_64"
-	startRegistry(t, arch, "wget", "ripgrep")
+	c := startRegistry(t, arch, "wget", "ripgrep")
 
 	output := t.TempDir()
-	if err := downloadPackages([]string{"wget", "ripgrep", "wget"}, arch, output); err != nil {
+	if err := c.downloadPackages([]string{"wget", "ripgrep", "wget"}, arch, output); err != nil {
 		t.Fatal(err)
 	}
 
@@ -237,6 +233,7 @@ func TestDownloadPackagesExtractsWithoutInstallState(t *testing.T) {
 }
 
 func TestDownloadPackagesRefusesExistingTarget(t *testing.T) {
+	c := newClient(defaultRegistry, io.Discard, io.Discard)
 	const arch = "linux-x86_64"
 	output := t.TempDir()
 	target := filepath.Join(output, "wget")
@@ -244,7 +241,7 @@ func TestDownloadPackagesRefusesExistingTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := downloadPackages([]string{"wget"}, arch, output)
+	err := c.downloadPackages([]string{"wget"}, arch, output)
 	if err == nil || !strings.Contains(err.Error(), "refusing to overwrite existing path") {
 		t.Fatalf("downloadPackages error=%v", err)
 	}
@@ -335,11 +332,11 @@ func TestReadWriteMeta(t *testing.T) {
 
 func TestInstallMultiAllPresent(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep", "fd")
+	c := startRegistry(t, arch, "ripgrep", "fd")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
-	if err := installPackages([]string{"ripgrep", "fd"}, installOpts{prefix: prefix, arch: arch, linked: true}); err != nil {
+	if err := c.installPackages([]string{"ripgrep", "fd"}, installOpts{prefix: prefix, arch: arch, linked: true}); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"ripgrep", "fd"} {
@@ -360,11 +357,11 @@ func TestInstallMultiAllPresent(t *testing.T) {
 // is written to the prefix.
 func TestInstallMultiOneMissingAbortsAll(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep") // "nope" intentionally absent
+	c := startRegistry(t, arch, "ripgrep") // "nope" intentionally absent
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
-	err := installPackages([]string{"ripgrep", "nope"}, installOpts{prefix: prefix, arch: arch, linked: true})
+	err := c.installPackages([]string{"ripgrep", "nope"}, installOpts{prefix: prefix, arch: arch, linked: true})
 	if err == nil {
 		t.Fatal("expected error for missing package")
 	}
@@ -378,7 +375,7 @@ func TestInstallMultiOneMissingAbortsAll(t *testing.T) {
 
 func TestInstallCleansLeftoverStoreWithInvalidMetadata(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep")
+	c := startRegistry(t, arch, "ripgrep")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	store := storePath(prefix, "ripgrep")
@@ -392,7 +389,7 @@ func TestInstallCleansLeftoverStoreWithInvalidMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := installPackages([]string{"ripgrep"}, installOpts{
+	if err := c.installPackages([]string{"ripgrep"}, installOpts{
 		prefix: prefix, arch: arch, linked: true,
 	}); err != nil {
 		t.Fatalf("install should clean the leftover and succeed: %v", err)
@@ -432,14 +429,14 @@ func TestInstallDownloadFailureReturns(t *testing.T) {
 			_, _ = writer.Write(body)
 		})
 	}
-	startRegistryWithMiddleware(t, arch, middleware, "ripgrep")
+	c := startRegistryWithMiddleware(t, arch, middleware, "ripgrep")
 	truncate.Store(true)
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	prefix := t.TempDir()
 
 	done := make(chan error, 1)
 	go func() {
-		done <- installPackages([]string{"ripgrep"}, installOpts{
+		done <- c.installPackages([]string{"ripgrep"}, installOpts{
 			prefix: prefix, arch: arch, linked: true,
 		})
 	}()
@@ -510,7 +507,7 @@ func TestLoadManifest(t *testing.T) {
 
 func TestSyncInstalls(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep", "fd")
+	c := startRegistry(t, arch, "ripgrep", "fd")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
@@ -518,7 +515,7 @@ func TestSyncInstalls(t *testing.T) {
 	if err := os.WriteFile(file, []byte("packages:\n  link:\n    - ripgrep\n    - fd\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := cmdSync(prefix, arch, file, true, false, false, false); err != nil {
+	if err := c.cmdSync(file, syncOpts{prefix: prefix, arch: arch, prefixSet: true}); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"ripgrep", "fd"} {
@@ -533,7 +530,7 @@ func TestSyncInstalls(t *testing.T) {
 
 func TestSyncManifestPrefix(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep")
+	c := startRegistry(t, arch, "ripgrep")
 	root := t.TempDir()
 	manifestPrefix := filepath.Join(root, "opt", "binman")
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
@@ -544,7 +541,7 @@ func TestSyncManifestPrefix(t *testing.T) {
 		t.Fatal(err)
 	}
 	// prefixSet=false: the flag prefix is a throwaway; the manifest's prefix wins.
-	if err := cmdSync(filepath.Join(root, "ignored"), arch, file, false, false, false, false); err != nil {
+	if err := c.cmdSync(file, syncOpts{prefix: filepath.Join(root, "ignored"), arch: arch}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(manifestPrefix, "bin", "ripgrep")); err != nil {
@@ -556,7 +553,7 @@ func TestSyncManifestPrefix(t *testing.T) {
 
 	// prefixSet=true: an explicit --prefix overrides the manifest.
 	flagPrefix := filepath.Join(root, "flag", "binman")
-	if err := cmdSync(flagPrefix, arch, file, true, false, false, false); err != nil {
+	if err := c.cmdSync(file, syncOpts{prefix: flagPrefix, arch: arch, prefixSet: true}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(flagPrefix, "bin", "ripgrep")); err != nil {
@@ -566,7 +563,7 @@ func TestSyncManifestPrefix(t *testing.T) {
 
 func TestSyncManifestArchPrecedence(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep")
+	c := startRegistry(t, arch, "ripgrep")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	file := filepath.Join(t.TempDir(), "binman.yaml")
@@ -574,7 +571,7 @@ func TestSyncManifestArchPrecedence(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := cmdSync(prefix, arch, file, true, true, false, false); err != nil {
+	if err := c.cmdSync(file, syncOpts{prefix: prefix, arch: arch, prefixSet: true, archSet: true}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := readMeta(prefix, "ripgrep")
@@ -588,12 +585,12 @@ func TestSyncManifestArchPrecedence(t *testing.T) {
 
 func TestSyncPrune(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep", "fd", "bat")
+	c := startRegistry(t, arch, "ripgrep", "fd", "bat")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
 	// Pre-install bat; it is intentionally absent from the manifest below.
-	if err := installPackages([]string{"bat"}, installOpts{prefix: prefix, arch: arch, linked: true}); err != nil {
+	if err := c.installPackages([]string{"bat"}, installOpts{prefix: prefix, arch: arch, linked: true}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -601,7 +598,7 @@ func TestSyncPrune(t *testing.T) {
 	if err := os.WriteFile(file, []byte("packages:\n  link:\n    - ripgrep\n    - fd\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := cmdSync(prefix, arch, file, true, false, false, true); err != nil {
+	if err := c.cmdSync(file, syncOpts{prefix: prefix, arch: arch, prefixSet: true, prune: true}); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"ripgrep", "fd"} {
@@ -619,7 +616,7 @@ func TestSyncPrune(t *testing.T) {
 
 func TestSyncUnlinked(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep", "python311")
+	c := startRegistry(t, arch, "ripgrep", "python311")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
@@ -628,7 +625,7 @@ func TestSyncUnlinked(t *testing.T) {
 	if err := os.WriteFile(file, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := cmdSync(prefix, arch, file, true, false, false, false); err != nil {
+	if err := c.cmdSync(file, syncOpts{prefix: prefix, arch: arch, prefixSet: true}); err != nil {
 		t.Fatal(err)
 	}
 	// Regular package is linked into the prefix root.
@@ -646,7 +643,7 @@ func TestSyncUnlinked(t *testing.T) {
 
 func TestSyncProfiles(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep", "gopls", "delve")
+	c := startRegistry(t, arch, "ripgrep", "gopls", "delve")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
@@ -655,7 +652,7 @@ func TestSyncProfiles(t *testing.T) {
 	if err := os.WriteFile(file, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := cmdSync(prefix, arch, file, true, false, false, false); err != nil {
+	if err := c.cmdSync(file, syncOpts{prefix: prefix, arch: arch, prefixSet: true}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -718,7 +715,7 @@ func TestManifestInstallPlan(t *testing.T) {
 
 func TestSyncSharedBatchKeepsLinkedPackagesLinked(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep")
+	c := startRegistry(t, arch, "ripgrep")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
@@ -727,7 +724,7 @@ func TestSyncSharedBatchKeepsLinkedPackagesLinked(t *testing.T) {
 	if err := os.WriteFile(file, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := cmdSync(prefix, arch, file, true, false, false, false); err != nil {
+	if err := c.cmdSync(file, syncOpts{prefix: prefix, arch: arch, prefixSet: true}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -750,6 +747,7 @@ func TestSyncSharedBatchKeepsLinkedPackagesLinked(t *testing.T) {
 }
 
 func TestRemoveRejectsPackagePathTraversal(t *testing.T) {
+	c := newClient(defaultRegistry, io.Discard, io.Discard)
 	root := t.TempDir()
 	prefix := filepath.Join(root, "prefix")
 	victim := filepath.Join(root, "victim")
@@ -760,7 +758,7 @@ func TestRemoveRejectsPackagePathTraversal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := cmdRemove(prefix, "../../victim"); err == nil {
+	if err := c.cmdRemove(prefix, "../../victim"); err == nil {
 		t.Fatal("expected invalid package name error")
 	}
 	if _, err := os.Stat(filepath.Join(victim, "keep")); err != nil {
@@ -769,6 +767,7 @@ func TestRemoveRejectsPackagePathTraversal(t *testing.T) {
 }
 
 func TestRemovePreservesStoreWhenMetadataIsInvalid(t *testing.T) {
+	c := newClient(defaultRegistry, io.Discard, io.Discard)
 	prefix := t.TempDir()
 	name := "ripgrep"
 	store := storePath(prefix, name)
@@ -782,7 +781,7 @@ func TestRemovePreservesStoreWhenMetadataIsInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := cmdRemove(prefix, name); err == nil {
+	if err := c.cmdRemove(prefix, name); err == nil {
 		t.Fatal("expected invalid metadata error")
 	}
 	if _, err := os.Stat(filepath.Join(store, "keep")); err != nil {
@@ -1044,7 +1043,7 @@ func TestUnlinkPreservesUserReplacement(t *testing.T) {
 
 func TestSyncReconcilesProfiles(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "gopls", "delve")
+	c := startRegistry(t, arch, "gopls", "delve")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	file := filepath.Join(t.TempDir(), "binman.yaml")
@@ -1052,13 +1051,13 @@ func TestSyncReconcilesProfiles(t *testing.T) {
 	if err := os.WriteFile(file, []byte("profiles:\n  go:\n    - gopls\n    - delve\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := cmdSync(prefix, arch, file, true, false, false, false); err != nil {
+	if err := c.cmdSync(file, syncOpts{prefix: prefix, arch: arch, prefixSet: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(file, []byte("profiles:\n  go:\n    - gopls\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := cmdSync(prefix, arch, file, true, false, false, false); err != nil {
+	if err := c.cmdSync(file, syncOpts{prefix: prefix, arch: arch, prefixSet: true}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Lstat(filepath.Join(prefix, "profile", "go", "bin", "delve")); !os.IsNotExist(err) {
@@ -1067,6 +1066,7 @@ func TestSyncReconcilesProfiles(t *testing.T) {
 }
 
 func TestRemoveCleansProfileLinks(t *testing.T) {
+	c := newClient(defaultRegistry, io.Discard, io.Discard)
 	prefix := t.TempDir()
 	name := "gopls"
 	path := filepath.Join(storePath(prefix, name), "bin", name)
@@ -1084,7 +1084,7 @@ func TestRemoveCleansProfileLinks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := cmdRemove(prefix, name); err != nil {
+	if err := c.cmdRemove(prefix, name); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Lstat(filepath.Join(profile, "bin", name)); !os.IsNotExist(err) {
@@ -1102,9 +1102,9 @@ func TestOutdatedReturnsRegistryErrors(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	startRegistry(t, "linux-x86_64")
+	c := startRegistry(t, "linux-x86_64")
 
-	if err := cmdOutdated(prefix); err == nil {
+	if err := c.cmdOutdated(prefix); err == nil {
 		t.Fatal("expected registry error")
 	}
 }
@@ -1132,14 +1132,14 @@ func TestResolveArtifactsReusesBearerToken(t *testing.T) {
 		})
 	}
 	packages := []string{"ripgrep", "fd", "bat", "eza"}
-	startRegistryWithMiddleware(t, arch, middleware, packages...)
+	c := startRegistryWithMiddleware(t, arch, middleware, packages...)
 	atomic.StoreInt32(&tokenRequests, 0)
 
 	requests := make([]artifactRequest, len(packages))
 	for index, packageName := range packages {
 		requests[index] = artifactRequest{name: packageName, arch: arch}
 	}
-	if _, err := resolveArtifacts(requests); err != nil {
+	if _, err := c.resolveArtifacts(requests); err != nil {
 		t.Fatal(err)
 	}
 	if got := atomic.LoadInt32(&tokenRequests); got != 1 {
@@ -1171,13 +1171,13 @@ func TestOutdatedResolvesPackagesConcurrently(t *testing.T) {
 	for index := range packages {
 		packages[index] = fmt.Sprintf("package-%02d", index)
 	}
-	startRegistryWithMiddleware(t, arch, middleware, packages...)
+	c := startRegistryWithMiddleware(t, arch, middleware, packages...)
 	prefix := t.TempDir()
 	for _, packageName := range packages {
 		if err := os.MkdirAll(storePath(prefix, packageName), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		digest, err := remoteDigest(packageName, arch)
+		digest, err := c.remoteDigest(packageName, arch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1189,7 +1189,7 @@ func TestOutdatedResolvesPackagesConcurrently(t *testing.T) {
 	}
 	atomic.StoreInt32(&peak, 0)
 
-	if err := cmdOutdated(prefix); err != nil {
+	if err := c.cmdOutdated(prefix); err != nil {
 		t.Fatal(err)
 	}
 	if got := atomic.LoadInt32(&peak); got < 2 {
@@ -1202,7 +1202,7 @@ func TestOutdatedResolvesPackagesConcurrently(t *testing.T) {
 
 func TestUpgradeResolvesAllPackagesBeforeWriting(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "first")
+	c := startRegistry(t, arch, "first")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	for _, name := range []string{"first", "missing"} {
@@ -1216,7 +1216,7 @@ func TestUpgradeResolvesAllPackagesBeforeWriting(t *testing.T) {
 		}
 	}
 
-	if err := cmdUpgrade(prefix, arch, []string{"first", "missing"}); err == nil {
+	if err := c.cmdUpgrade(prefix, arch, []string{"first", "missing"}); err == nil {
 		t.Fatal("expected missing package error")
 	}
 	got, err := readMeta(prefix, "first")
@@ -1230,7 +1230,7 @@ func TestUpgradeResolvesAllPackagesBeforeWriting(t *testing.T) {
 
 func TestUpgradeArchOverride(t *testing.T) {
 	arch := "linux-x86_64"
-	startRegistry(t, arch, "ripgrep")
+	c := startRegistry(t, arch, "ripgrep")
 	prefix := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	if err := os.MkdirAll(storePath(prefix, "ripgrep"), 0o755); err != nil {
@@ -1242,7 +1242,7 @@ func TestUpgradeArchOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := cmdUpgrade(prefix, arch, []string{"ripgrep"}); err != nil {
+	if err := c.cmdUpgrade(prefix, arch, []string{"ripgrep"}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := readMeta(prefix, "ripgrep")

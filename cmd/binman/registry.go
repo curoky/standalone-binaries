@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -17,19 +17,15 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// ociRegistry is the registry reference root. It is a variable so tests can
-// point it at a local httptest registry; production always uses ghcr.
-var ociRegistry = defaultRegistry
-
-func ref(packageName, arch string) string {
-	return fmt.Sprintf("%s:%s-%s", ociRegistry, packageName, arch)
+func (c *client) ref(packageName, arch string) string {
+	return fmt.Sprintf("%s:%s-%s", c.registry, packageName, arch)
 }
 
-func remotePackageNames(arch string) ([]string, error) {
+func (c *client) remotePackageNames(arch string) ([]string, error) {
 	if err := validateArch(arch); err != nil {
 		return nil, err
 	}
-	repository, err := name.NewRepository(ociRegistry, name.StrictValidation)
+	repository, err := name.NewRepository(c.registry, name.StrictValidation)
 	if err != nil {
 		return nil, err
 	}
@@ -43,20 +39,14 @@ func remotePackageNames(arch string) ([]string, error) {
 func packageNamesFromTags(tags []string, arch string) []string {
 	suffix := "-" + arch
 	names := make([]string, 0, len(tags))
-	seen := make(map[string]bool, len(tags))
 	for _, tag := range tags {
-		if !strings.HasSuffix(tag, suffix) {
-			continue
+		packageName, ok := strings.CutSuffix(tag, suffix)
+		if ok && validatePackageName(packageName) == nil {
+			names = append(names, packageName)
 		}
-		packageName := strings.TrimSuffix(tag, suffix)
-		if validatePackageName(packageName) != nil || seen[packageName] {
-			continue
-		}
-		seen[packageName] = true
-		names = append(names, packageName)
 	}
-	sort.Strings(names)
-	return names
+	slices.Sort(names)
+	return slices.Compact(names)
 }
 
 func isNotFound(err error) bool {
@@ -81,66 +71,51 @@ type artifactDownload struct {
 	destination string
 }
 
-// remoteLayer returns the published content layer. Its digest is the package
-// version and its compressed stream is the package tarball.
-func remoteLayer(packageName, arch string, puller *remote.Puller) (v1.Layer, error) {
-	if err := validatePackageName(packageName); err != nil {
-		return nil, err
+func (c *client) resolveArtifact(request artifactRequest, puller *remote.Puller) (packageArtifact, error) {
+	artifact := packageArtifact{name: request.name, arch: request.arch}
+	if err := validatePackageName(request.name); err != nil {
+		return artifact, err
 	}
-	if err := validateArch(arch); err != nil {
-		return nil, err
+	if err := validateArch(request.arch); err != nil {
+		return artifact, err
 	}
-	reference, err := name.ParseReference(ref(packageName, arch), name.StrictValidation)
+	reference, err := name.ParseReference(c.ref(request.name, request.arch), name.StrictValidation)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", packageName, err)
+		return artifact, fmt.Errorf("%s: %w", request.name, err)
 	}
 	image, err := remote.Image(reference, remote.Reuse(puller))
 	if err != nil {
 		if isNotFound(err) {
-			return nil, fmt.Errorf("%s: not found for arch %q", packageName, arch)
+			return artifact, fmt.Errorf("%s: not found for arch %q", request.name, request.arch)
 		}
-		return nil, fmt.Errorf("%s: %w", packageName, err)
+		return artifact, fmt.Errorf("%s: %w", request.name, err)
 	}
 	layers, err := image.Layers()
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", packageName, err)
+		return artifact, fmt.Errorf("%s: %w", request.name, err)
 	}
 	if len(layers) == 0 {
-		return nil, fmt.Errorf("%s: image has no layers", packageName)
+		return artifact, fmt.Errorf("%s: image has no layers", request.name)
 	}
-	return layers[len(layers)-1], nil
+	artifact.layer = layers[len(layers)-1]
+	digest, err := artifact.layer.Digest()
+	if err != nil {
+		return artifact, fmt.Errorf("%s: %w", request.name, err)
+	}
+	artifact.digest = digest.String()
+	return artifact, nil
 }
 
-func resolveArtifact(request artifactRequest, puller *remote.Puller) (packageArtifact, error) {
-	layer, err := remoteLayer(request.name, request.arch, puller)
-	if err != nil {
-		return packageArtifact{}, err
-	}
-	digest, err := layer.Digest()
-	if err != nil {
-		return packageArtifact{}, fmt.Errorf("%s: %w", request.name, err)
-	}
-	return packageArtifact{
-		name:   request.name,
-		arch:   request.arch,
-		layer:  layer,
-		digest: digest.String(),
-	}, nil
-}
-
-func remoteDigest(packageName, arch string) (string, error) {
-	artifacts, err := resolveArtifacts([]artifactRequest{{name: packageName, arch: arch}})
+func (c *client) remoteDigest(packageName, arch string) (string, error) {
+	artifacts, err := c.resolveArtifacts([]artifactRequest{{name: packageName, arch: arch}})
 	if err != nil {
 		return "", err
 	}
 	return artifacts[0].digest, nil
 }
 
-func resolveArtifacts(requests []artifactRequest) ([]packageArtifact, error) {
-	puller, err := remote.NewPuller(
-		remote.WithAuth(authn.Anonymous),
-		remote.WithJobs(maxParallel),
-	)
+func (c *client) resolveArtifacts(requests []artifactRequest) ([]packageArtifact, error) {
+	puller, err := remote.NewPuller(remote.WithAuth(authn.Anonymous), remote.WithJobs(maxParallel))
 	if err != nil {
 		return nil, err
 	}
@@ -148,18 +123,13 @@ func resolveArtifacts(requests []artifactRequest) ([]packageArtifact, error) {
 	resolveErrors := make([]error, len(requests))
 	var group errgroup.Group
 	group.SetLimit(maxParallel)
-	for index := range requests {
+	for index, request := range requests {
 		group.Go(func() error {
-			request := requests[index]
-			artifact, err := resolveArtifact(request, puller)
-			if err != nil {
-				resolveErrors[index] = err
-				return nil
-			}
-			artifacts[index] = artifact
+			artifacts[index], resolveErrors[index] = c.resolveArtifact(request, puller)
 			return nil
 		})
 	}
+	// Each error is collected in request order, not goroutine completion order.
 	_ = group.Wait()
 	return artifacts, errors.Join(resolveErrors...)
 }
@@ -167,9 +137,8 @@ func resolveArtifacts(requests []artifactRequest) ([]packageArtifact, error) {
 func downloadArtifacts(downloads []artifactDownload) error {
 	var group errgroup.Group
 	group.SetLimit(maxParallel)
-	for index := range downloads {
+	for _, download := range downloads {
 		group.Go(func() error {
-			download := downloads[index]
 			if err := downloadLayer(download.layer, download.destination); err != nil {
 				return fmt.Errorf("%s: %w", download.name, err)
 			}
@@ -179,8 +148,6 @@ func downloadArtifacts(downloads []artifactDownload) error {
 	return group.Wait()
 }
 
-// downloadLayer atomically replaces dst after the complete compressed layer
-// has been written.
 func downloadLayer(layer v1.Layer, dst string) error {
 	reader, err := layer.Compressed()
 	if err != nil {
