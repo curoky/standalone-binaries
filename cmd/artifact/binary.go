@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"debug/buildinfo"
 	"debug/elf"
 	"debug/macho"
 	"encoding/binary"
@@ -9,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -20,7 +22,10 @@ const (
 	reexportDylib   = uint32(0x8000001f)
 	lazyLoadDylib   = uint32(0x20)
 	loadUpwardDylib = uint32(0x80000023)
+	codeSignature   = uint32(0x1d)
 )
+
+var nixDarwinResolv = regexp.MustCompile(`^/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-libresolv-[0-9]+(\.[0-9]+)*/lib/libresolv\.9\.dylib$`)
 
 type elfInfo struct {
 	interpreter string
@@ -33,6 +38,7 @@ type machOInfo struct {
 	dependencies []string
 	rpaths       []string
 	hasNixLoad   bool
+	hasSignature bool
 }
 
 func isELFMagic(magic [8]byte) bool {
@@ -141,24 +147,89 @@ func normalizeMachO(path string) (machOInfo, error) {
 	if err != nil {
 		return machOInfo{}, fmt.Errorf("inspect Mach-O %s: %w", path, err)
 	}
+	var arguments []string
+	for _, dependency := range darwinCGOResolvDependencies(path, info) {
+		arguments = append(arguments, "-change", dependency, "/usr/lib/libresolv.9.dylib")
+	}
 	seen := make(map[string]bool)
 	for _, rpath := range info.rpaths {
 		if !strings.HasPrefix(rpath, "/nix/") || seen[rpath] {
 			continue
 		}
 		seen[rpath] = true
-		command := exec.Command("install_name_tool", "-delete_rpath", rpath, path)
-		if output, err := command.CombinedOutput(); err != nil {
-			return machOInfo{}, fmt.Errorf("delete Mach-O rpath %s from %s: %w: %s", rpath, path, err, bytes.TrimSpace(output))
-		}
+		arguments = append(arguments, "-delete_rpath", rpath)
 	}
-	if len(seen) > 0 {
-		info, err = inspectMachO(path)
-		if err != nil {
-			return machOInfo{}, fmt.Errorf("reinspect Mach-O %s: %w", path, err)
-		}
+	if len(arguments) == 0 {
+		return info, nil
+	}
+	command := exec.Command("install_name_tool", append(arguments, path)...)
+	if output, err := command.CombinedOutput(); err != nil {
+		return machOInfo{}, fmt.Errorf("normalize Mach-O %s: %w: %s", path, err, bytes.TrimSpace(output))
+	}
+
+	// Load-command edits invalidate code signatures. Use Apple's codesign:
+	// nixpkgs sigtool 0.1.3 cannot preserve metadata, notably Lima's
+	// virtualization entitlement. Do not re-sign an unchanged file.
+	arguments = []string{"--force", "--sign", "-", "--timestamp=none"}
+	if info.hasSignature {
+		arguments = append(arguments, "--preserve-metadata=identifier,entitlements,flags,runtime")
+	}
+	command = exec.Command("/usr/bin/codesign", append(arguments, path)...)
+	if output, err := command.CombinedOutput(); err != nil {
+		return machOInfo{}, fmt.Errorf("sign normalized Mach-O %s: %w: %s", path, err, bytes.TrimSpace(output))
+	}
+	info, err = inspectMachO(path)
+	if err != nil {
+		return machOInfo{}, fmt.Errorf("reinspect Mach-O %s: %w", path, err)
 	}
 	return info, nil
+}
+
+// Temporary workaround tracked as artifact-darwin-cgo-resolv in
+// docs/regression/darwin.md. Reassess without this rewrite after nixpkgs
+// updates; a successful patched artifact/probe is not removal evidence.
+func darwinCGOResolvDependencies(path string, info machOInfo) []string {
+	var dependencies []string
+	seen := make(map[string]bool)
+	for _, dependency := range info.dependencies {
+		if nixDarwinResolv.MatchString(dependency) && !seen[dependency] {
+			dependencies = append(dependencies, dependency)
+			seen[dependency] = true
+		}
+	}
+	if len(dependencies) == 0 {
+		return nil
+	}
+
+	// normalizeFile calls us only for Darwin Mach-O files. Narrow this
+	// workaround further to thin arm64 executables (the supported Darwin
+	// target); ReadFile alone would inspect only the first slice of a fat file.
+	file, err := macho.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer file.Close()
+	if file.Magic != macho.Magic64 || file.Cpu != macho.CpuArm64 || file.Type != macho.TypeExec {
+		return nil
+	}
+	build, err := buildinfo.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	settings := make(map[string]string)
+	for _, setting := range build.Settings {
+		settings[setting.Key] = setting.Value
+	}
+	// Only Go's Darwin CGO build is known to use this Nix-packaged Apple
+	// resolver with the system libresolv.9 ABI. Missing metadata, pure Go,
+	// other dylibs/ABIs and non-Go programs are NOT candidates. Their Nix
+	// dependencies remain untouched and must still pass validateMachO.
+	if settings["GOOS"] != "darwin" || settings["GOARCH"] != "arm64" ||
+		settings["CGO_ENABLED"] != "1" || settings["-compiler"] != "gc" ||
+		(settings["-buildmode"] != "exe" && settings["-buildmode"] != "pie") {
+		return nil
+	}
+	return dependencies
 }
 
 func validateMachO(path string, info machOInfo) error {
@@ -226,6 +297,8 @@ func inspectMachOFile(file *macho.File) machOInfo {
 				info.dependencies = append(info.dependencies, name)
 			}
 		case idDylib:
+		case codeSignature:
+			info.hasSignature = true
 		case loadRpath:
 			if name != "" {
 				info.rpaths = append(info.rpaths, name)
@@ -250,4 +323,5 @@ func (info *machOInfo) merge(other machOInfo) {
 	info.dependencies = append(info.dependencies, other.dependencies...)
 	info.rpaths = append(info.rpaths, other.rpaths...)
 	info.hasNixLoad = info.hasNixLoad || other.hasNixLoad
+	info.hasSignature = info.hasSignature || other.hasSignature
 }

@@ -12,9 +12,9 @@ description: "定期 review 本仓库中被 patch 或被 pin 老版本的包，�
 本 skill 是 `patch-nixpkgs-standalone` 的逆操作：那个在 stock 静态构建失败时**加**
 workaround；这个在 stock 构建重新可用时**去掉**它。
 
-## 两类回归对象
+## 三类回归对象
 
-本 skill 覆盖两种「偏离 unstable 上游」的情况，判定与回归方式不同：
+本 skill 覆盖三种「偏离 unstable 上游」的情况，判定与回归方式不同：
 
 ### A. 本地 patch 包（`packages/<pkg>/`）
 
@@ -45,6 +45,17 @@ shellcheck = {
 这类要试着去掉 `version`。只要 unstable 最新版在目标平台能构建且满足根 `AGENTS.md`
 的约束，就删除 pin。
 
+### C. 公共组件 workaround（如 `cmd/artifact/`）
+
+从包级集中到公共层的临时修正仍是回归对象，必须在平台表中独立登记，不能仅靠包行备注
+追踪。候选 ID 不一定是 flake package attr；按「来源」读取共享实现和表中链接的专属
+回归步骤，不把候选 ID 直接传给 `nix build`。
+
+回归必须在不应用该 workaround 的条件下验证全部当前受影响 consumer。普通构建或
+`probe` 若仍经过共享修正，成功不代表上游已经修好。Darwin Go/CGO resolver 的具体
+操作和保留边界见仓库 `docs/regression/darwin.md` 的「Darwin CGO Resolver 回归」。
+只有临时 resolver 替换可删除，不能连带删除通用 rpath 清理、签名或结构性 packaging。
+
 ## Principle
 
 **只要上游能构建且满足当前产物目标，就优先用 unstable 上游包。**
@@ -69,10 +80,13 @@ shellcheck = {
 - **B 类版本 pin**——所有非 `unstable` 的 `version` pin 都进入审计候选。确认它不是刻意的
   长期兼容选择后，目标是去掉 pin、回到 unstable。
 
+- **C 类公共 workaround**——按与 A 类相同的标准判定临时修正，但回归范围是所有
+  当前 consumer。共享实现中仍有通用规范化职责时，只删除已失效的特例。
+
 ## Queue Contract
 
 - `docs/regression/` 按平台/架构拆成多张 Markdown 表：`linux.md`（跨架构共享）、
-  `linux-aarch64.md`（aarch64 特有差异）、`darwin.md`（macOS），约定见 `README.md`。批量回归只遍历
+  `linux-aarch64.md`（aarch64 特有差异）、`darwin.md`（macOS），约定见 `AGENTS.md`。批量回归只遍历
   「回归」列为 `✅` 或 `🟡` 的行，默认按表格顺序处理：
 
   ```bash
@@ -90,6 +104,8 @@ shellcheck = {
 - `✅` 可以尝试整项回到 unstable；`🟡` 只回归对应平台原因栏所述 workaround，保留 wrapper、资源打包、
   产品行为与多版本发布；`❌` 不进入批量回归；`⏳` 只做长期例外审计。
 - `✅` 和 `🟡` 只表示值得验证，不表示当前已经可以安全回归。仍需实际构建和 portability 验证。
+- 公共组件候选与包级候选一起消费；包级 native selection 或 packaging 的 commit
+  不能代替公共 patch 的回归记录。经过 patch 后的成功构建不更新其独立回归 commit。
 - 回归失败时保留状态；若得到更准确的失败证据，更新原因和判据。不要用 checkbox 表示“已测试”。
 
 新增或改变 pin、本地 derivation、override、禁用检查或例外，由 `patch-nixpkgs-standalone` skill
@@ -110,6 +126,8 @@ shellcheck = {
      或 diffutils 的 check 失败）。那个失败就是你的 regression test。
    - B 类：找出这个包/平台当初为何被 pin 到老 `version`（看注释或 git 历史）。它的
      regression test 就是「unstable 最新版能否构建 + portable」。
+   - C 类：读取共享实现、直接调用点和候选链接的专属步骤，确定要移除的特例与必须保留的
+     通用职责，以及全部当前 consumer；这不是包级回归，不套用“删包目录”的流程。
 
 3. **测 stock upstream 构建。** 为目标平台构建 patch/pin 要替换掉的纯上游 derivation：
    - 优先临时修改本仓库 manifest/local wiring 后构建 `nix build .#<name>`，这样使用的正是
@@ -118,6 +136,9 @@ shellcheck = {
      或不同 static package set。
    - A 类：若这正是 patch 绕过的东西、现在**能构建且能链接**，patch 是移除候选。
    - B 类：直接改 manifest 去掉 `version` pin，再构建最终 flake output。
+   - C 类：按专属步骤在一次性工作副本中绕过该特例，保留校验及无关处理，用同一 lock、
+     当前 package selection 验证全部 consumer；不要添加永久 bypass flag。发现某个
+     consumer 仍依赖特例即可记录保留证据；删除则必须满足完整范围的验收。
    - 在包**目标的每个平台**（Linux + darwin）上复现。一个平台修好不代表另一个也修好。
 
 4. **验证上游构建仍满足 portability 目标**（与 `patch-nixpkgs-standalone` 同一套检查）：
@@ -142,6 +163,9 @@ shellcheck = {
    - **B 类，去掉版本 pin：** 在 `manifests/default.nix` 里删掉那条 `version = "..."`（回到 unstable）。
      若这个 pin 只在某个 per-platform key 下、且去掉后该 key 变空，就把整个 per-platform key
      也删掉；若删掉后整个包条目变成 `{ }`，保留 `<pkg> = { };` 即可。
+   - **C 类，删除公共特例：** 只删除已验证过时的 matcher、helper、调用和专属测试；
+     保留公共规范化、校验、必要签名及相关测试。独立的 native selection 和包级 workaround
+     按各自行的判据处理，不因公共特例移除而连带删除。
 
 6. **清理你的改动产生的 orphan：** 不再被用到的 patch 文件、wrapper 脚本、
    `packages/<pkg>/` 下的 vendor 配置、以及失效的 `callPackage` wiring。
@@ -161,6 +185,9 @@ shellcheck = {
    - 若回归改变稳定 package selection、例外或协议，更新根
    `AGENTS.md`；若只删除包级非默认策略，更新或删除对应 case study。不要在根文档维护易漂移的
    当前包枚举。
+   - C 类的 commit 仅在不应用该特例的验证完整通过，或得到仍需保留的明确失败证据时刷新；
+     部分成功或仍经过特例的构建不算移除回归。成功后删除独立候选行及其过时专属步骤，
+     同步共享组件文档和 consumer 行的说明。
 
 ## Guardrails
 

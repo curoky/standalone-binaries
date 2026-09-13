@@ -12,15 +12,12 @@ let
 in
 {
   # colima binary only; runtime deps (lima, docker, ...) are installed
-  # separately. Native pkgs (CGO on) links only /usr/lib + frameworks.
+  # separately. Artifact normalizes eligible native CGO resolver dependencies.
   colima = pkgs.callPackage ../colima { };
-
-  # Native buildx with its Nix libresolv load command redirected to macOS.
-  docker-buildx = pkgs.callPackage ../docker-buildx/darwin.nix { };
 
   # lima: hostside limactl + helpers + bundled guest agents. qemu PATH wrapper
   # dropped (darwin defaults to the VZ backend); runtime deps installed
-  # separately. Native pkgs (CGO on) links only /usr/lib + frameworks.
+  # separately. Artifact preserves entitlements during CGO resolver relocation.
   lima = pkgs.callPackage ../lima { };
 
   # Partial-static C packages.
@@ -34,11 +31,8 @@ in
     inherit (pkgs) perlPackages;
   };
 
-  # Native Go packages with Darwin-specific Mach-O relocation.
-  golangci-lint = pkgs.callPackage ../golangci-lint/darwin.nix { };
-  gost = pkgs.callPackage ../gost/darwin.nix { };
+  # rclone must relocate libresolv before its package-specific nuke-refs.
   rclone = pkgs.callPackage ../rclone/darwin.nix { };
-  supercronic = pkgs.callPackage ../supercronic/darwin.nix { };
 
   # Perl.
   perl = pkgs.callPackage ../perl/darwin.nix {

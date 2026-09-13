@@ -30,6 +30,9 @@ auth，不读取 Docker credential config。发布 workflow 在 manifest 上添�
 `dev.curoky.standalone.archive-path` 供 CI 判定发布身份；`bm` 仍以 layer digest 判断版本，
 不要求这些 annotations，也不解析 Nix cache。
 
+Darwin 包在发布前由 [`artifact`](../artifact/AGENTS.md#darwin-cgo-resolver) 完成有限的
+Go/CGO resolver 路径修正和必要重签；`bm` 只解压归档，不改写 Mach-O 或重新签名。
+
 `bm` 自身使用 `binman-<architecture>` tag，归档路径是 `binman/bin/bm`。
 `install.sh` 是唯一允许依赖宿主 `curl` 和 `tar` 的路径。
 

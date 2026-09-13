@@ -7,7 +7,7 @@
   `AGENTS.md`
 
 本仓库将 nixpkgs 包和必要的本地定制转换为可搬运目录，再生成确定性 tar.gz。
-包级 workaround 和回归状态以[回归清单](docs/regression/AGENTS.md)为准。
+包级与公共组件 workaround 的回归状态以[回归清单](docs/regression/AGENTS.md)为准。
 
 ## 产物不变量
 
@@ -26,6 +26,10 @@ Darwin 的 `git-filter-repo` 和 `netron` 使用宿主 `python3`，`eza-ls` 可�
 macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`。随包携带
 非系统 dylib 时，install name 和 load command 必须使用 `@loader_path` 或
 `@rpath`，且 rpath 必须位于 `@loader_path` 下。
+
+已确认的 Darwin arm64 Go/CGO `libresolv.9` store dependency 由 artifact 统一修正；
+必须匹配 Go build info 和完整库路径，不泛化到其他 Mach-O。门禁和构建期签名规则见
+[`cmd/artifact/AGENTS.md`](cmd/artifact/AGENTS.md#darwin-cgo-resolver)。
 
 ## 包集合
 
@@ -127,6 +131,8 @@ patch**，用于探测某个包在某 channel 上不打 patch 能否编译过、
 - `<pkg>`：任意 nixpkgs 顶层 attr 名；带点的嵌套 attr（如
   `llvmPackages_18.clang-unwrapped`）因 flake attr 路径限制不支持。
 - 构建变体与正式流程一致：Linux musl cross static，Darwin 原生 static。
+- Probe 仍会应用 artifact 公共 workaround；评估公共 patch 能否删除时，必须按
+  [回归清单](docs/regression/AGENTS.md)的专属步骤绕过该 patch，不能只凭 probe 成功。
 - 探针是探索入口，不进入包集合、发布或回归清单；非包或不可解析的 attr 在构建时
   自然报错属预期。定型的包仍须回到 `manifests/default.nix` 或 `packages/`。
 
