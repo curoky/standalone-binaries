@@ -31,7 +31,7 @@ in
     inherit (pkgs) perlPackages;
   };
 
-  # rclone must relocate libresolv before its package-specific nuke-refs.
+  # rclone clears only known Go resource references; artifact relocates libresolv.
   rclone = pkgs.callPackage ../rclone/darwin.nix { };
 
   # Perl.

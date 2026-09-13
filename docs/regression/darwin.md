@@ -47,7 +47,7 @@ Go/CGO 的公共 resolver 路径修正由
 | `prettier` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/prettier/` |
 | `protobuf_3_8_0` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.8.0 | 版本化产品，不回到最新 upstream | — | `packages/protobuf/3_8_0/` |
 | `protobuf_3_9_2` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.9.2 | 版本化产品，不回到最新 upstream | — | `packages/protobuf/3_9_2/` |
-| `rclone` | 🩹 本地 | 🟡 | 仅 darwin 有定制（Linux 走零定制 manifest pkgsStatic 全静态）；postInstall 先将 resolver 改指系统库，再用 `nuke-refs` 清理 tzdata/mailcap/iana-etc fallback store hash。该顺序必须保留：若先 nuke，原始 resolver hash 被抹掉，无法命中 artifact 的严格门禁；本轮未迁移或重建此包 | stock native 只链接系统 dylib且不内嵌真实 store 路径，或 `pkgsStatic` 可直接构建并满足 macOS portability 后删除 override | b7c2ada94fe9 | `packages/rclone/` |
+| `rclone` | 🩹 资源清理 + native selection | 🟡 | 1.75.1 / Go 1.26.7 的 stock native 仍内嵌 tzdata/mailcap/iana-etc；即使经过公共 artifact 也不会清理这些资源。现用 `remove-references-to -t` 仅清理三项，并以 `disallowedReferences` 校验；source 保留原始 resolver，统一由 artifact 修正。Darwin `pkgsStatic` 仍在 Go bootstrap 缺 `-lresolv` 失败。out/archive、签名和禁读 `/nix` smoke 通过，详见下方记录；Linux source derivation 未变、未重建 | stock native 不再内嵌真实资源 store 引用后删除资源 override，resolver 继续由公共候选管理；`pkgsStatic` 可构建且 portable 后恢复默认选择。不能仅凭经过资源清理或公共 patch 的成功构建判定上游已修复 | dc5d91f84032 | `packages/rclone/`, `cmd/artifact/binary.go` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
 | `rsync` | 🩹 本地 | ✅ | unstable rsync 3.5.0 在 `preBuild` 中插值 `python3` 以改写测试脚本；Darwin `pkgsStatic.python3` 被标记 broken，导致 package set 求值失败。启用 `strictDeps` 后测试 `partial-protected-regular-retry-policy` 又因裸 `cc -dynamiclib` 不在 PATH 而失败。静态 Darwin libiconv 还会把 Nix store 下的 i18n 数据目录编入 rsync。保留其余静态依赖，注入 native Python 和 check-only compiler，并把 native libiconv load command 改指系统 `/usr/lib/libiconv.2.dylib` | stock `pkgsStatic.rsync` 不再求值静态 Python、测试依赖完整，且不再内嵌 libiconv store 路径 | dc5d91f84032 | `packages/rsync/`, `packages/local/darwin.nix`, `manifests/default.nix` |
 | `shellcheck` | 📌 `25.11` | ❌ | 已验证：unstable ShellCheck 0.11.0 静态 darwin 构建时 GHC 报 `External interpreter terminated (1)`，构建失败 | 已确认必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
@@ -62,6 +62,29 @@ Go/CGO 的公共 resolver 路径修正由
 | `zsh` | 🩹 + 📦 本地 | 🟡 | 静态 module patches；FPATH wrapper 和 zshenv policy 必须保留 | 逐项删编译 patch，保留 relocation packaging | — | `packages/zsh/` |
 | `zsh-plugins` | 📦 本地 | ❌ | 聚合 oh-my-zsh 与 plugins | plugin bundle 是产品 | — | `packages/zsh-plugins/` |
 
+## Rclone 资源清理回归
+
+在 `dc5d91f84032` 的 stock native 1.75.1 中确认四个 Nix reference：`libresolv-96`、
+`tzdata-2026c`、`mailcap-2.1.54`、`iana-etc-20251215`。后三项来自 nixpkgs Go stdlib
+补丁，不是 build info；未清理的 stock 经过 artifact 后仍保留这三项，资源 workaround 尚不能删除。
+
+当前包仅定向清理资源 hash，保留既有不可解析占位值的语义；这不是系统路径重定位。
+时区和 MIME 仍可查找系统文件；IANA patch 直接替换 Go 的 services/protocols 路径，
+不能称为全部都有文件 fallback，也未恢复任意协议名的系统数据库读取能力。
+来源与边界见 [Go 构建策略](../package-strategies/go.md#darwin-cgo-resolver)。
+
+本次实际验证了 source 只剩原始 resolver reference，最终 out 的 Nix reference 集为空，
+Go build info 不变，三个入口只链接系统库且 `codesign --verify --strict` 通过，
+archive 解包的二进制与 out 字节一致。搬出 store 并用 `sandbox-exec` 禁止读取 `/nix` 后，
+out 与解包产物均通过 version、本地 copy/check、`.abw` 系统 MIME、Shanghai 时区、
+New York 冬夏时差及 `GODEBUG=netdns=cgo+2` 的 localhost HTTP 下载。
+同一 Go toolchain 的定向清理 fixture 额外通过 CGO `postgresql` 服务名和内置 `icmp`
+协议名查询。Nix 原有 checkPhase 执行成功但顶层包报告 `[no test files]`，version install
+check 通过；没有跑 rclone 全仓测试、macFUSE mount 或真实云端后端。
+
+后续回归先对比 stock 与清理后的资源引用及 Go patch，再重复禁读 `/nix` 的行为验证。
+不要恢复全量 `nuke-refs`，也不要把 resolver 的 hash 改成占位值后放宽公共门禁。
+
 ## Darwin CGO Resolver 回归
 
 `artifact-darwin-cgo-resolv` 是公共组件候选 ID，不是可构建的 package attr。
@@ -71,7 +94,7 @@ Go/CGO 的公共 resolver 路径修正由
 1. 从当前 flake 的 `sources.aarch64-darwin` 核对实际使用的 source 和 Go toolchain，
    检查未经过 artifact 的宿主 Mach-O，包括 `bin`、`libexec` 和其他随包 helper。
    初始验证集至少包含 `gost`、`supercronic`、`golangci-lint`、`docker-buildx`、
-   `colima`、`lima`；同时纳入当前 source 中新发现的 Go/CGO resolver consumer。
+   `colima`、`lima`、`rclone`；同时纳入当前 source 中新发现的 Go/CGO resolver consumer。
    仍在发布的旧 channel/toolchain 也要覆盖，不能仅凭某一个 Go 版本修复就删除全局规则。
 2. 在一次性工作副本中，仅移除 `normalizeMachO` 调用
    `darwinCGOResolvDependencies` 并生成 resolver `-change` 参数的部分。保留原有
@@ -87,5 +110,5 @@ Go/CGO 的公共 resolver 路径修正由
    wrapper 与模板读取。构建/运行成本无法覆盖时明确记录未验证项，不删除公共 patch。
 5. 验证通过后删除 resolver 专用 matcher、helper、调用和对应测试，保留通用 rpath 清理、
    必要重签及其测试。同步组件文档、Nix/workflow 注释和包行中的 resolver 描述，再删除此候选。
-   native selection 的回归独立进行；`rclone` 的包级 resolver / `nuke-refs` 顺序仍按其
-   自身候选验证，不随公共 patch 一并删除。
+   native selection 的回归独立进行；`rclone` 的包级资源定向清理仍按其自身候选验证，
+   不随公共 resolver patch 一并删除。

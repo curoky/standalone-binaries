@@ -537,8 +537,8 @@
     };
   };
   # rclone: Linux only here (pkgsStatic musl static). darwin uses the local
-  # package (packages/rclone/darwin.nix) which redirects the Nix libresolv
-  # load command to /usr/lib.
+  # package (packages/rclone/darwin.nix) to clear known Go resource references;
+  # artifact handles the original libresolv load command.
   rclone = {
     platforms = [
       "x86_64-linux"
