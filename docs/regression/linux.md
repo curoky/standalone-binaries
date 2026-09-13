@@ -48,8 +48,8 @@
 | `miniserve` | 📦 本地 | ❌ | wrapper 设置仓库要求的默认功能开关 | 产品行为必须保留 | — | `packages/miniserve/` |
 | `music-decrypto` | ⚠️ glibc 动态 | 🟡 | Linux 仅长期审计 .NET AOT | Linux 出现 musl-static AOT | 56c02bc00adc | `packages/music-decrypto/` |
 | `netron` | 📦 本地 | ❌ | wheel 重打包并绑定 sibling/宿主 Python | runtime packaging 必须保留 | — | `packages/netron/` |
-| `nodejs-slim24` | 🩹 本地 | 🟡 | 已删 `uvwasi` override（stock 已传 `UVWASI_BUILD_SHARED=FALSE`，删后构建成功、musl 静态、`node --version` v24.18.0）；仍保留 `ada`/`libuv`/`hdrhistogram_c` 的 doCheck/SHARED-off 与 node 级 configureFlags | 逐 patch 验证删除，保留 Node 24 runtime 产品 | 56c02bc00adc | `packages/nodejs/24/` |
-| `nodejs-slim26` | 🩹 本地 | 🟡 | 已删 `uvwasi` override（同 node24，删后构建成功、musl 静态、v26.5.0）；仍保留 `ada`/`libuv`/`hdrhistogram_c`/`lief`（maturin musl cdylib 失败）/`temporal_capi`（pkg-config 缺失）与 node 级 configureFlags | 逐 patch 删除，最终满足各平台动态依赖规则 | 56c02bc00adc | `packages/nodejs/26/` |
+| `nodejs-slim24` | 🩹 本地 | 🟡 | 已删 `uvwasi` 与 `hdrhistogram_c` override（stock 已传 `UVWASI_BUILD_SHARED=FALSE` 及 hdrhistogram 的 SHARED-off + `libhdr_histogram.a` symlink，重复 `ln -s` 会以 `File exists` 失败）；仍保留 `ada`/`libuv` 的 doCheck 与 node 级 configureFlags | 逐 patch 验证删除，保留 Node 24 runtime 产品 | 56c02bc00adc | `packages/nodejs/24/` |
+| `nodejs-slim26` | 🩹 本地 | 🟡 | 已删 `uvwasi` 与 `hdrhistogram_c` override（同 node24，stock 已处理 SHARED-off + symlink）；仍保留 `ada`/`libuv`/`lief`（maturin musl cdylib 失败）/`temporal_capi`（pkg-config 缺失）与 node 级 configureFlags | 逐 patch 删除，最终满足各平台动态依赖规则 | 56c02bc00adc | `packages/nodejs/26/` |
 | `nsight-systems` | ⚠️ 预编译 glibc | ⏳ | NVIDIA 只提供 glibc 动态发行物 | 上游提供可用的 musl-static 发行物 | — | `packages/nsight-systems/` |
 | `opencommit` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/opencommit/` |
 | `openssh_gssapi` | 🩹 + 📦 本地 | ❌ | wrappers 相对定位 ssh 与 sshd helpers；服务端关闭预认证 sandbox，因为 QEMU user-mode 明确拒绝 guest seccomp，rlimit sandbox 也会让跨架构容器在 SSH 握手前断连；消费者必须把监听面限制在可信边界 | 可搬运 helper 定位与跨架构 SSH 必须保留 | — | `packages/openssh_gssapi/` |

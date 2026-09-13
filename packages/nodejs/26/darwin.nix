@@ -59,22 +59,14 @@
 let
   # pkgsStatic with the same static-build patches ./linux.nix applies so the
   # node dependencies compile as static archives. See ./linux.nix for the
-  # per-dependency rationale (ada / libuv tests, uvwasi / hdrhistogram_c shared
-  # targets, lief python bindings, temporal_capi install check).
+  # per-dependency rationale (ada / libuv tests, lief python bindings,
+  # temporal_capi install check). hdrhistogram_c no longer needs a local
+  # override: unstable nixpkgs already disables the shared target and installs
+  # the `libhdr_histogram.a` symlink node links against.
   pkgsStaticNode = pkgsStatic.extend (
     _: prev: {
       ada = prev.ada.overrideAttrs { doCheck = false; };
       libuv = prev.libuv.overrideAttrs { doCheck = false; };
-      hdrhistogram_c = prev.hdrhistogram_c.overrideAttrs (old: {
-        cmakeFlags = (old.cmakeFlags or [ ]) ++ [
-          "-DHDR_HISTOGRAM_BUILD_SHARED=OFF"
-          "-DHDR_HISTOGRAM_BUILD_PROGRAMS=OFF"
-        ];
-        postInstall = (old.postInstall or "") + ''
-          ln -s $out/lib/libhdr_histogram_static.a $out/lib/libhdr_histogram.a
-        '';
-        doCheck = false;
-      });
       # node needs only lief's C/C++ library (`out`), not its Python bindings.
       # The nixpkgs lief package hardcodes `LIEF_PYTHON_API true`, and derives
       # `pyEnv`, `buildInputs` and the `Python_EXECUTABLE` cmake flag from its
