@@ -128,8 +128,10 @@ func startRegistryWithMiddleware(
 
 func TestPrefixFromExecutable(t *testing.T) {
 	cases := map[string]string{
-		filepath.FromSlash("/opt/tools/store/binman/bm"): filepath.FromSlash("/opt/tools"),
-		filepath.FromSlash("/home/u/.bm/store/binman/bm"): filepath.FromSlash("/home/u/.bm"),
+		filepath.FromSlash("/opt/tools/store/binman/bin/bm"):  filepath.FromSlash("/opt/tools"),
+		filepath.FromSlash("/home/u/.bm/store/binman/bin/bm"): filepath.FromSlash("/home/u/.bm"),
+		// Legacy layout without the bin/ segment no longer maps to a prefix:
+		filepath.FromSlash("/opt/tools/store/binman/bm"): defaultPrefix,
 		// Not installed under a prefix (e.g. bootstrapped onto PATH):
 		filepath.FromSlash("/home/u/.local/bin/bm"): defaultPrefix,
 		filepath.FromSlash("/usr/local/bin/bm"):     defaultPrefix,

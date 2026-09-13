@@ -116,16 +116,16 @@ digest="$(tr ',' '\n' <"$tmp/manifest.json" |
 [ -n "$digest" ] || die "could not find layer digest for $TAG (is it published?)"
 
 # 3. Download the blob into a temp dir, then move the bm binary into place.
-# The archive layout is ./binman/bm; extracting to a tmp dir avoids tar
+# The archive layout is ./binman/bin/bm; extracting to a tmp dir avoids tar
 # member-match quirks (leading "./", matching the dir as well as the file).
 curl -fsSL \
   -H "Authorization: Bearer ${token}" \
   -o "$tmp/binman.tar.gz" \
   "https://ghcr.io/v2/curoky/standalone-binaries/blobs/${digest}"
 tar -xzf "$tmp/binman.tar.gz" -C "$tmp"
-[ -f "$tmp/binman/bm" ] || die "archive did not contain binman/bm"
+[ -f "$tmp/binman/bin/bm" ] || die "archive did not contain binman/bin/bm"
 mkdir -p "$INSTALL_DIR"
-mv -f "$tmp/binman/bm" "$INSTALL_DIR/bm"
+mv -f "$tmp/binman/bin/bm" "$INSTALL_DIR/bm"
 
 chmod +x "$INSTALL_DIR/bm"
 

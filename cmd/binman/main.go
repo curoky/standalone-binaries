@@ -52,11 +52,12 @@ func setupLogger(prefix string, verbose bool) (io.Closer, error) {
 }
 
 // detectPrefix derives the install prefix from bm's own location. When bm is
-// installed as a package it lives at <prefix>/store/binman/bm and is linked as
-// <prefix>/bm, so the resolved executable path is <prefix>/store/binman/bm.
-// Walk that resolved path looking for a ".../store/binman" segment and return
-// the directory above "store". Falls back to defaultPrefix when bm is not
-// running from such a layout (e.g. bootstrapped into ~/.local/bin).
+// installed as a package it lives at <prefix>/store/binman/bin/bm and is linked
+// as <prefix>/bin/bm, so the resolved executable path is
+// <prefix>/store/binman/bin/bm. Walk that resolved path looking for a
+// ".../store/binman/bin" segment and return the directory above "store". Falls
+// back to defaultPrefix when bm is not running from such a layout (e.g.
+// bootstrapped into ~/.local/bin).
 func detectPrefix() string {
 	exe, err := os.Executable()
 	if err != nil {
@@ -69,11 +70,15 @@ func detectPrefix() string {
 }
 
 // prefixFromExecutable maps a resolved bm path back to its install prefix.
-// exe == <prefix>/store/binman/bm -> binman == store/binman, store == store.
+// exe == <prefix>/store/binman/bin/bm -> the segments above bm must be
+// bin/binman/store, and the prefix is the directory above "store".
 func prefixFromExecutable(exe string) string {
-	binmanDir := filepath.Dir(exe)
+	binDir := filepath.Dir(exe)
+	binmanDir := filepath.Dir(binDir)
 	storeDir := filepath.Dir(binmanDir)
-	if filepath.Base(binmanDir) == "binman" && filepath.Base(storeDir) == "store" {
+	if filepath.Base(binDir) == "bin" &&
+		filepath.Base(binmanDir) == "binman" &&
+		filepath.Base(storeDir) == "store" {
 		return filepath.Dir(storeDir)
 	}
 	return defaultPrefix

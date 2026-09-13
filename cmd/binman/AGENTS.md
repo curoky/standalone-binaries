@@ -30,7 +30,7 @@ auth，不读取 Docker credential config。发布 workflow 在 manifest 上添�
 `dev.curoky.standalone.archive-path` 供 CI 判定发布身份；`bm` 仍以 layer digest 判断版本，
 不要求这些 annotations，也不解析 Nix cache。
 
-`bm` 自身使用 `binman-<architecture>` tag，归档路径是 `binman/bm`。
+`bm` 自身使用 `binman-<architecture>` tag，归档路径是 `binman/bin/bm`。
 `install.sh` 是唯一允许依赖宿主 `curl` 和 `tar` 的路径。
 
 `search <query>` 和 `list --all` 通过 OCI tags API 分页读取完整 tag 列表，只保留
