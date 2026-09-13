@@ -19,6 +19,81 @@ import (
 	"oras.land/oras-go/v2/content"
 )
 
+func loadTestGC(t *testing.T, client *registryClient) (gcState, []string, error) {
+	t.Helper()
+	tags, err := client.repositoryTags(context.Background())
+	if err != nil {
+		return gcState{}, nil, err
+	}
+	return client.loadGC(context.Background(), tags)
+}
+
+func TestPruneListsTagsOnce(t *testing.T) {
+	fixture := newRefreshRegistry(t)
+	state := snapshot{ID: "sha256:" + strings.Repeat("1", 64), System: "x86_64-linux"}
+	entry := testCacheEntry(t, strings.Repeat("a", 32), "root", []byte("nar"))
+	tag := fixture.publish(t, state, entry)
+	fixture.list(tag)
+	if err := pruneCache(context.Background(), fixture.client, testRoots(), 1, 2, 2, true); err != nil {
+		t.Fatal(err)
+	}
+	fixture.assertReads(t, 1, 1)
+}
+
+func TestGCWaitsForAllPreflightsBeforeWriting(t *testing.T) {
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+	var writes atomic.Int32
+	expected := digest.FromString("{}")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodHead {
+			writes.Add(1)
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		started <- struct{}{}
+		select {
+		case <-release:
+		case <-r.Context().Done():
+			return
+		}
+		w.Header().Set("Content-Type", ocispec.MediaTypeImageManifest)
+		w.Header().Set("Content-Length", "2")
+		w.Header().Set("Docker-Content-Digest", expected.String())
+	}))
+	defer server.Close()
+	client, err := newRegistryClient(server.Listener.Addr().String()+"/cache", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	refs := []segmentRef{{Tag: "v1-one", Digest: expected}, {Tag: "v1-two", Digest: digest.FromString("changed")}}
+	deleter := &fakeVersionDeleter{}
+	done := make(chan error, 1)
+	go func() {
+		_, err := executeGC(ctx, client, deleter, gcState{}, refs, nil, map[string]int64{"v1-one": 1, "v1-two": 2})
+		done <- err
+	}()
+	for range 2 {
+		select {
+		case <-started:
+		case <-time.After(5 * time.Second):
+			t.Fatal("preflights did not run concurrently")
+		}
+	}
+	if writes.Load() != 0 {
+		t.Error("GC wrote before preflights completed")
+	}
+	close(release)
+	if err := <-done; err == nil || !strings.Contains(err.Error(), "changed during prune") {
+		t.Fatalf("preflight error=%v", err)
+	}
+	if writes.Load() != 0 || len(deleter.deleted) != 0 {
+		t.Fatal("failed preflight wrote or deleted data")
+	}
+}
+
 func TestGCGraceAndReachabilityReset(t *testing.T) {
 	now := time.Now().UTC()
 	candidate := ref("s1", "x86_64-linux", "pkg", "v1-candidate", 1)
@@ -50,7 +125,7 @@ func TestGCGraceAndReachabilityReset(t *testing.T) {
 func TestGCRecordRoundTripAndIsolation(t *testing.T) {
 	client := testRegistryClient(t)
 	ctx := context.Background()
-	state, tags, err := client.loadGC(ctx)
+	state, tags, err := loadTestGC(t, client)
 	if err != nil || len(tags) != 0 {
 		t.Fatalf("empty record: %v %v", tags, err)
 	}
@@ -60,7 +135,7 @@ func TestGCRecordRoundTripAndIsolation(t *testing.T) {
 	if err := client.saveGC(ctx, state); err != nil {
 		t.Fatal(err)
 	}
-	loaded, tags, err := client.loadGC(ctx)
+	loaded, tags, err := loadTestGC(t, client)
 	if err != nil || len(tags) != 1 || !loaded.Candidates["v1-test"].Since.Equal(now) {
 		t.Fatalf("record: %+v %v", loaded, err)
 	}
@@ -72,7 +147,7 @@ func TestGCRecordRoundTripAndIsolation(t *testing.T) {
 	if err := client.saveGC(ctx, state); err != nil {
 		t.Fatal(err)
 	}
-	loaded, tags, err = client.loadGC(ctx)
+	loaded, tags, err = loadTestGC(t, client)
 	if err != nil || len(tags) != 2 || len(loaded.Candidates) != 0 {
 		t.Fatalf("latest reset not selected: %+v %v", loaded, err)
 	}
@@ -107,7 +182,7 @@ func TestGCRejectsInvalidRecords(t *testing.T) {
 			if err := client.repo.PushReference(ctx, content.NewDescriptorFromBytes(ocispec.MediaTypeImageManifest, manifest), bytes.NewReader(manifest), tag); err != nil {
 				t.Fatal(err)
 			}
-			if _, _, err := client.loadGC(ctx); err == nil {
+			if _, _, err := loadTestGC(t, client); err == nil {
 				t.Fatal("accepted invalid GC record")
 			}
 		})
@@ -145,7 +220,7 @@ func TestGCWriteFailureNeverDeletes(t *testing.T) {
 	if len(deleter.deleted) != 0 {
 		t.Fatal("deleted versions after persistence failure")
 	}
-	if _, tags, err := client.loadGC(ctx); err != nil || len(tags) != 0 {
+	if _, tags, err := loadTestGC(t, client); err != nil || len(tags) != 0 {
 		t.Fatalf("failed write left GC records: %v %v", tags, err)
 	}
 }
@@ -177,7 +252,7 @@ func TestExecuteGCPreflightsAndPersistsBeforeDeleting(t *testing.T) {
 	if _, err := executeGC(ctx, client, deleter, state, segments, nil, nil); err == nil || len(deleter.deleted) != 0 {
 		t.Fatal("missing mapping allowed deletion")
 	}
-	_, tags, err := client.loadGC(ctx)
+	_, tags, err := loadTestGC(t, client)
 	if err != nil || len(tags) != 0 {
 		t.Fatal("preflight failure wrote a GC record")
 	}
@@ -191,7 +266,7 @@ func TestExecuteGCPreflightsAndPersistsBeforeDeleting(t *testing.T) {
 	if _, err := executeGC(ctx, client, deleter, state, segments, nil, mapping); err == nil {
 		t.Fatal("expected delete failure")
 	}
-	loaded, tags, err := client.loadGC(ctx)
+	loaded, tags, err := loadTestGC(t, client)
 	if err != nil || len(tags) != 1 || len(loaded.Candidates) != 1 {
 		t.Fatal("candidate state was not persisted before deletion")
 	}

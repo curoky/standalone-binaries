@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"cmp"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"maps"
+	"net/http"
 	"os"
 	"path"
 	"slices"
@@ -22,6 +21,7 @@ import (
 	"github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/errgroup"
+	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content"
 	"oras.land/oras-go/v2/errdef"
 	"oras.land/oras-go/v2/registry"
@@ -29,6 +29,15 @@ import (
 	"oras.land/oras-go/v2/registry/remote/auth"
 	"oras.land/oras-go/v2/registry/remote/credentials"
 	"oras.land/oras-go/v2/registry/remote/errcode"
+	"oras.land/oras-go/v2/registry/remote/retry"
+)
+
+const (
+	storeHashAnnotation     = "org.nixos.store.hash"
+	registryTimeout         = 30 * time.Second
+	registryTimeoutAttempts = 3
+	segmentLoadConcurrency  = 32
+	maxMetadataSize         = 64 << 20
 )
 
 type registryClient struct {
@@ -62,12 +71,14 @@ func newRegistryClient(repository string, insecure bool) (*registryClient, error
 		credential = credentials.Credential(store)
 		authSource = "docker credential store"
 	}
-	client := *auth.DefaultClient
-	client.Credential = credential
-	repo.Client = &client
-	// Startup overview to confirm which repository is targeted and how it
-	// authenticates. Never logs the token value, only its source and username,
-	// so it is safe under `set -x`-style CI logs.
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConnsPerHost = segmentLoadConcurrency
+	repo.Client = &auth.Client{
+		Client:     &http.Client{Transport: retry.NewTransport(transport)},
+		Cache:      auth.NewCache(),
+		Credential: credential,
+		Header:     auth.DefaultClient.Header.Clone(),
+	}
 	log.Printf("cache client: repo=%s registry=%s plain-http=%t auth=%s",
 		repo.Reference.Repository, repo.Reference.Registry, repo.PlainHTTP, authSource)
 	return &registryClient{repo: repo}, nil
@@ -86,19 +97,10 @@ type manifestRef struct {
 	NARLayers map[string]ocispec.Descriptor
 }
 
-const storeHashAnnotation = "org.nixos.store.hash"
-
-// registryTimeout bounds each individual registry round-trip (tag listing,
-// manifest fetch, blob fetch). Without it the initial index load can block
-// indefinitely on a slow or wedged GHCR request, so `serveCache` never marks
-// the index ready and CI probes exhaust their retries on 503.
-const registryTimeout = 30 * time.Second
-
-const registryTimeoutAttempts = 3
-
+// The deadline covers body reads, which transport retries cannot restart.
 func registryRequest[T any](ctx context.Context, name string, request func(context.Context) (T, error)) (T, error) {
 	var zero T
-	for attempt := 1; attempt <= registryTimeoutAttempts; attempt++ {
+	for attempt := 1; ; attempt++ {
 		requestCtx, cancel := context.WithTimeout(ctx, registryTimeout)
 		value, err := request(requestCtx)
 		cancel()
@@ -113,24 +115,23 @@ func registryRequest[T any](ctx context.Context, name string, request func(conte
 		}
 		log.Printf("%s timed out, retrying (%d/%d)", name, attempt+1, registryTimeoutAttempts)
 	}
-	panic("unreachable")
 }
 
-func (client *registryClient) listTags(ctx context.Context, system string) ([]string, error) {
-	log.Printf("listing cache tags from %s", client.repo.Reference.Repository)
-	tags, err := registryRequest(ctx, "list cache tags", func(requestCtx context.Context) ([]string, error) {
-		return registry.Tags(requestCtx, client.repo)
+func (client *registryClient) repositoryTags(ctx context.Context) ([]string, error) {
+	tags, err := registryRequest(ctx, "list cache tags", func(ctx context.Context) ([]string, error) {
+		return registry.Tags(ctx, client.repo)
 	})
-	if err != nil {
-		if errors.Is(err, errdef.ErrNotFound) || isNameUnknown(err) {
-			log.Printf("cache repository %s not found yet, treating as empty", client.repo.Reference.Repository)
-			return nil, nil
-		}
-		return nil, fmt.Errorf("list cache segments: %w", err)
+	if errors.Is(err, errdef.ErrNotFound) || isNameUnknown(err) {
+		return nil, nil
 	}
-	log.Printf("cache tags fetched: %d total", len(tags))
+	if err != nil {
+		return nil, fmt.Errorf("list cache tags: %w", err)
+	}
+	return tags, nil
+}
 
-	segmentTags := make([]string, 0, len(tags))
+func segmentTags(tags []string, system string) []string {
+	selected := make([]string, 0, len(tags))
 	for _, tag := range tags {
 		suffix, ok := strings.CutPrefix(tag, segmentPrefix)
 		if !ok {
@@ -140,10 +141,17 @@ func (client *registryClient) listTags(ctx context.Context, system string) ([]st
 		if system != "" && (!ok || !strings.HasPrefix(suffix, system+"-")) {
 			continue
 		}
-		segmentTags = append(segmentTags, tag)
+		selected = append(selected, tag)
 	}
-	log.Printf("matching segment tags: %d (system %q)", len(segmentTags), system)
-	return segmentTags, nil
+	return selected
+}
+
+func (client *registryClient) listTags(ctx context.Context, system string) ([]string, error) {
+	tags, err := client.repositoryTags(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return segmentTags(tags, system), nil
 }
 
 func (client *registryClient) listSegments(ctx context.Context, system string) ([]segmentRef, error) {
@@ -156,58 +164,23 @@ func (client *registryClient) listSegments(ctx context.Context, system string) (
 		return nil, err
 	}
 	slices.SortFunc(segments, compareSegments)
-	log.Printf("listed cache: %d segment(s)", len(segments))
 	return segments, nil
 }
-
-// segmentLoadConcurrency bounds how many segment manifests are fetched in
-// parallel. Loading is O(number of tags for the snapshot) network round trips;
-// a snapshot that never changes accumulates one tag per CI run, so serve can
-// face hundreds. Fetching serially takes minutes, so fan out with a fixed
-// worker pool.
-const segmentLoadConcurrency = 32
 
 func (client *registryClient) listManifests(ctx context.Context, system string) ([]manifestRef, error) {
 	tags, err := client.listTags(ctx, system)
 	if err != nil {
 		return nil, err
 	}
-	manifests := make([]manifestRef, len(tags))
-	missing := make([]bool, len(tags))
-	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(segmentLoadConcurrency)
-	for index, tag := range tags {
-		group.Go(func() error {
-			if err := groupCtx.Err(); err != nil {
-				return err
-			}
-			ref, err := client.getManifest(groupCtx, tag)
-			if err != nil {
-				if errors.Is(err, errdef.ErrNotFound) {
-					missing[index] = true
-					log.Printf("segment %s disappeared while loading, skipping", tag)
-					return nil
-				}
-				return fmt.Errorf("load manifest %s: %w", tag, err)
-			}
-			manifests[index] = ref
-			return nil
-		})
-	}
-	if err := group.Wait(); err != nil {
-		return nil, err
-	}
-	loaded := manifests[:0]
-	for index, ref := range manifests {
-		if !missing[index] {
-			loaded = append(loaded, ref)
-		}
-	}
-	return loaded, nil
+	return loadTags(ctx, tags, client.getManifest)
 }
 
 func (client *registryClient) fetchSegments(ctx context.Context, tags []string) ([]segmentRef, error) {
-	segments := make([]segmentRef, len(tags))
+	return loadTags(ctx, tags, client.getSegment)
+}
+
+func loadTags[T any](ctx context.Context, tags []string, fetch func(context.Context, string) (T, error)) ([]T, error) {
+	items := make([]T, len(tags))
 	missing := make([]bool, len(tags))
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(segmentLoadConcurrency)
@@ -216,29 +189,29 @@ func (client *registryClient) fetchSegments(ctx context.Context, tags []string) 
 			if err := groupCtx.Err(); err != nil {
 				return err
 			}
-			ref, err := client.getSegment(groupCtx, tag)
-			if err != nil {
-				if errors.Is(err, errdef.ErrNotFound) {
-					missing[index] = true
-					log.Printf("segment %s disappeared while loading, skipping", tag)
-					return nil
-				}
-				return fmt.Errorf("load segment %s: %w", tag, err)
+			item, err := fetch(groupCtx, tag)
+			if errors.Is(err, errdef.ErrNotFound) {
+				missing[index] = true
+				log.Printf("segment %s disappeared while loading, skipping", tag)
+				return nil
 			}
-			segments[index] = ref
+			if err != nil {
+				return fmt.Errorf("load %s: %w", tag, err)
+			}
+			items[index] = item
 			return nil
 		})
 	}
 	if err := group.Wait(); err != nil {
 		return nil, err
 	}
-	loaded := segments[:0]
-	for index, ref := range segments {
+	loaded := items[:0]
+	for index, item := range items {
 		if !missing[index] {
-			loaded = append(loaded, ref)
+			loaded = append(loaded, item)
 		}
 	}
-	log.Printf("loaded %d/%d segments", len(loaded), len(tags))
+	clear(items[len(loaded):])
 	return loaded, nil
 }
 
@@ -255,20 +228,27 @@ func isNameUnknown(err error) bool {
 	return false
 }
 
-func (client *registryClient) getManifest(ctx context.Context, tag string) (manifestRef, error) {
-	return registryRequest(ctx, "fetch manifest "+tag, func(requestCtx context.Context) (manifestRef, error) {
-		descriptor, reader, err := client.repo.FetchReference(requestCtx, tag)
-		if err != nil {
-			return manifestRef{}, err
-		}
-		defer func() { _ = reader.Close() }()
+func (client *registryClient) fetchManifest(ctx context.Context, tag string) (ocispec.Descriptor, ocispec.Manifest, error) {
+	descriptor, body, err := oras.FetchBytes(ctx, client.repo, tag, oras.FetchBytesOptions{MaxBytes: maxMetadataSize})
+	if err != nil {
+		return ocispec.Descriptor{}, ocispec.Manifest{}, err
+	}
+	var manifest ocispec.Manifest
+	err = json.Unmarshal(body, &manifest)
+	return descriptor, manifest, err
+}
 
-		body, err := readMetadata(reader, descriptor)
+func (client *registryClient) fetchMetadata(ctx context.Context, descriptor ocispec.Descriptor) ([]byte, error) {
+	if descriptor.Size < 0 || descriptor.Size > maxMetadataSize {
+		return nil, fmt.Errorf("metadata size %d exceeds allowed range", descriptor.Size)
+	}
+	return content.FetchAll(ctx, client.repo, descriptor)
+}
+
+func (client *registryClient) getManifest(ctx context.Context, tag string) (manifestRef, error) {
+	return registryRequest(ctx, "fetch manifest "+tag, func(ctx context.Context) (manifestRef, error) {
+		descriptor, manifest, err := client.fetchManifest(ctx, tag)
 		if err != nil {
-			return manifestRef{}, err
-		}
-		var manifest ocispec.Manifest
-		if err := json.Unmarshal(body, &manifest); err != nil {
 			return manifestRef{}, err
 		}
 		if len(manifest.Layers) == 0 {
@@ -278,7 +258,6 @@ func (client *registryClient) getManifest(ctx context.Context, tag string) (mani
 		if metadata.MediaType != segmentMediaType {
 			return manifestRef{}, fmt.Errorf("unexpected metadata media type %q", metadata.MediaType)
 		}
-
 		if metadata.Size < 0 {
 			return manifestRef{}, fmt.Errorf("metadata layer has invalid size %d", metadata.Size)
 		}
@@ -308,15 +287,8 @@ func (client *registryClient) getSegment(ctx context.Context, tag string) (segme
 	if err != nil {
 		return segmentRef{}, err
 	}
-
-	return registryRequest(ctx, "fetch segment metadata "+tag, func(requestCtx context.Context) (segmentRef, error) {
-		reader, err := client.repo.Fetch(requestCtx, manifest.Metadata)
-		if err != nil {
-			return segmentRef{}, err
-		}
-		defer func() { _ = reader.Close() }()
-
-		body, err := readMetadata(reader, manifest.Metadata)
+	return registryRequest(ctx, "fetch segment metadata "+tag, func(ctx context.Context) (segmentRef, error) {
+		body, err := client.fetchMetadata(ctx, manifest.Metadata)
 		if err != nil {
 			return segmentRef{}, err
 		}
@@ -381,15 +353,6 @@ func validateSegment(tag string, item segment, manifest manifestRef) error {
 	return nil
 }
 
-const maxMetadataSize = 64 << 20
-
-func readMetadata(reader io.Reader, descriptor ocispec.Descriptor) ([]byte, error) {
-	if descriptor.Size < 0 || descriptor.Size > maxMetadataSize {
-		return nil, fmt.Errorf("metadata size %d exceeds allowed range", descriptor.Size)
-	}
-	return content.ReadAll(io.LimitReader(reader, maxMetadataSize+1), descriptor)
-}
-
 func compareSegments(a, b segmentRef) int {
 	if order := a.CreatedAt.Compare(b.CreatedAt); order != 0 {
 		return order
@@ -402,117 +365,21 @@ func (client *registryClient) blobReader(ctx context.Context, digest string) (io
 	return reader, err
 }
 
-const narUploadConcurrency = 8
-
-func (client *registryClient) pushSegment(ctx context.Context, state snapshot, packageKey string, entries map[string]cacheEntry) error {
-	runID := os.Getenv("GITHUB_RUN_ID")
-	if runID == "" {
-		runID = fmt.Sprintf("%d", time.Now().UnixNano())
-	}
-	item := segment{
-		Version:          segmentVersion,
-		Snapshot:         state.ID,
-		RepositoryCommit: state.RepositoryCommit,
-		System:           state.System,
-		PackageKey:       packageKey,
-		RunID:            runID,
-		CreatedAt:        time.Now().UTC(),
-		Channels:         state.Channels,
-		Entries:          entries,
-	}
-	metadata, err := json.Marshal(item)
-	if err != nil {
-		return err
-	}
-	metadataDescriptor := content.NewDescriptorFromBytes(segmentMediaType, metadata)
-	err = client.repo.Blobs().Push(ctx, metadataDescriptor, bytes.NewReader(metadata))
-	if err != nil && !errors.Is(err, errdef.ErrAlreadyExists) {
-		return err
-	}
-
-	hashes := slices.Sorted(maps.Keys(entries))
-	layers := make([]ocispec.Descriptor, 1, len(entries)+1)
-	layers[0] = metadataDescriptor
-	uploaded := make([]bool, len(hashes))
-	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(narUploadConcurrency)
-	for index, hash := range hashes {
-		entry := entries[hash]
-		descriptor := ocispec.Descriptor{
-			MediaType: narMediaType,
-			Digest:    digest.Digest(entry.NARDigest),
-			Size:      entry.NARSize,
-		}
-		descriptor.Annotations = map[string]string{storeHashAnnotation: hash}
-		layers = append(layers, descriptor)
-		group.Go(func() error {
-			if err := groupCtx.Err(); err != nil {
-				return err
-			}
-			pushed, err := client.pushFile(groupCtx, descriptor, entry.NARPath)
-			if err != nil {
-				return fmt.Errorf("push NAR for %s: %w", hash, err)
-			}
-			uploaded[index] = pushed
-			return nil
-		})
-	}
-	if err := group.Wait(); err != nil {
-		return err
-	}
-	var uploadedCount int
-	for _, pushed := range uploaded {
-		if pushed {
-			uploadedCount++
-		}
-	}
-	log.Printf("pushed %d NAR blob(s), skipped %d already present", uploadedCount, len(uploaded)-uploadedCount)
-
-	manifest, err := json.Marshal(ocispec.Manifest{
+func (client *registryClient) pushManifest(ctx context.Context, tag string, layers []ocispec.Descriptor) error {
+	body, err := json.Marshal(ocispec.Manifest{
 		Versioned: specs.Versioned{SchemaVersion: 2},
 		MediaType: ocispec.MediaTypeImageManifest,
-		Config:    metadataDescriptor,
+		Config:    layers[0],
 		Layers:    layers,
 	})
 	if err != nil {
 		return err
 	}
-	manifestDescriptor := content.NewDescriptorFromBytes(ocispec.MediaTypeImageManifest, manifest)
-	tag := client.segmentTag(state, runID)
-	if err := client.repo.PushReference(ctx, manifestDescriptor, bytes.NewReader(manifest), tag); err != nil {
-		return fmt.Errorf("publish segment %s: %w", tag, err)
-	}
-	log.Printf("published segment %s for package %s (%d entries)", tag, packageKey, len(entries))
-	return nil
-}
-
-func (client *registryClient) pushFile(ctx context.Context, descriptor ocispec.Descriptor, path string) (bool, error) {
-	exists, err := client.repo.Blobs().Exists(ctx, descriptor)
-	if err != nil || exists {
-		return false, err
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = file.Close() }()
-	if err := client.repo.Blobs().Push(ctx, descriptor, file); err != nil {
-		if errors.Is(err, errdef.ErrAlreadyExists) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
-
-func (client *registryClient) segmentTag(state snapshot, runID string) string {
-	return fmt.Sprintf("%s%s-%s", segmentTagPrefix(state.ID, state.System), runID, rand.Text())
+	descriptor := content.NewDescriptorFromBytes(ocispec.MediaTypeImageManifest, body)
+	return client.repo.PushReference(ctx, descriptor, bytes.NewReader(body), tag)
 }
 
 func segmentTagPrefix(snapshotID, system string) string {
 	short := strings.TrimPrefix(snapshotID, "sha256:")
-	if len(short) > 16 {
-		short = short[:16]
-	}
-	return fmt.Sprintf("%s%s-%s-", segmentPrefix, short, system)
+	return fmt.Sprintf("%s%s-%s-", segmentPrefix, short[:min(len(short), 16)], system)
 }

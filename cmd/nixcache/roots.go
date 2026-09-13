@@ -27,7 +27,7 @@ func loadRoots(path string) (cacheRoots, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }() // Read-only file; decoding reports read errors.
 	info, err := file.Stat()
 	if err != nil {
 		return nil, err

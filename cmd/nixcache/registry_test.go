@@ -20,27 +20,76 @@ import (
 	"oras.land/oras-go/v2/content"
 )
 
-func TestReadMetadataVerifiesBody(t *testing.T) {
+func TestFetchMetadataVerifiesBody(t *testing.T) {
 	body := []byte(`{"key":"value"}`)
 	descriptor := content.NewDescriptorFromBytes(segmentMediaType, body)
 	for _, test := range []struct {
 		name       string
 		body       []byte
 		descriptor ocispec.Descriptor
+		valid      bool
 	}{
-		{"digest", []byte(`{"key":"other"}`), descriptor},
-		{"truncated", body[:len(body)-1], descriptor},
-		{"trailing", append(bytes.Clone(body), ' '), descriptor},
-		{"oversized", body, ocispec.Descriptor{Size: maxMetadataSize + 1, Digest: descriptor.Digest}},
+		{"valid", body, descriptor, true},
+		{"digest", []byte(`{"key":"other"}`), descriptor, false},
+		{"truncated", body[:len(body)-1], descriptor, false},
+		{"trailing", append(bytes.Clone(body), ' '), descriptor, false},
+		{"oversized", body, ocispec.Descriptor{Size: maxMetadataSize + 1, Digest: descriptor.Digest}, false},
+		{"negative", body, ocispec.Descriptor{Size: -1, Digest: descriptor.Digest}, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if _, err := readMetadata(bytes.NewReader(test.body), test.descriptor); err == nil {
-				t.Fatal("invalid metadata accepted")
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if test.descriptor.Size < 0 || test.descriptor.Size > maxMetadataSize {
+					t.Error("invalid size triggered a network request")
+				}
+				w.(http.Flusher).Flush()
+				_, _ = w.Write(test.body)
+			}))
+			defer server.Close()
+			client, err := newRegistryClient(server.Listener.Addr().String()+"/cache", true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := client.fetchMetadata(context.Background(), test.descriptor)
+			if (err == nil) != test.valid {
+				t.Fatalf("valid=%t err=%v", test.valid, err)
+			}
+			if test.valid && !bytes.Equal(got, body) {
+				t.Fatalf("body=%q", got)
 			}
 		})
 	}
-	if _, err := readMetadata(bytes.NewReader(body), descriptor); err != nil {
-		t.Fatal(err)
+}
+
+func TestFetchManifestVerifiesBody(t *testing.T) {
+	body := []byte(`{"schemaVersion":2}`)
+	for _, test := range []struct {
+		name  string
+		body  []byte
+		size  int
+		valid bool
+	}{
+		{"valid", body, len(body), true},
+		{"digest", []byte(`{"schemaVersion":3}`), len(body), false},
+		{"truncated", body[:len(body)-1], len(body), false},
+		{"oversized", nil, maxMetadataSize + 1, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", ocispec.MediaTypeImageManifest)
+				w.Header().Set("Content-Length", fmt.Sprint(test.size))
+				w.Header().Set("Docker-Content-Digest", digest.FromBytes(body).String())
+				_, _ = w.Write(test.body)
+			}))
+			defer server.Close()
+			client, err := newRegistryClient(server.Listener.Addr().String()+"/cache", true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, manifest, err := client.fetchManifest(context.Background(), "tag")
+			if (err == nil) != test.valid || (test.valid && manifest.SchemaVersion != 2) {
+				t.Fatalf("manifest=%+v err=%v", manifest, err)
+			}
+		})
 	}
 }
 
@@ -64,7 +113,7 @@ func TestMissingRepositoryIsEmpty(t *testing.T) {
 	if _, err := index.refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	entries := index.entries
+	entries := index.current.Load().entries
 	if len(entries) != 0 {
 		t.Fatalf("entries=%v", entries)
 	}
@@ -133,7 +182,7 @@ func TestRegistryRoundTrip(t *testing.T) {
 	if _, err := index.refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := index.entries[hash]; got.NARInfo != entry.NARInfo || got.NARDigest != entry.NARDigest {
+	if got := index.current.Load().entries[hash]; got != entry.NARInfo {
 		t.Fatalf("loaded entry=%#v", got)
 	}
 
@@ -178,9 +227,9 @@ func TestNewestSegmentWins(t *testing.T) {
 	if _, err := index.refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	entries := index.entries
-	if !strings.Contains(entries[hash].NARInfo, "System: new") {
-		t.Fatalf("newest entry=%q", entries[hash].NARInfo)
+	entries := index.current.Load().entries
+	if !strings.Contains(entries[hash], "System: new") {
+		t.Fatalf("newest entry=%q", entries[hash])
 	}
 }
 

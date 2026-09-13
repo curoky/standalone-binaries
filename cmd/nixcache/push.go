@@ -3,17 +3,27 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"net/url"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/nix-community/go-nix/pkg/narinfo"
 	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/errgroup"
+	"oras.land/oras-go/v2/content"
+	"oras.land/oras-go/v2/errdef"
 )
 
 func pushPaths(ctx context.Context, client *registryClient, repoRoot, packageKey string, storePaths []string) error {
@@ -101,4 +111,87 @@ func readCache(cacheDir string) (map[string]cacheEntry, error) {
 		return nil, fmt.Errorf("nix copy produced no narinfo files")
 	}
 	return entries, nil
+}
+
+const narUploadConcurrency = 8
+
+func (client *registryClient) pushSegment(ctx context.Context, state snapshot, packageKey string, entries map[string]cacheEntry) error {
+	runID := os.Getenv("GITHUB_RUN_ID")
+	if runID == "" {
+		runID = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	item := segment{
+		Version: segmentVersion, Snapshot: state.ID, RepositoryCommit: state.RepositoryCommit,
+		System: state.System, PackageKey: packageKey, RunID: runID, CreatedAt: time.Now().UTC(),
+		Channels: state.Channels, Entries: entries,
+	}
+	metadata, err := json.Marshal(item)
+	if err != nil {
+		return err
+	}
+	metadataDescriptor := content.NewDescriptorFromBytes(segmentMediaType, metadata)
+	if err := client.repo.Blobs().Push(ctx, metadataDescriptor, bytes.NewReader(metadata)); err != nil && !errors.Is(err, errdef.ErrAlreadyExists) {
+		return err
+	}
+
+	hashes := slices.Sorted(maps.Keys(entries))
+	layers := make([]ocispec.Descriptor, len(hashes)+1)
+	layers[0] = metadataDescriptor
+	uploaded := make([]bool, len(hashes))
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(narUploadConcurrency)
+	for index, hash := range hashes {
+		entry := entries[hash]
+		descriptor := ocispec.Descriptor{
+			MediaType: narMediaType, Digest: digest.Digest(entry.NARDigest), Size: entry.NARSize,
+			Annotations: map[string]string{storeHashAnnotation: hash},
+		}
+		layers[index+1] = descriptor
+		group.Go(func() error {
+			if err := groupCtx.Err(); err != nil {
+				return err
+			}
+			pushed, err := client.pushFile(groupCtx, descriptor, entry.NARPath)
+			if err != nil {
+				return fmt.Errorf("push NAR for %s: %w", hash, err)
+			}
+			uploaded[index] = pushed
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return err
+	}
+	var uploadedCount int
+	for _, pushed := range uploaded {
+		if pushed {
+			uploadedCount++
+		}
+	}
+	log.Printf("pushed %d NAR blob(s), skipped %d already present", uploadedCount, len(uploaded)-uploadedCount)
+	tag := fmt.Sprintf("%s%s-%s", segmentTagPrefix(state.ID, state.System), runID, rand.Text())
+	if err := client.pushManifest(ctx, tag, layers); err != nil {
+		return fmt.Errorf("publish segment %s: %w", tag, err)
+	}
+	log.Printf("published segment %s for package %s (%d entries)", tag, packageKey, len(entries))
+	return nil
+}
+
+func (client *registryClient) pushFile(ctx context.Context, descriptor ocispec.Descriptor, path string) (bool, error) {
+	exists, err := client.repo.Blobs().Exists(ctx, descriptor)
+	if err != nil || exists {
+		return false, err
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = file.Close() }() // Read-only file; upload errors are reported below.
+	if err := client.repo.Blobs().Push(ctx, descriptor, file); err != nil {
+		if errors.Is(err, errdef.ErrAlreadyExists) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

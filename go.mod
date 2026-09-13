@@ -3,6 +3,7 @@ module github.com/curoky/standalone-binaries
 go 1.26
 
 require (
+	github.com/felixge/httpsnoop v1.1.0
 	github.com/google/go-containerregistry v0.21.7
 	github.com/google/go-github/v75 v75.0.0
 	github.com/nix-community/go-nix v0.0.0-20250101154619-4bdde671e0a1

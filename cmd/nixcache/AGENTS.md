@@ -8,7 +8,8 @@
 
 - Nix 通过 `nix copy --to file://...` 生成 closure、NAR 和 narinfo；Go 负责校验、
   OCI 编排和 HTTP serving。
-- Cache repository、listen address、refresh interval 和 media type 固定在代码中。
+- Cache repository、refresh interval 和 media type 固定在代码中；listen address 由
+  `serve --host`、`--port` 设置，默认 `127.0.0.1:37515`。
 - Segment immutable；每次 push 发布独立 tag，matrix job 可并发执行。
 - Snapshot 是原始 `flake.lock` 的 SHA-256。每个 snapshot segment 引用完整 closure，
   NAR blob 由 registry 按 digest 去重。
@@ -66,13 +67,22 @@ digest、size、media type 和 annotation 一致。Manifest 和 metadata 正文�
 发布 metadata 和按 store hash 排序的 layer。`--key` 或
 `NIXCACHE_PACKAGE_KEY` 必填；`NIX_SIGNING_KEY_FILE` 传给 Nix。
 
-`serve` 监听 `127.0.0.1:37515`，首次并发加载同平台所有现存 segment 的 manifest 和
-metadata，不预下载 NAR payload。每 5 分钟重新列举 tag，仅读取新增 segment，并从内存
-移除已消失的 tag；未变化的不可变 segment 不重复请求 manifest 或 metadata。
+`serve [--host <host>] [--port <port>]` 默认监听 `127.0.0.1:37515`。支持 IPv6
+（例如 `--host ::1`）；port 范围为 0–65535，`--port 0` 自动分配可用端口，日志输出实际
+监听地址。服务没有认证，非 loopback 监听仅用于可信网络，不得直接暴露公网；自定义地址时
+须同步设置客户端 `probe --cache` 和 Nix substituter，CI 默认地址不变。
+
+首次并发加载同平台所有现存 segment 的 manifest 和 metadata，不预下载 NAR payload。
+每 5 分钟重新列举 tag，仅读取新增 segment，并从内存移除已消失的 tag；未变化的不可变
+segment 不重复请求 manifest 或 metadata，集合无变化时直接复用已发布的 index snapshot。
+ORAS 使用独立连接池和内置 HTTP 重试；metadata 操作的超时覆盖正文读取，NAR streaming
+沿用调用方 context，不套用 metadata 的短超时。
 
 每次成功刷新按 `CreatedAt`、tag 升序合并 entries，同一 store hash 选择最新 narinfo；
 NAR index 独立收录所有保留 segment 的 URL，不能只从最新 narinfo 生成，否则客户端刚
-取得的旧 URL 会失效。同一 URL 的 digest/size 冲突直接失败。两个 index 原子替换。
+取得的旧 URL 会失效。同一 URL 的 digest/size 冲突直接失败。两个 index 与 readiness
+由不可变 snapshot 原子发布，请求不持有索引锁；narinfo index 只存响应文本，NAR index
+只存 digest/size。访问日志使用 `httpsnoop` 保留 `io.ReaderFrom` 等 HTTP streaming 接口。
 删除最新记录后，仍存在的旧 segment 可继续提供该 path。
 日志记录 snapshot 数、复用/加载/移除 segment 数和耗时。
 
@@ -114,8 +124,9 @@ manifest，校验单 tar.gz layer 和以下 manifest annotations，并确认 lay
    `createdAt` 和 `candidates[tag] = {digest, since}`，与 segment 的 v1 schema 独立。
 4. 候选须在已持久化记录中等待至少 24 小时，此次仍可删除且 manifest digest 未改变，才
    可删除。重新可达或 digest 变化会重置宽限期；不是按上传时间推算失去引用的时间。
-5. 本次时间必须晚于最新记录，时钟回退停止；删除前解析全部目标 GitHub version ID 并复核
-   segment digest；先发布新的 GC 记录，再
+5. 本次时间必须晚于最新记录，时钟回退停止；一次 prune 共用同一份 tag 列表读取 segment
+   和 GC 记录。删除前解析全部目标 GitHub version ID，并有限并发复核 segment digest；
+   全部预检成功后先发布新的 GC 记录，再
    回收旧 GC 记录，最后删除合格 segment。失败重试读取最新记录，不恢复已取消的候选。
 
 GC 记录只允许单写者；build/prune 共用 workflow concurrency group，不得与另一个 prune
@@ -138,7 +149,10 @@ layer，归档布局为 `nixcache/bin/nixcache`；`install.sh` 只依赖 `curl` 
 ```bash
 CGO_ENABLED=0 go test ./cmd/nixcache
 CGO_ENABLED=0 go vet ./cmd/nixcache
+CGO_ENABLED=1 go test -race ./cmd/nixcache
+go test -run '^$' -bench . -benchmem ./cmd/nixcache
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ./cmd/nixcache
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ./cmd/nixcache
 CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build ./cmd/nixcache
 bash -n cmd/nixcache/install.sh
 shellcheck cmd/nixcache/install.sh

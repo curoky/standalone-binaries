@@ -14,7 +14,7 @@ func main() {
 	os.Exit(run())
 }
 
-func run() int {
+func newCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "nixcache",
 		Short:         "GHCR-backed Nix cache for standalone-binaries",
@@ -47,6 +47,7 @@ func run() int {
 	}
 	push.Flags().StringVar(&packageKey, "key", "", "stable package identity for retention")
 
+	config := serveConfig{host: defaultHost, port: defaultPort}
 	serve := &cobra.Command{
 		Use:   "serve",
 		Short: "Serve the cache as a local Nix substituter",
@@ -56,9 +57,11 @@ func run() int {
 			if err != nil {
 				return err
 			}
-			return serveCache(cmd.Context(), client, currentSystem())
+			return serveCache(cmd.Context(), client, currentSystem(), config)
 		},
 	}
+	serve.Flags().StringVar(&config.host, "host", defaultHost, "listen host (no authentication; use trusted networks only)")
+	serve.Flags().IntVar(&config.port, "port", defaultPort, "listen port (0 selects an available port)")
 
 	var cacheURL string
 	probe := &cobra.Command{
@@ -145,7 +148,11 @@ func run() int {
 	}
 
 	root.AddCommand(push, serve, probe, publication, prune, size)
-	if err := root.Execute(); err != nil {
+	return root
+}
+
+func run() int {
+	if err := newCommand().Execute(); err != nil {
 		if errors.Is(err, errProbeMiss) {
 			return 1
 		}

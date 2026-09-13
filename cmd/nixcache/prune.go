@@ -47,10 +47,15 @@ func pruneCache(ctx context.Context, client *registryClient, roots cacheRoots, k
 	if packageKeep < 1 {
 		return fmt.Errorf("package-keep must be at least 1, got %d", packageKeep)
 	}
-	segments, err := client.listSegments(ctx, "")
+	tags, err := client.repositoryTags(ctx)
 	if err != nil {
 		return err
 	}
+	segments, err := client.fetchSegments(ctx, segmentTags(tags, ""))
+	if err != nil {
+		return err
+	}
+	slices.SortFunc(segments, compareSegments)
 	if len(segments) == 0 {
 		log.Printf("no cache segments found")
 		return nil
@@ -62,7 +67,7 @@ func pruneCache(ctx context.Context, client *registryClient, roots cacheRoots, k
 	}
 	candidates, _ := segmentsToDelete(segments, keep, retainDays, packageKeep)
 	candidates = slices.DeleteFunc(candidates, func(ref segmentRef) bool { return protected[ref.Tag] })
-	previous, gcTags, err := client.loadGC(ctx)
+	previous, gcTags, err := client.loadGC(ctx, tags)
 	if err != nil {
 		return err
 	}
@@ -109,14 +114,25 @@ func executeGC(ctx context.Context, client *registryClient, ghcr versionDeleter,
 			return 0, fmt.Errorf("no package version found for %s", ref.Tag)
 		}
 	}
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(segmentLoadConcurrency)
 	for _, ref := range toDelete {
-		current, err := client.repo.Resolve(ctx, ref.Tag)
-		if err != nil {
-			return 0, err
-		}
-		if current.Digest != ref.Digest {
-			return 0, fmt.Errorf("segment %s changed during prune", ref.Tag)
-		}
+		group.Go(func() error {
+			if err := groupCtx.Err(); err != nil {
+				return err
+			}
+			current, err := client.repo.Resolve(groupCtx, ref.Tag)
+			if err != nil {
+				return err
+			}
+			if current.Digest != ref.Digest {
+				return fmt.Errorf("segment %s changed during prune", ref.Tag)
+			}
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return 0, err
 	}
 	// Persist resets before deletion so a failed cleanup cannot resurrect an old grace period.
 	if err := client.saveGC(ctx, next); err != nil {
@@ -243,12 +259,7 @@ func retainedSegmentsByPackage(segments []segmentRef, keptSnapshots map[string]m
 	window := time.Duration(retainDays) * 24 * time.Hour
 	kept := make(map[string]bool)
 	for _, group := range groups {
-		sort.Slice(group, func(i, j int) bool {
-			if !group[i].CreatedAt.Equal(group[j].CreatedAt) {
-				return group[i].CreatedAt.After(group[j].CreatedAt)
-			}
-			return group[i].Tag > group[j].Tag
-		})
+		slices.SortFunc(group, func(a, b segmentRef) int { return compareSegments(b, a) })
 		newest := group[0].CreatedAt
 		cutoff := newest.Add(-window)
 		for index, ref := range group {
@@ -258,14 +269,6 @@ func retainedSegmentsByPackage(segments []segmentRef, keptSnapshots map[string]m
 		}
 	}
 	return kept
-}
-
-func shortSnapshot(id string) string {
-	trimmed := id
-	if len(trimmed) > 23 { // "sha256:" + 16
-		trimmed = trimmed[:23]
-	}
-	return trimmed
 }
 
 // humanSize renders a byte count using binary units for log output.
