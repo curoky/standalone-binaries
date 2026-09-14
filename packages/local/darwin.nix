@@ -18,6 +18,9 @@ in
     inherit (pkgs) python3 libiconv;
     nativeCC = pkgs.stdenv.cc;
   };
+  smartmontools = pkgsStatic.callPackage ../smartmontools/darwin.nix {
+    inherit (pkgs) autoreconfHook hostname;
+  };
   wget = pkgsStatic.callPackage ../wget/darwin-static.nix {
     inherit (pkgs) perlPackages;
   };
