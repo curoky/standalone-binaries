@@ -4,7 +4,7 @@
 一个完全自包含的 derivation 文件，不抽象公共 nix 逻辑：
 
 - [`podman5.nix`](podman5.nix)：跟随上游 nixpkgs pin 的 podman 5.x（当前
-  5.8.4），不 override `version`/`src`/`vendorHash`，复用 nixpkgs 拉取的源码与
+  5.8.6），不 override `version`/`src`/`vendorHash`，复用 nixpkgs 拉取的源码与
   module 集。
 - [`podman6.nix`](podman6.nix)：把 podman 6.x pin 到具体 release（当前 6.1.0），
   自行 override `version`/`src` 并把 `vendorHash` 设为 `null`（6.1.0 源码自带
@@ -40,6 +40,25 @@ $BINDIR/../libexec/podman
 系统路径列表。v5.8.x 与 v6.1.0 的 vendor 路径都已是 `go.podman.io/common`，两个版本
 复用同一份 patch。
 
+`containers.conf` 显式设置默认 OCI runtime 为 `crun`，并在
+`[engine.runtimes]` 中只登记随包提供的 `crun` 与 `runc`。配置只保存稳定的二进制名；
+实际路径仍由上述 resolver 限定到 sibling `libexec/podman`，不得在配置中写死安装路径。
+`runc` 是显式可选 runtime，不是默认 fallback；用户通过 `--runtime=runc` 选择它。
+
+除下述 firewall 与 IPv4/dual-stack 网络选择外，运行 backend 和 provider 均采用固定配置：
+storage 使用 overlay、数据库使用 sqlite、cgroup 使用 cgroupfs、容器日志使用 k8s-file、
+事件使用 file、网络使用 netavark、rootless 网络使用 pasta。镜像格式固定 OCI，
+transport 固定 docker，短名称固定解析到唯一的 docker.io。未随包提供的 compose provider、
+OCI hooks 和 netavark plugin 扫描全部禁用，不从宿主目录补充能力。GPU 是唯一外部设备
+例外：CDI 只扫描固定目录 `/etc/cdi`。配置不兼容旧 boltdb 数据；修改这些固定值前按全新
+数据目录评估，不增加迁移或 fallback。
+
+两个入口 wrapper 都覆盖主配置路径，并清除 `CONTAINERS_CONF_OVERRIDE`、
+`CONTAINERS_REGISTRIES_CONF_OVERRIDE` 与旧 `REGISTRIES_CONFIG_PATH`，不接受宿主配置
+叠加。Podman 6 在设置 `CONTAINERS_REGISTRIES_CONF` 后原生跳过 registry drop-ins；
+Podman 5 仍会扫描默认目录，故 `registries-conf-dir.patch` 让显式主配置直接终止路径
+解析，不创建或扫描任何 drop-in 目录。
+
 `policy.json` 的定位只用 `bin/podman`/`bin/podman-server` 设置的
 `CONTAINERS_POLICY_JSON=$root/../conf/policy.json`。podman 6.x 上游已原生读取该 env，
 podman 5.x 未支持，故 `podman5.nix` 额外应用 `policy-json-env.patch`，给
@@ -67,8 +86,16 @@ helper bundle 里的 `aardvark-dns` 由两个 `.nix` 文件通过
 配置文件不得写死安装前缀。
 
 `bin/install.sh` 原地安装当前包目录，不得复制或移动 `bin`、`conf`、`libexec` 和
-`data`。它只创建 sibling `data`，并从 `conf/podmanxd.service` 模板渲染当前包根目录
-的真实路径后注册 systemd unit。
+`data`。它只创建 sibling `data`，从 `conf/podmanxd.service` 模板渲染当前包根目录
+的真实路径，同时安装 `podmanxd.service` 与 `podmanxd.socket`，但只启用并启动 socket。
+
+Podman API 使用 systemd socket activation。`podmanxd.socket` 固定监听
+`/run/podman/podman.sock`，由 systemd 以 `root:root`、`0666` 创建，使普通本地用户可
+直接使用 remote client。rootful Podman API 等价于高权限主机控制面；world-writable
+socket 是明确接受的产品安全边界，不得扩大到 TCP。不得改回 `ExecStartPost` 轮询或
+`chmod 0777`。`podmanxd.service` 使用上游同类设置 `Type=exec`、`Delegate=yes`、
+`KillMode=process`，并通过 `ExecStop=podman stop --all` 在停止 API service 时停止全部
+容器。`bin/podman-server` 不传监听 URI，只消费 socket unit 传入的文件描述符。
 
 ## IPv6 / dual-stack 网络
 
@@ -81,9 +108,10 @@ IPv6 ULA `fd4e:9a7c:5b2e::/64`），否则软链到纯 IPv4 候选
 连带 `podman run` 整体报错）。网络后端固定 netavark，容器 DNS 由 bundle 的
 aardvark-dns 提供。
 
-`containers.conf` 只声明 `network_backend = "netavark"`，**不写死 `default_network`**
-——两份候选内网络名都叫 `podman`，即 podman 的内建默认网络名，故无需 override，也无需
-写 `default_network`。`network_config_dir` **不做环境变量展开**（不同于
+网络保留两项动态选择：宿主 IPv4/IPv6 能力，以及由 netavark 选择可用 firewall backend。
+`containers.conf` 显式固定 `network_backend = "netavark"`、
+`default_network = "podman"` 和 `default_rootless_network_cmd = "pasta"`。
+两份候选内网络名都必须叫 `podman`。`network_config_dir` **不做环境变量展开**（不同于
 `storage.conf` 的 `graphroot`/`runroot` 由 containers/storage 主动 `os.ExpandEnv`），
 故扫描目录 `conf/networks` 由 `podman-server` 按自身位置解析真实路径，经
 `--network-config-dir` 注入。
@@ -128,8 +156,22 @@ sudo sysctl --system
 ```
 
 若上联网卡靠 RA/SLAAC 取址，开转发后还需 `net.ipv6.conf.<uplink>.accept_ra=2`。
-ULA 地址出公网需要 NAT66，宿主内核须支持 `ip6table_nat`（netavark 6.x 用
-nftables，主流内核已内置）。
+ULA 地址出公网需要 NAT66，宿主内核与 netavark 选择的 firewall backend 必须支持
+IPv6 NAT。
+
+## GPU / CDI
+
+GPU 通过 CDI 暴露，不启用 legacy OCI hooks。宿主必须安装 GPU 驱动和对应 CDI generator，
+并把 spec 固定生成到 `/etc/cdi`。NVIDIA 示例：
+
+```bash
+sudo mkdir -p /etc/cdi
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+podman run --rm --device nvidia.com/gpu=all <image> nvidia-smi
+```
+
+驱动升级后须重新生成 spec。GPU 驱动、设备节点及 CDI spec 是宿主硬件接口，不能随
+standalone Podman bundle 分发；除此之外不扫描其他 CDI 目录。
 
 `installCheckPhase` 应聚焦 resolver 行为，验证 relocation、sibling 目录查找成功，以及
 无法逃逸到外部二进制。至少覆盖 conmon 专用 resolver、OCI runtime resolver 和通用

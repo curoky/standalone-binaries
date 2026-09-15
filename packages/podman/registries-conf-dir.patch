@@ -1,0 +1,4 @@
+--- a/vendor/go.podman.io/image/v5/pkg/sysregistriesv2/system_registries_v2.go
++++ b/vendor/go.podman.io/image/v5/pkg/sysregistriesv2/system_registries_v2.go
+@@ -575,0 +576 @@
++		return wrapper

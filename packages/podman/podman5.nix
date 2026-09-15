@@ -69,6 +69,9 @@ in
 
       ./strict-helper-search.patch
 
+      # Keep registry drop-ins inside the package instead of scanning host paths.
+      ./registries-conf-dir.patch
+
       # podman 5.x ignores CONTAINERS_POLICY_JSON; backport the podman 6.x env
       # override so the wrapper can resolve policy.json relative to the binary.
       ./policy-json-env.patch
@@ -111,6 +114,7 @@ in
       cp "$relocated/libexec/podman/conmon" "$host_bin/conmon"
       cp "$relocated/libexec/podman/conmon" "$host_bin/conmonrs"
       cp "$relocated/libexec/podman/crun" "$host_bin/crun"
+      cp "$relocated/libexec/podman/runc" "$host_bin/runc"
       cp "$relocated/libexec/podman/pasta" "$host_bin/pasta"
       cp "$relocated/libexec/podman/conmon" "$relocated/libexec/podman/conmonrs"
 
@@ -137,6 +141,35 @@ in
                       fmt.Println(filepath.Clean(os.Getenv("TMPDIR")))
                       fmt.Println(opts.GraphRoot)
                       fmt.Println(opts.RunRoot)
+                      return
+              }
+              if os.Args[1] == "config" {
+                      cfg, err := config.New(nil)
+                      if err != nil {
+                              fmt.Fprintln(os.Stderr, err)
+                              os.Exit(1)
+                      }
+                      fmt.Println(cfg.Containers.LogDriver)
+                      fmt.Println(cfg.Network.NetworkBackend)
+                      fmt.Println(cfg.Network.FirewallDriver)
+                      fmt.Println(cfg.Network.DefaultNetwork)
+                      fmt.Println(cfg.Network.DefaultRootlessNetworkCmd)
+                      fmt.Println(cfg.Engine.CgroupManager)
+                      fmt.Println(cfg.Engine.DBBackend)
+                      fmt.Println(cfg.Engine.EventsLogger)
+                      fmt.Println(cfg.Engine.OCIRuntime)
+                      fmt.Println(cfg.Engine.ServiceTimeout)
+                      fmt.Println(len(cfg.Engine.RuntimeSupportsJSON.Get()))
+                      fmt.Println(len(cfg.Engine.RuntimeSupportsKVM.Get()))
+                      fmt.Println(len(cfg.Engine.OCIRuntimes))
+                      fmt.Println(len(cfg.Engine.ComposeProviders.Get()))
+                      fmt.Println(len(cfg.Engine.HooksDir.Get()))
+                      fmt.Println(len(cfg.Engine.CdiSpecDirs.Get()))
+                      fmt.Println(len(cfg.Engine.ConmonPath.Get()))
+                      fmt.Println(len(cfg.Engine.ConmonRsPath.Get()))
+                      fmt.Println(len(cfg.Engine.HelperBinariesDir.Get()))
+                      fmt.Println(len(cfg.Network.CNIPluginDirs.Get()))
+                      fmt.Println(len(cfg.Network.NetavarkPluginDirs.Get()))
                       return
               }
 
@@ -184,6 +217,35 @@ in
         esac
       }
 
+      output=$(
+        HOME="$state/home" \
+          CONTAINERS_CONF="$relocated/conf/containers.conf" \
+          CONTAINERS_STORAGE_CONF="$relocated/conf/storage.conf" \
+          "$relocated/bin/resolver-test" config
+      )
+      test "$output" = "$(printf '%s\n' \
+        "k8s-file" \
+        "netavark" \
+        "" \
+        "podman" \
+        "pasta" \
+        "cgroupfs" \
+        "sqlite" \
+        "file" \
+        "crun" \
+        "0" \
+        "2" \
+        "0" \
+        "2" \
+        "0" \
+        "0" \
+        "1" \
+        "0" \
+        "0" \
+        "0" \
+        "0" \
+        "0")"
+
       output=$(PATH="$host_bin" "$relocated/bin/resolver-test" conmon)
       test "$output" = "$relocated/libexec/podman/conmon"
 
@@ -221,6 +283,23 @@ in
       fi
       assert_contains "$output" 'could not find OCI runtime "crun"'
       mv "$relocated/libexec/podman/crun.disabled" "$relocated/libexec/podman/crun"
+
+      output=$(
+        PATH="$host_bin" \
+          "$relocated/bin/resolver-test" runtime runc "$host_bin/runc"
+      )
+      test "$output" = "$relocated/libexec/podman/runc"
+
+      mv "$relocated/libexec/podman/runc" "$relocated/libexec/podman/runc.disabled"
+      if output=$(
+        PATH="$host_bin" \
+          "$relocated/bin/resolver-test" runtime runc "$host_bin/runc" 2>&1
+      ); then
+        echo "Podman unexpectedly used an OCI runtime outside the sibling directory" >&2
+        exit 1
+      fi
+      assert_contains "$output" 'could not find OCI runtime "runc"'
+      mv "$relocated/libexec/podman/runc.disabled" "$relocated/libexec/podman/runc"
 
       output=$(
         CONTAINERS_HELPER_BINARY_DIR="$host_bin" \
@@ -263,15 +342,40 @@ in
       test -x "$install_root/libexec/podman/crun"
       test "$(cat "$systemctl_log")" = "$(printf '%s\n' \
         "daemon-reload" \
-        "enable podmanxd.service" \
-        "start podmanxd.service" \
-        "status podmanxd.service")"
+        "enable podmanxd.socket" \
+        "start podmanxd.socket" \
+        "status podmanxd.socket")"
+      grep -Fx "Requires=podmanxd.socket" "$systemd_unit_dir/podmanxd.service"
+      grep -Fx "After=podmanxd.socket" "$systemd_unit_dir/podmanxd.service"
+      grep -Fx "Type=exec" "$systemd_unit_dir/podmanxd.service"
+      grep -Fx "Delegate=yes" "$systemd_unit_dir/podmanxd.service"
+      grep -Fx "KillMode=process" "$systemd_unit_dir/podmanxd.service"
       grep -F "ExecStart=\"$install_root/bin/podman-server\"" \
         "$systemd_unit_dir/podmanxd.service"
       grep -F "ExecStop=\"$install_root/bin/podman\" stop --all" \
         "$systemd_unit_dir/podmanxd.service"
+      grep -Fx "ListenStream=/run/podman/podman.sock" \
+        "$systemd_unit_dir/podmanxd.socket"
+      grep -Fx "SocketUser=root" "$systemd_unit_dir/podmanxd.socket"
+      grep -Fx "SocketGroup=root" "$systemd_unit_dir/podmanxd.socket"
+      grep -Fx "SocketMode=0666" "$systemd_unit_dir/podmanxd.socket"
+      grep -Fx "DirectoryMode=0755" "$systemd_unit_dir/podmanxd.socket"
+      grep -Fx "Accept=no" "$systemd_unit_dir/podmanxd.socket"
+      grep -Fx "Service=podmanxd.service" "$systemd_unit_dir/podmanxd.socket"
+      if grep -E '^ExecStartPost=' "$systemd_unit_dir/podmanxd.service"; then
+        echo "installed Podman service contains imperative socket setup" >&2
+        exit 1
+      fi
+      if grep -F 'chmod 0777' "$systemd_unit_dir/podmanxd.service"; then
+        echo "installed Podman service exposes its rootful API socket" >&2
+        exit 1
+      fi
       if grep -F '@PODMANX_ROOT@' "$systemd_unit_dir/podmanxd.service"; then
         echo "installed systemd unit contains an unresolved path template" >&2
+        exit 1
+      fi
+      if grep -E -- '--time=|unix:///run/podman/podman.sock' "$install_root/bin/podman-server"; then
+        echo "podman-server overrides configured service or socket settings" >&2
         exit 1
       fi
 
@@ -294,6 +398,8 @@ in
       test -d "$install_root/data/tmpdir"
       grep -F 'export PODMAN_DATA_DIR=$root/../data' "$install_root/bin/podman"
       grep -F 'export PODMAN_DATA_DIR=$root/../data' "$install_root/bin/podman-server"
+      grep -F 'unset CONTAINERS_CONF_OVERRIDE CONTAINERS_REGISTRIES_CONF_OVERRIDE REGISTRIES_CONFIG_PATH' \
+        "$install_root/bin/podman" "$install_root/bin/podman-server"
       grep -F 'graphroot = "$PODMAN_DATA_DIR/graphroot"' "$install_root/conf/storage.conf"
       grep -F 'runroot = "$PODMAN_DATA_DIR/runroot"' "$install_root/conf/storage.conf"
       if grep -F '/opt/podmanx/data' "$install_root/conf/storage.conf"; then
@@ -301,12 +407,17 @@ in
         exit 1
       fi
 
-      # 自适应默认网络：沿用 podman 内建网络名 "podman"，故 containers.conf 不设
-      # default_network、无需 override。podman-server 探测宿主机 IPv6 能力后，把
+      # 自适应默认网络：containers.conf 显式固定网络名 "podman"。podman-server
+      # 探测宿主机 IPv6 能力后，把
       # conf/networks/podman.json 软链到 conf/networks.d/{dualstack,ipv4}.json。
       # network_config_dir 不做环境变量展开，故用运行时真实路径经 --network-config-dir
       # 直接指向 conf/networks（包目录可写、原地执行，软链接即时切换）。
-      grep -F 'network_backend = "netavark"' "$install_root/conf/containers.conf"
+      grep -Fx 'log_driver = "k8s-file"' "$install_root/conf/containers.conf"
+      grep -Fx 'network_backend = "netavark"' "$install_root/conf/containers.conf"
+      grep -Fx 'default_network = "podman"' "$install_root/conf/containers.conf"
+      grep -Fx 'default_rootless_network_cmd = "pasta"' "$install_root/conf/containers.conf"
+      grep -Fx 'cni_plugin_dirs = []' "$install_root/conf/containers.conf"
+      grep -Fx 'netavark_plugin_dirs = []' "$install_root/conf/containers.conf"
       grep -F -- '--network-config-dir="$PODMAN_NET_DIR"' "$install_root/bin/podman-server"
       grep -F 'PODMAN_NET_DIR=$root/../conf/networks' "$install_root/bin/podman-server"
       grep -F '/proc/sys/net/ipv6/conf/all/disable_ipv6' "$install_root/bin/podman-server"
@@ -314,8 +425,27 @@ in
       grep -F 'ln -sf ../networks.d/ipv4.json' "$install_root/bin/podman-server"
       # 软链接目标目录随包预建（podman-server 不再运行时 mkdir），确保原地执行即可软链。
       test -d "$install_root/conf/networks"
-      if grep -E '^[[:space:]]*default_network' "$install_root/conf/containers.conf"; then
-        echo "containers.conf must not set default_network (uses built-in name podman)" >&2
+      grep -Fx 'cgroup_manager = "cgroupfs"' "$install_root/conf/containers.conf"
+      grep -Fx 'database_backend = "sqlite"' "$install_root/conf/containers.conf"
+      grep -Fx 'events_logger = "file"' "$install_root/conf/containers.conf"
+      grep -Fx 'conmon_path = []' "$install_root/conf/containers.conf"
+      grep -Fx 'conmonrs_path = []' "$install_root/conf/containers.conf"
+      grep -Fx 'helper_binaries_dir = []' "$install_root/conf/containers.conf"
+      grep -Fx 'compose_providers = []' "$install_root/conf/containers.conf"
+      grep -Fx 'hooks_dir = []' "$install_root/conf/containers.conf"
+      grep -Fx 'cdi_spec_dirs = ["/etc/cdi"]' "$install_root/conf/containers.conf"
+      grep -Fx 'image_default_format = "oci"' "$install_root/conf/containers.conf"
+      grep -Fx 'image_default_transport = "docker://"' "$install_root/conf/containers.conf"
+      grep -Fx 'service_timeout = 0' "$install_root/conf/containers.conf"
+      grep -Fx 'runtime = "crun"' "$install_root/conf/containers.conf"
+      grep -Fx 'runtime_supports_json = ["crun", "runc"]' "$install_root/conf/containers.conf"
+      grep -Fx '[engine.runtimes]' "$install_root/conf/containers.conf"
+      grep -Fx 'crun = ["crun"]' "$install_root/conf/containers.conf"
+      grep -Fx 'runc = ["runc"]' "$install_root/conf/containers.conf"
+      grep -Fx 'short-name-mode = "disabled"' "$install_root/conf/registries.conf"
+      grep -Fx 'transient_store = false' "$install_root/conf/storage.conf"
+      if grep -E '^[[:space:]]*firewall_driver' "$install_root/conf/containers.conf"; then
+        echo "containers.conf must leave firewall backend selection to netavark" >&2
         exit 1
       fi
       if grep -E '^[[:space:]]*network_config_dir' "$install_root/conf/containers.conf"; then

@@ -10,6 +10,7 @@ export CONTAINERS_REGISTRIES_CONF=$root/../conf/registries.conf
 export CONTAINERS_POLICY_JSON=$root/../conf/policy.json
 export PODMAN_DATA_DIR=$root/../data
 export TMPDIR=$PODMAN_DATA_DIR/tmpdir
+unset CONTAINERS_CONF_OVERRIDE CONTAINERS_REGISTRIES_CONF_OVERRIDE REGISTRIES_CONFIG_PATH
 mkdir -p "$TMPDIR"
 
 export CONTAINER_HOST=unix:///run/podman/podman.sock
