@@ -18,7 +18,6 @@
 # libpq's static archive plus psql. libpq's `all`/`all-lib` targets are patched
 # to not require the `.so`.
 {
-  lib,
   stdenv,
   postgresql,
 }:
@@ -56,30 +55,24 @@ in
   # the fully-static build linking.
   gssSupport = false;
 }).overrideAttrs (old: {
-  # Upstream marks the whole derivation broken under `stdenv.hostPlatform.isStatic`
-  # (generic.nix) because the *server* can't dlopen shared modules in static musl.
-  # We build only libpq's static archive + psql, which nixpkgs itself notes does
-  # work in pkgsStatic, so clear the flag for this scoped build.
+  # Upstream marks the whole derivation broken for static hosts because the
+  # server cannot load shared modules. This package builds only libpq's static
+  # archive and psql, so that server limitation does not apply.
   meta = (old.meta or { }) // {
     broken = false;
   };
 
-  # Only ship a single self-contained output (the psql client). The stock
-  # multi-output split (out/lib/dev/...) creates a reference cycle here since we
-  # don't build the server/pg_config that normally separates them.
+  # Ship one self-contained output. The stock split creates a cycle here
+  # because the server and pg_config are intentionally not built.
   outputs = [ "out" ];
-  # The stock outputChecks reference the now-removed dev/doc/man/lib outputs.
   outputChecks = { };
 
   env = (old.env or { }) // {
-    # Drop -flto: gcc LTO is incompatible with postgres's partial-link step.
     CFLAGS = "-fdata-sections -ffunction-sections";
   };
 
-  # The inherited postPatch does `--subst-var dev`; with a single output point
-  # the dev/doc/man shell vars at $out. Then patch libpq so its `all`/`all-lib`
-  # targets build only the static archive (no `.so`, which the static toolchain
-  # cannot link).
+  # The inherited postPatch substitutes split-output variables. Point them all
+  # at the sole output, then make libpq build only its static archive.
   postPatch = ''
     export dev="$out" doc="$out" man="$out"
   ''
@@ -92,7 +85,6 @@ in
       --replace-fail "all: all-lib libpq-refs-stamp" "all: all-lib"
   '';
 
-  # Single-output build: point every split dir at $out.
   preConfigure = (old.preConfigure or "") + ''
     configureFlagsArray+=(
       "--includedir=$out/include"
@@ -104,18 +96,19 @@ in
     )
   '';
 
-  # Build only libpq (static) and psql, skipping the server backend.
   buildPhase = ''
     runHook preBuild
     make -C src/interfaces/libpq all-lib -j$NIX_BUILD_CORES
     make -C src/bin/psql -j$NIX_BUILD_CORES
     runHook postBuild
   '';
+
   installPhase = ''
     runHook preInstall
     make -C src/interfaces/libpq install
-    make -C src/bin/psql install
+    make -C src/bin/psql bindir="$out/bin" install
     runHook postInstall
   '';
+
   postInstall = "";
 })
