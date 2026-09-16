@@ -13,6 +13,3 @@ ExecStart="@PODMANX_ROOT@/bin/podman-server"
 ExecStop="@PODMANX_ROOT@/bin/podman" stop --all
 Restart=on-failure
 RestartSec=5s
-
-[Install]
-WantedBy=multi-user.target

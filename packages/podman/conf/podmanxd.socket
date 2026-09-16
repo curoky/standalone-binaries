@@ -7,7 +7,6 @@ SocketUser=root
 SocketGroup=root
 SocketMode=0666
 DirectoryMode=0755
-Accept=no
 Service=podmanxd.service
 
 [Install]

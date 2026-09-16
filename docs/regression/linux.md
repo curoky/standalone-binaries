@@ -8,8 +8,12 @@ Podman 的 systemd packaging 固定采用 `podmanxd.socket` 激活
 `podmanxd.service`：installer 只启用 socket，socket 以 `root:root`、`0666` 向普通
 本地用户暴露 rootful API（明确接受的高权限安全边界），service 通过 `ExecStop` 停止全部
 容器。运行配置固定为 overlay+sqlite、cgroupfs、file/k8s-file 日志、crun 默认 runtime、
-netavark；禁用未打包的 provider、宿主 hooks 和 network plugin 扫描，CDI 只读取
-`/etc/cdi` 以支持宿主 GPU；firewall backend 和 IPv4/dual-stack 网络选择保持动态。
+netavark+nftables；禁用未打包的 provider、宿主 hooks 和 network plugin 扫描，CDI 只读取
+`/etc/cdi` 以支持宿主 GPU；一份内部双栈网络适用于双栈和 IPv6-only 宿主，无动态选择；server 直接读取包内
+`conf/networks`，installer 不复制或链接网络配置。XDG config/data/cache 沿用包内 HOME
+默认目录，DNS 端口固定在 containers.conf；禁用 netavark 的可选 firewalld 联动。
+libpod 运行目录沿用 `/run/libpod`，确保宿主重启后由上游刷新状态；server 和 client 均绑定随包 CA。
+默认 seccomp 使用二进制内置 profile，不加载宿主默认 JSON，不生成启动期配置副本。
 该行为属于产品边界，不作为上游回归候选。
 
 | 包 | 定制 | 回归 | 原因与保留边界 | 回归判据 | commit | 来源 |
@@ -67,8 +71,8 @@ netavark；禁用未打包的 provider、宿主 hooks 和 network plugin 扫描�
 | `patchelf` | 📌 `25.05` | ✅ | 历史 pin；已验证：unstable patchelf 0.15.2 `make check` 编译测试用 `.so` 时报 `R_X86_64_32 against hidden symbol __TMC_END__`（musl-static crt 与 PIC 冲突），构建失败 | Linux 用 unstable 构建并满足 musl-static portability | 56c02bc00adc | `manifests/default.nix` |
 | `perl` | 🩹 + 📦 本地 | 🟡 | 实测无可回归项：注入 Compress::Raw::Lzma + IO::Compress::Brotli 的静态 XS 必需，stock perl `require` 直接 `Can't locate Compress/Raw/Lzma.pm`（unstable 未 vendor 这两个模块）；wrapper 保留 | 只删除 stock 已覆盖的依赖/link patch | 56c02bc00adc | `packages/perl/` |
 | `pnpm` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/pnpm/` |
-| `podman5` | 🩹 + 📦 本地 | 🟡 | 跟随 nixpkgs 的 Podman 5.x；保留 musl `aardvark-dns`、严格 sibling helper resolver、policy env backport、Podman 5 registry drop-in 封闭 patch 和静态 runc packaging。配置固定 overlay+sqlite、cgroupfs、file/k8s-file、crun 默认（runc 可显式选择）、netavark+pasta；禁用未打包 provider、宿主 hooks 和 network plugin，CDI 仅扫描 `/etc/cdi` 以支持宿主 GPU。firewall backend 与 IPv4/dual-stack 保持动态选择。wrapper、storage、systemd socket activation 与所有 helper 均按包相对路径定位，service 停止时停止全部容器 | 分别回归编译 patch；确定性、自包含 packaging 保留 | 56c02bc00adc | `packages/podman/podman5.nix` |
-| `podman6` | 📌 + 🩹 + 📦 本地 | 🟡 | 固定 Podman 6.1.0；保留 musl `aardvark-dns`、严格 sibling helper resolver 和静态 runc packaging。配置固定 overlay+sqlite、cgroupfs、file/k8s-file、crun 默认（runc 可显式选择）、netavark+pasta；禁用未打包 provider、宿主 hooks 和 network plugin，CDI 仅扫描 `/etc/cdi` 以支持宿主 GPU。Podman 6 在 bundled registries.conf 生效时原生跳过 drop-ins；firewall backend 与 IPv4/dual-stack 保持动态选择。wrapper、storage、systemd socket activation 与所有 helper 均按包相对路径定位，service 停止时停止全部容器 | 分别回归 pin/编译 patch；确定性、自包含 packaging 保留 | 56c02bc00adc | `packages/podman/podman6.nix` |
+| `podman5` | 🩹 + 📦 本地 | 🟡 | 跟随 nixpkgs 5.x；保留 musl aardvark-dns、静态 runc 解包、sibling helper/PATH 限制、policy env backport（移除 libpod 宿主默认路径覆盖）、registry env 入口与 drop-in 封闭。共享 bin/conf/tests、独立 nix；固定 native overlay+sqlite、cgroupfs、crun、netavark+nftables；携带 nft、BusyBox、CA，seccomp 使用内置 profile；禁用宿主 LSM profile。统一内部双栈 bridge，适用双栈与 IPv6-only 宿主，无网络/backend 探测；CDI 仅 /etc/cdi；保留 socket activation 与停止容器边界 | 分别回归编译修正；packaging 保留。x86_64 完整构建与真实网络 loader 测试通过，aarch64 本轮仅 eval；真实网络受 Workspace CAP_NET_ADMIN 限制 | dc5d91f84032 | `packages/podman/AGENTS.md`、`packages/podman/podman5.nix` |
+| `podman6` | 📌 + 🩹 + 📦 本地 | 🟡 | 固定 6.1.0；共享 bin/conf/tests、独立 nix；保留 musl aardvark-dns、静态 runc 解包、sibling helper/PATH 限制。registry 显式路径仍加载 drop-ins，使用 DoNotLoadDropInFiles 封闭；policy env 原生支持。固定 native overlay+sqlite、cgroupfs、crun、netavark+nftables，携带 nft、BusyBox、CA，seccomp 使用内置 profile；统一内部双栈 bridge，无 backend 探测；要求 cgroup v2 | 分别回归 pin/编译修正；packaging 保留。x86_64 完整构建与真实网络 loader 测试通过，aarch64 本轮仅 eval；当前 Workspace cgroup v1 不能验证 v6 runtime | dc5d91f84032 | `packages/podman/AGENTS.md`、`packages/podman/podman6.nix` |
 | `postgresql` | 🩹 + 📦 本地 | 🟡 | 实测无可回归项：`gccAsClang`（否则 generic.nix 切 clang 报 `C compiler cannot create executables`）与其绑定的去 `-flto` 必需；`curlSupport=false`（打开报 library 'curl' does not provide curl_multi_init）、`gssSupport=false`（gss_store_cred_into 缺失）必需；psql-only 产品边界保留 | 逐项删 workaround，保留 psql-only 输出 | 56c02bc00adc | `packages/postgresql/` |
 | `prettier` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/prettier/` |
 | `protobuf3_20` | 📌 `24.05` | ❌ | unstable 已删除该版本：属性不存在，去 pin 后 `base.${name} or null` 静默产出空包，非有效回归 | 只能改指 unstable 现存版本别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |

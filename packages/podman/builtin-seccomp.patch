@@ -1,0 +1,40 @@
+--- a/libpod/util.go
++++ b/libpod/util.go
+@@ -26 +25,0 @@
+-	"go.podman.io/storage/pkg/fileutils"
+@@ -72,32 +71,14 @@
+ 	return json.Unmarshal(tmp, to)
+ }
+ 
+-// DefaultSeccompPath returns the path to the default seccomp.json file
+-// if it exists, first it checks OverrideSeccomp and then default.
+-// If neither exist function returns ""
++// DefaultSeccompPath uses the configured profile or the built-in default.
++// An empty path selects the profile compiled into this Podman version.
+ func DefaultSeccompPath() (string, error) {
+ 	def, err := config.Default()
+ 	if err != nil {
+ 		return "", err
+ 	}
+-	if def.Containers.SeccompProfile != "" {
+-		return def.Containers.SeccompProfile, nil
+-	}
+-
+-	err = fileutils.Exists(config.SeccompOverridePath)
+-	if err == nil {
+-		return config.SeccompOverridePath, nil
+-	}
+-	if !errors.Is(err, os.ErrNotExist) {
+-		return "", err
+-	}
+-	if err := fileutils.Exists(config.SeccompDefaultPath); err != nil {
+-		if !errors.Is(err, os.ErrNotExist) {
+-			return "", err
+-		}
+-		return "", nil
+-	}
+-	return config.SeccompDefaultPath, nil
++	return def.Containers.SeccompProfile, nil
+ }
+ 
+ // CheckDependencyContainer verifies the given container can be used as a

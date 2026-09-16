@@ -35,7 +35,7 @@ nixpkgs 的 Go stdlib 补丁会内嵌 `tzdata`、`mailcap`、`iana-etc` 的 stor
 
 Podman 必须绑定本仓库的静态 container helpers。尤其是 runc：上游 wrapper 是动态
 launcher，而 Podman 的 helper collection 会复制该 launcher。`packages/podman/podman5.nix`
-与 `packages/podman/podman6.nix` 因此直接安装真实静态 runc，并显式绑定 `conmon`、
+与 `packages/podman/podman6.nix` 因此在 upstream 安装后解包真实静态 runc，并显式绑定 `conmon`、
 `catatonit` 和 `crun`。
 
 删除这层替换前，必须确认 Podman 收集到的是静态入口，而不是 `wrapProgram` launcher。
