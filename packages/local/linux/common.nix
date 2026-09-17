@@ -33,6 +33,8 @@ rec {
   openssh_gssapi = pkgsStatic.callPackage ../../openssh_gssapi { };
   poppler = pkgsStatic.callPackage ../../poppler { };
   postgresql = pkgsStatic.callPackage ../../postgresql { };
+  radare2 = pkgsStatic.callPackage ../../radare2 { };
+  rizin = pkgsStatic.callPackage ../../rizin { };
   sudo = pkgsStatic.callPackage ../../sudo { };
   wget = pkgsStatic.callPackage ../../wget/linux.nix { };
 
