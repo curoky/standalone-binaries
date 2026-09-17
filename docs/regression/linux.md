@@ -20,6 +20,7 @@ Podman 的 systemd packaging 产品边界见 [`packages/podman/AGENTS.md`](../..
 | `clang-tools-21` | 📦 本地 | ❌ | 固定 LLVM 21，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-22` | 📦 本地 | ❌ | 固定 LLVM 22，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `cloc` | 📦 本地 | 🟡 | `doInstallCheck=false`（沙箱无 sibling perl）+ Perl wrapper packaging；详见 nix 注释 | 只恢复可运行的 install check | 56c02bc00adc | `packages/cloc/` |
+| `codex` | 🩹 本地 | 🟡 | 仅构建 `codex-cli`（丢弃 V8 backed code-mode-host）+ 去 wrapProgram store 路径 + 补 perl 建 vendored openssl；详见 nix 注释 | 上游 CLI 不再需要 code-mode-host 或 denoland 出 musl librusty_v8 后回 stock | dc5d91f84032 | `packages/codex/` |
 | `cmake_3_27_9` | 📌 源码版本 + 🩹 | 🟡 | 保留 cstdint patch、`BUILD_TESTING=false`、openssl/curses 关闭；详见 nix 注释 | 上游修复后删剩余 workaround，保留版本化 output | 56c02bc00adc | `packages/cmake/3_27_9/` |
 | `cmake_4_1_2` | 📌 源码版本 + 🩹 | 🟡 | 保留 `--no-system-libs`、openssl/curses 关闭、`BUILD_TESTING=false`；详见 nix 注释 | 上游支持静态 shared-module test 后删剩余 workaround | 56c02bc00adc | `packages/cmake/4_1_2/` |
 | `conmon` | 🩹 本地 | ✅ | 清空 propagatedBuildInputs（systemd-minimal isStatic badPlatform）；详见 nix 注释 | stock unstable 无需清空即可 musl-static 构建 | 56c02bc00adc | `packages/conmon/` |
