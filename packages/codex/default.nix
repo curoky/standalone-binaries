@@ -4,6 +4,7 @@
   codex,
   emptyFile,
   perl,
+  buildPackages,
 }:
 
 # Stock `codex` (nixpkgs) builds two binaries: the `codex` CLI and a
@@ -21,6 +22,17 @@
 # replace the two `librusty_v8*` inputs with empty files so the derivation stops
 # fetching the (unavailable, unused) archive at eval time.
 #
+# codex's `nativeBuildInputs`/`buildInputs` pull in `clang` and `libclang`
+# purely as *build-time* tooling: clang is the C compiler for the vendored
+# BoringSSL/openssl-sys sources, and libclang backs bindgen (via
+# `LIBCLANG_PATH`). Under our musl-static cross set, callPackage resolves both
+# to the *target* `clang-static-*-musl`, which has no binary cache and forces a
+# from-source rebuild of the entire LLVM/Clang toolchain (~1.5h each, OOM-kills
+# CI runners). These tools run on the build platform, so we pull them from
+# `buildPackages`, whose glibc `clang`/`libclang` are cached on
+# `cache.nixos.org`. This does not affect the emitted binary: the target still
+# links against musl-static via stdenv's gcc.
+#
 # We also drop upstream's `postFixup`, which used `wrapProgram` to bake the
 # nixpkgs `ripgrep`/`bubblewrap` store paths into PATH. That violates our
 # no-`/nix/store` invariant. codex already locates `rg` and `bwrap` from the
@@ -29,6 +41,8 @@
 (codex.override {
   librusty_v8 = emptyFile;
   librusty_v8_src_binding = emptyFile;
+  clang = buildPackages.clang;
+  libclang = buildPackages.libclang;
 }).overrideAttrs
   (old: {
     cargoBuildFlags = [
@@ -48,7 +62,11 @@
     env = builtins.removeAttrs (old.env or { }) [
       "RUSTY_V8_ARCHIVE"
       "RUSTY_V8_SRC_BINDING_PATH"
-    ];
+    ] // {
+      # Re-point bindgen at the build-platform libclang overridden above; the
+      # inherited value still referenced the target static libclang.
+      LIBCLANG_PATH = "${lib.getLib buildPackages.libclang}/lib";
+    };
 
     # Upstream shell-completion generation and the wrapProgram PATH injection
     # both bake nixpkgs store paths into the output; neither is compatible with
