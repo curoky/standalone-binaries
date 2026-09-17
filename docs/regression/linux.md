@@ -13,7 +13,7 @@ Podman 的 systemd packaging 产品边界见 [`packages/podman/AGENTS.md`](../..
 | `aardvark-dns` | 🩹 本地 | ✅ | musl 无 `close_range` wrapper，patch 改用 raw syscall；详见 nix 注释 | 上游改用 musl-safe close_range 后删 patch | 56c02bc00adc | `packages/aardvark-dns/` |
 | `atuin` | 📦 本地 | 🟡 | 预生成相对定位 init.zsh；详见 nix 注释 | 预生成 init 属产品行为保留 | dc5d91f84032 | `packages/atuin/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
-| `catatonit` | 🩹 本地 | ✅ | 清空 installCheckPhase（缺 readelf）；详见 nix 注释 | 上游修好 check 后恢复 | 624af665418d | `packages/catatonit/` |
+| `catatonit` | 🩹 本地 | ✅ | 补 build-for-build binutils 让 installCheck 的 readelf 可用；详见 nix 注释 | 上游把 binutils 加进 nativeBuildInputs 后恢复 | dc5d91f84032 | `packages/catatonit/` |
 | `clang-tools-18` | 📦 本地 | ❌ | 固定 LLVM 18，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-19` | 📦 本地 | ❌ | 固定 LLVM 19，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-20` | 📦 本地 | ❌ | 固定 LLVM 20，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
@@ -44,7 +44,6 @@ Podman 的 systemd packaging 产品边界见 [`packages/podman/AGENTS.md`](../..
 | `gnutar` | 🩹 本地 | ✅ | `-Wl,--allow-multiple-definition`（xattrat 符号冲突）；详见 nix 注释 | stock 无 flag 也能静态链接并保留 ACL/xattr | 56c02bc00adc | `packages/gnutar/` |
 | `gocryptfs` | 🩹 本地 | 🟡 | 清空 propagatedBuildInputs + 设 PKG_CONFIG_PATH；详见 nix 注释 | 上游 pcsclite doc 可构建、cross cgo 自动定位 openssl 后删 | 56c02bc00adc | `packages/gocryptfs/` |
 | `gpgme` | 🩹 本地 | 🟡 | minimalGnuPG + `--disable-gpg-test` + `doCheck=false`；详见 nix 注释 | 逐项恢复依赖与 checks，保持 musl-static | 56c02bc00adc | `packages/gpgme/` |
-| `libarchive` | 🩹 本地 | ✅ | 去 Nix store 路径、关 XAR/libxml2、保留 ZIP AES；详见 nix 注释 | stock 四 CLI 无 store 路径且 musl-static、smoke 通过 | 56c02bc00adc | `packages/libarchive/` |
 | `libewf` | 🩹 本地 | ✅ | radare2/rizin 依赖；补 cross OpenSSL 探针 cache；详见 nix 注释 | 上游同 arch cross 不依赖运行探针后删 override | dc5d91f84032 | `packages/libewf/` |
 | `libtool` | 📦 本地 | ❌ | 改写 `libtoolize` 的 baked data paths | 相对资源定位必须保留 | — | `packages/libtool/` |
 | `lua5_5` | 🩹 本地 | ✅ | 恢复 `/usr/local` module paths，避免嵌 store 路径；详见 nix 注释 | stock 默认 module paths 无 store 路径 | 56c02bc00adc | `packages/lua/` |
