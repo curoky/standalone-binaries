@@ -1,3 +1,11 @@
+# poppler-utils — musl-static build of the CLI utilities only.
+#
+# Stock `poppler-utils` is rejected under musl-static because default features
+# pull in `nss -> p11-kit` (badPlatforms = isStatic). Build `minimal + utils`,
+# then also disable openjpeg (otherwise `libtiff -> giflib` forces a shared
+# lib) and `BUILD_TESTING`. The `minimal` build drops poppler's own transitive
+# linkage, so the CLIs no longer resolve fontconfig/freetype/expat/bzip2/brotli
+# symbols; the CMakeLists patch appends those static archives explicitly.
 {
   lib,
   poppler,

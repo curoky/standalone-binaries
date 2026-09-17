@@ -1,3 +1,14 @@
+# cmake 3.27.9 — versioned musl-static build.
+#
+# Kept as a pinned source version alongside the newer cmake. Workarounds still
+# required on top of a from-scratch mkDerivation:
+#   - `postPatch` inserts `#include <cstdint>` into cmcppdap's network.h; this
+#     old source is missing the header and fails to compile with modern
+#     toolchains.
+#   - `BUILD_TESTING = false`: the shared-module test fails to link under
+#     musl-static with "R_X86_64_32 against __TMC_END__".
+#   - `CMAKE_USE_OPENSSL = false` / `BUILD_CursesDialog = false`: openssl and
+#     curses are deliberately dropped.
 {
   lib,
   stdenv,

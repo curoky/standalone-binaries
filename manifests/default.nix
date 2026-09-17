@@ -64,6 +64,9 @@
   };
   flex = { };
   gawk = { };
+  # gdb pins 25.11 on both platforms: unstable gdb 17.2's build dependency
+  # dejagnu -> expect fails to link under musl-static (undefined reference to
+  # tclStubsPtr), which also breaks gdb itself. No regression room.
   gdb = {
     version = "25.11";
   };
@@ -305,7 +308,11 @@
     ];
   };
 
-  # protobuf
+  # protobuf legacy version pins. These are not un-pinnable: unstable has either
+  # removed the attribute (dropping the pin silently yields an empty package via
+  # `base.<name> or null`) or turned it into a throwing alias (eval error). Any
+  # change would have to retarget an existing unstable alias, altering the
+  # version semantics, so this is not a de-pin regression.
   protobuf_23 = {
     version = "24.05";
   };
@@ -661,19 +668,26 @@
 
   ## ---- cross-platform with per-platform overrides -----------------------
   # linux uses default version; darwin pins a specific version.
+  # aria2 pins darwin to 24.11: unstable aria2 1.37.0's static darwin build
+  # fails to link libxml2.a (missing iconv/iconv_open/libiconv symbols).
   aria2 = {
     "aarch64-darwin" = {
       version = "24.11";
     };
   };
   # shellcheck splits outputs (bin/man/doc/out); the executable lives in `bin`,
-  # so the default `out` would export an empty tree.
+  # so the default `out` would export an empty tree. darwin pins 25.11: unstable
+  # ShellCheck 0.11.0's static darwin build fails with GHC "External interpreter
+  # terminated (1)".
   shellcheck = {
     output = [ "bin" ];
     "aarch64-darwin" = {
       version = "25.11";
     };
   };
+  # uv pins darwin to 25.11: unstable uv 0.11.32's static darwin build triggers
+  # a cc-wrapper multi-target defect in aws-lc-sys (--target arm64-apple-macosx
+  # -> "posix_spawn failed").
   uv = {
     "aarch64-darwin" = {
       version = "25.11";

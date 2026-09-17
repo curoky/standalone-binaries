@@ -1,3 +1,12 @@
+# cloc — sibling-perl wrapper with its Perl modules bundled.
+#
+# `cloc` is a Perl script; the wrapper resolves the sibling static `perl`
+# (../../perl/bin/perl relative to the install) and sets PERL5LIB to the bundled
+# modules so the relocatable tarball has no PATH or store dependency.
+#
+# `doInstallCheck = false` is not recoverable: the stock installCheck runs
+# `$out/bin/cloc` (the sibling wrapper), and the sandbox has no sibling perl, so
+# it fails with "perl: No such file or directory".
 {
   lib,
   cloc,
