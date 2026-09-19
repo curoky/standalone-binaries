@@ -66,11 +66,11 @@ buildDotnetModule rec {
     rm $out/bin/musicdecrypto
     mv $out/lib/music-decrypto/musicdecrypto $out/bin/musicdecrypto
   ''
-  + lib.optionalString stdenv.isLinux ''
+  + lib.optionalString stdenv.hostPlatform.isLinux ''
     patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 $out/bin/musicdecrypto
     patchelf --set-rpath "/lib64:/usr/lib64" $out/bin/musicdecrypto
   ''
-  + lib.optionalString stdenv.isDarwin ''
+  + lib.optionalString stdenv.hostPlatform.isDarwin ''
     OLD_ICU_PATH=$(otool -L "$out/bin/musicdecrypto" | grep libicucore | awk '{print $1}')
 
     if [ -n "$OLD_ICU_PATH" ]; then

@@ -36,7 +36,7 @@ let
         chmod -R a+w googletest
         ln -s ../googletest gmock/gtest
       ''
-      + lib.optionalString stdenv.isDarwin ''
+      + lib.optionalString stdenv.hostPlatform.isDarwin ''
         substituteInPlace src/google/protobuf/testing/googletest.cc \
           --replace 'tmpnam(b)' '"'$TMPDIR'/foo"'
       '';
