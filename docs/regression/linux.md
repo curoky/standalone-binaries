@@ -82,7 +82,7 @@ Podman 的 systemd packaging 产品边界见 [`packages/podman/AGENTS.md`](../..
 | `python315` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/python/` |
 | `radare2` | 🩹 本地 | ✅ | libewf override + sdb `both_libraries`→`library`；详见 nix 注释 | 上游 sdb 静态构建不产 `.so` 后删 override | dc5d91f84032 | `packages/radare2/` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
-| `rizin` | 🩹 本地 | ✅ | libewf/tree-sitter override + 三处 cross-static 修复；详见 nix 注释 | 上游补齐 native cc/wrap/静态构建后逐项删 | dc5d91f84032 | `packages/rizin/` |
+| `rizin` | 🩹 本地 | ✅ | libewf/tree-sitter override + 三处 cross-static 修复 + aarch64 关 pyyaml installCheck；详见 nix 注释 | 上游补齐 native cc/wrap/静态构建、pyyaml float repr 测试跨 arch 稳定后逐项删 | dc5d91f84032 | `packages/rizin/` |
 | `runc` | 📦 native selection | ❌ | Linux 容器运行时，无 macOS 构建目标 | 无 macOS 端可回归空间（平台固有） | — | `manifests/default.nix` |
 | `s6` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch；详见 nix 注释 | 上游修 s6 stack 后去 pin；输出无 store 路径 | 56c02bc00adc | `packages/s6/`, `flake.nix` |
 | `s6-linux-init` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch + symlinkJoin；详见 nix 注释 | 上游修 s6 stack 后去 pin；产物与生成脚本无 store 路径 | 56c02bc00adc | `packages/s6-linux-init/`, `flake.nix` |

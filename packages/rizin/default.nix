@@ -3,6 +3,7 @@
   stdenv,
   callPackage,
   buildPackages,
+  python3,
   rizin,
 }:
 
@@ -34,9 +35,23 @@
 #      musl-static ("failed to set dynamic section sizes: bad value"). Turning it
 #      into a plain `library()` respects default_library=static and only emits the
 #      archive rizin actually uses.
+#
+#   6. rizin's build pulls in pyyaml (to generate sources at build time). Under
+#      the aarch64 musl-static set pyyaml's pytestCheckHook runs in the
+#      installCheck phase and fails one implicit resolver case
+#      (`test_implicit_resolver::yaml11.schema`): a YAML 1.1 sexagesimal float is
+#      dumped via the C library's float repr, which differs between the x86_64
+#      and aarch64 musl runtimes, so the exact-string assertion trips only on
+#      aarch64. pyyaml is only a build-time code generator here, so drop its
+#      installCheck to unblock the cross build.
 (rizin.override {
   libewf = callPackage ../libewf { };
   tree-sitter = callPackage ../tree-sitter { };
+  python3 = python3.override {
+    packageOverrides = _: prev: {
+      pyyaml = prev.pyyaml.overrideAttrs { doInstallCheck = false; };
+    };
+  };
 }).overrideAttrs
   (old: {
     depsBuildBuild = (old.depsBuildBuild or [ ]) ++ [ buildPackages.stdenv.cc ];
