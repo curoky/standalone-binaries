@@ -1,3 +1,10 @@
+# zsh — musl-static build with three modules built in, plus an FPATH wrapper.
+#
+# Without the `link=either` patch the static build fails to `zmodload
+# zsh/system`, `zsh/regex` and `zsh/mathfunc`, so those three modules must be
+# built in. The wrapper resolves the co-located functions dir relative to the
+# install (FPATH) and `--enable-zshenv=/etc/zsh/zshenv` keeps the global zshenv
+# out of the read-only store (packaging policy).
 {
   lib,
   stdenv,
@@ -26,6 +33,8 @@ zsh.overrideAttrs (oldAttrs: rec {
     (lib.filter (f: !(lib.hasPrefix "--enable-zshenv=" f)) (oldAttrs.configureFlags or [ ]))
     ++ [ "--enable-zshenv=/etc/zsh/zshenv" ];
 
+  # Force the system/regex/mathfunc modules to be buildable either statically
+  # or dynamically; the static build otherwise fails to `zmodload` all three.
   postPatch = (oldAttrs.postPatch or "") + ''
     echo "link=either" >> Src/Modules/system.mdd
     echo "link=either" >> Src/Modules/regex.mdd

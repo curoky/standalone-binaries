@@ -1,3 +1,10 @@
+# wget (Linux) — static wget with a bundled CA bundle.
+#
+# The wrapper resolves a co-located CA bundle (etc/wget/ca-bundle.crt) relative
+# to the install so TLS works in the relocatable tarball.
+#
+# `doCheck = false` on the static build is required: restoring the checks
+# segfaults `wget_options_fuzzer` (exit 139) and the fuzzer corpus is missing.
 {
   lib,
   stdenv,

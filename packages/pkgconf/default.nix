@@ -1,3 +1,9 @@
+# pkgconf — no Nix store paths baked into the binary.
+#
+# Stock `pkgconf-unwrapped` compiles its own Nix output's `.pc`, system
+# lib/include and personality paths into the binary. Point them at the standard
+# `/usr` and `/usr/local` locations so the standalone product has no
+# `/nix/store` residue.
 { pkgconf-unwrapped }:
 
 pkgconf-unwrapped.overrideAttrs (oldAttrs: {

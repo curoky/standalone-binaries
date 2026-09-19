@@ -4,84 +4,75 @@
 [`linux-aarch64.md`](linux-aarch64.md)。表格约定、状态/定制图例与批量回归命令见
 [`AGENTS.md`](AGENTS.md)。
 
-Podman 的 systemd packaging 固定采用 `podmanxd.socket` 激活
-`podmanxd.service`：installer 只启用 socket，socket 以 `root:root`、`0666` 向普通
-本地用户暴露 rootful API（明确接受的高权限安全边界），service 通过 `ExecStop` 停止全部
-容器。运行配置固定为 overlay+sqlite、cgroupfs、file/k8s-file 日志、crun 默认 runtime、
-netavark+nftables；禁用未打包的 provider、宿主 hooks 和 network plugin 扫描，CDI 只读取
-`/etc/cdi` 以支持宿主 GPU；一份内部双栈网络适用于双栈和 IPv6-only 宿主，无动态选择；server 直接读取包内
-`conf/networks`，installer 不复制或链接网络配置。XDG config/data/cache 沿用包内 HOME
-默认目录，DNS 端口固定在 containers.conf；禁用 netavark 的可选 firewalld 联动。
-libpod 运行目录沿用 `/run/libpod`，确保宿主重启后由上游刷新状态；server 和 client 均绑定随包 CA。
-默认 seccomp 使用二进制内置 profile，不加载宿主默认 JSON，不生成启动期配置副本。
-该行为属于产品边界，不作为上游回归候选。
+`原因与保留边界`、`回归判据` 两列只给摘要，完整说明见「来源」列指向的 nix 文件注释；
+Podman 的 systemd packaging 产品边界见 [`packages/podman/AGENTS.md`](../../packages/podman/AGENTS.md)。
 
 | 包 | 定制 | 回归 | 原因与保留边界 | 回归判据 | commit | 来源 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
-| `aardvark-dns` | 🩹 本地 | ✅ | aardvark-dns 2.1.0 在 `src/main.rs` 无条件调用 `libc::close_range`，但 musl 的 libc 绑定（libc 0.2.189）只导出 `SYS_close_range` 常量、不导出 wrapper 函数（仅 gnu 有），musl-static 构建报 `cannot find function close_range in crate libc`；patch 改用 `libc::syscall(libc::SYS_close_range, ...)`（raw syscall，两平台 SYS 常量齐全）。仅改 crate 自身源码不动 vendor，故无需 cargoHash override。由 podman5/podman6 通过 `podman.override { aardvark-dns = ...; }` 消费 | 上游 aardvark-dns 改用 musl-safe 的 close_range 调用（或 libc 为 musl 补齐 wrapper）后删除该 patch | 56c02bc00adc | `packages/aardvark-dns/` |
-| `atuin` | 📦 本地 | 🟡 | 结构性 packaging：随二进制预生成 `share/atuin/init.zsh`（build 期用 native `atuin init zsh --disable-up-arrow --disable-ai` 生成），并注入 prologue 用 `${(%):-%x}` 相对定位同包 `bin/atuin`（定义 `atuin` 函数并前置 PATH），使可搬运产物无 PATH 依赖。checkPhase 直接跑上游全量测试（pty-proxy 时序测试在慢环境偶发 flaky，未 skip，观察 CI 是否稳定） | 预生成 init 属产品行为保留 | dc5d91f84032 | `packages/atuin/` |
+| `aardvark-dns` | 🩹 本地 | ✅ | musl 无 `close_range` wrapper，patch 改用 raw syscall；详见 nix 注释 | 上游改用 musl-safe close_range 后删 patch | 56c02bc00adc | `packages/aardvark-dns/` |
+| `atuin` | 📦 本地 | 🟡 | 预生成相对定位 init.zsh；详见 nix 注释 | 预生成 init 属产品行为保留 | dc5d91f84032 | `packages/atuin/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
-| `catatonit` | 🩹 本地 | ✅ | 清空 stock `installCheckPhase`：上游 check 跑 `readelf` 但未把 binutils 加入 `nativeBuildInputs`，musl64 cross `strictDeps` 构建下报 `readelf: command not found` | 上游把 binutils 加入 `nativeBuildInputs`（或改用可用 check）后，unstable install check 与最终静态验证通过 | 624af665418d | `packages/catatonit/` |
-| `clang-tools-18` | 📦 本地 | ❌ | 固定 LLVM 18，只提取并瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `clang-tools-19` | 📦 本地 | ❌ | 固定 LLVM 19，只提取并瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `clang-tools-20` | 📦 本地 | ❌ | 固定 LLVM 20，只提取并瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `clang-tools-21` | 📦 本地 | ❌ | 固定 LLVM 21，只提取并瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `clang-tools-22` | 📦 本地 | ❌ | 固定 LLVM 22，只提取并瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `cloc` | 📦 本地 | 🟡 | 实测 `doInstallCheck=false` 不可回归：上游 installCheck 跑 `$out/bin/cloc`（sibling wrapper），沙箱无 sibling perl 报 `perl: No such file or directory`；sibling Perl wrapper 与模块 bundling packaging 保留 | 只恢复可运行的 install check | 56c02bc00adc | `packages/cloc/` |
-| `cmake_3_27_9` | 📌 源码版本 + 🩹 | 🟡 | 已回归掉冗余 flag（删除 `CXXFLAGS=-Wno-elaborated-enum-base`、`CMAKE_EXE_LINKER_FLAGS=-static`、`NIX_CFLAGS_COMPILE=-Wno-unused-command-line-argument`）；仍保留 `postPatch`（补 `#include <cstdint>`）、`BUILD_TESTING=false`（否则 shared-module test 报 `R_X86_64_32 against __TMC_END__`）与 openssl/curses 关闭 | 上游修复老源码 header 与静态 shared-module test 后删除剩余 workaround，保留版本化 output | 56c02bc00adc | `packages/cmake/3_27_9/` |
-| `cmake_4_1_2` | 📌 源码版本 + 🩹 | 🟡 | 已回归掉 `CMAKE_EXE_LINKER_FLAGS=-static`；仍保留 `--no-system-libs`、openssl/curses 关闭、`BUILD_TESTING=false`（同 3.27.9 的 shared-module test 链接失败） | 上游支持静态 shared-module test 后删除剩余 workaround，保留版本化 output | 56c02bc00adc | `packages/cmake/4_1_2/` |
-| `conmon` | 🩹 本地 | ✅ | 收窄 build inputs 并清空 propagated inputs：stock unstable 的 propagatedBuildInputs 拉入 `systemd-minimal`，其 `badPlatforms` 含 `isStatic`，musl-static 下 eval 即被拒 | stock unstable 无需清空 propagated inputs 即可构建为 musl-static | 56c02bc00adc | `packages/conmon/` |
-| `copyparty` | 📦 本地 | ❌ | 纯 Python 源码与 FTP/TFTP 依赖绑定 sibling 静态 `python314`；显式禁用媒体处理、SFTP、Argon2、ZeroMQ、libmagic、ctypes 外部库探测等未打包能力；wrapper 必须保留真实 `sys.executable` 以支持多进程 | sibling runtime、纯 Python 依赖裁剪和功能边界属于 packaging | — | `packages/copyparty/` |
-| `crun` | 🩹 本地 | 🟡 | 实测均不可回归：stock features 拉入 `elfutils`（`badPlatforms` 含 isStatic）eval 即被拒，故 feature 禁用必须保留；恢复 checks 后 348 项 37 failed（rootless/namespace 用例在 musl 静态沙箱失败），`doCheck=false` 保留。crun 1.29（上游 PR #2088）已把 YAJL 换成 json-c，`buildInputs` 用 `json_c` 替换 `yajl`，并删除已不存在的 `--enable-embedded-yajl` flag | 逐项恢复 stock features/checks，保持 musl-static | dc5d91f84032 | `packages/crun/` |
+| `catatonit` | 🩹 本地 | ✅ | 清空 installCheckPhase（缺 readelf）；详见 nix 注释 | 上游修好 check 后恢复 | 624af665418d | `packages/catatonit/` |
+| `clang-tools-18` | 📦 本地 | ❌ | 固定 LLVM 18，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-19` | 📦 本地 | ❌ | 固定 LLVM 19，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-20` | 📦 本地 | ❌ | 固定 LLVM 20，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-21` | 📦 本地 | ❌ | 固定 LLVM 21，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-22` | 📦 本地 | ❌ | 固定 LLVM 22，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `cloc` | 📦 本地 | 🟡 | `doInstallCheck=false`（沙箱无 sibling perl）+ Perl wrapper packaging；详见 nix 注释 | 只恢复可运行的 install check | 56c02bc00adc | `packages/cloc/` |
+| `cmake_3_27_9` | 📌 源码版本 + 🩹 | 🟡 | 保留 cstdint patch、`BUILD_TESTING=false`、openssl/curses 关闭；详见 nix 注释 | 上游修复后删剩余 workaround，保留版本化 output | 56c02bc00adc | `packages/cmake/3_27_9/` |
+| `cmake_4_1_2` | 📌 源码版本 + 🩹 | 🟡 | 保留 `--no-system-libs`、openssl/curses 关闭、`BUILD_TESTING=false`；详见 nix 注释 | 上游支持静态 shared-module test 后删剩余 workaround | 56c02bc00adc | `packages/cmake/4_1_2/` |
+| `conmon` | 🩹 本地 | ✅ | 清空 propagatedBuildInputs（systemd-minimal isStatic badPlatform）；详见 nix 注释 | stock unstable 无需清空即可 musl-static 构建 | 56c02bc00adc | `packages/conmon/` |
+| `copyparty` | 📦 本地 | ❌ | 纯 Python + sibling runtime + 功能裁剪 | sibling runtime、依赖裁剪和功能边界属 packaging | — | `packages/copyparty/` |
+| `crun` | 🩹 本地 | 🟡 | feature 禁用（elfutils badPlatform）+ `doCheck=false` + json-c 迁移；详见 nix 注释 | 逐项恢复 features/checks，保持 musl-static | dc5d91f84032 | `packages/crun/` |
 | `curl` | 📦 本地 | ❌ | 内置 CA bundle 与相对路径 wrapper | 自包含证书定位是 packaging | — | `packages/curl/` |
-| `diffutils` | 🩹 本地 | ✅ | 仅禁用 stock checks：unstable diffutils 3.12 的 gnulib checkPhase 在 musl-static 下 9 个多线程/setlocale 测试失败（`test-setlocale_null-mt`、`test-thread_create` 等 SIGABRT） | Linux 用 unstable 全量 checks 与 musl-static portability 验证通过 | 56c02bc00adc | `packages/diffutils/` |
-| `dive` | 📌 `25.11` | ✅ | 去 pin 实测失败：unstable 静态依赖链 dive→gpgme-static→gnupg-static→openldap-static 在 openldap 配置阶段报 `Could not locate Cyrus SASL`（`sasl.h`/`-lsasl2` 缺失），构建中断；macOS 已回归到 unstable native | Linux 用 unstable 并满足 musl-static portability | 56c02bc00adc | `manifests/default.nix` |
-| `dool` | 📦 本地 | ❌ | Python sibling runtime wrapper，并默认追加 `--bytes` | runtime 与产品默认行为必须保留 | — | `packages/dool/` |
-| `execline` | 📌 `s6-pin` + 🩹 本地 | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`：后续 unstable bump 破坏了 s6 stack 编译，整套（含 skalibs / s6-dns 等）统一钉在该 rev。此外 stock execline 2.9.9.2 用 `--enable-absolute-paths`，产物二进制文本 baked 自身 `/nix/store/.../bin` 路径（`EXECLINE_BINPREFIX`/`EXECLINE_SHEBANGPREFIX`），仍需 patch 去掉 baked prefix | 后续 unstable 修复 s6 stack 编译后去掉 pin；stock 输出不再写入 Nix store 路径 | 56c02bc00adc | `packages/execline/`, `flake.nix` |
-| `exiftool` | 📦 本地 | 🟡 | 已删 `propagatedBuildInputs = [ ArchiveZip ]` override（stock `perlPackages.ImageExifTool` 已自带 Archive-Zip 等压缩模块，模块 bundling 靠 postInstall rsync 独立于该 override）；仍保留 `doInstallCheck=false`（versionCheckPhase 跑 sibling wrapper，沙箱无 sibling perl）与 sibling Perl/模块 bundling packaging | install check 与 wrapper packaging 保留，仅在上游可运行 install check 时恢复 | 56c02bc00adc | `packages/exiftool/` |
-| `eza-ls` | 📦 本地 | ❌ | 自定义 `ls` 兼容层与 bundled eza | 这是独立产品行为，不是上游 bug | — | `packages/eza-ls/` |
+| `diffutils` | 🩹 本地 | ✅ | 禁用 checks（9 个 gnulib 多线程/setlocale 测试 SIGABRT）；详见 nix 注释 | 上游全量 checks 与 musl-static 验证通过 | 56c02bc00adc | `packages/diffutils/` |
+| `dive` | 📌 `25.11` | ✅ | 去 pin 失败（openldap 缺 Cyrus SASL）；详见 manifest 注释 | Linux 用 unstable 并满足 musl-static portability | 56c02bc00adc | `manifests/default.nix` |
+| `dool` | 📦 本地 | ❌ | Python sibling runtime wrapper，默认追加 `--bytes` | runtime 与产品默认行为必须保留 | — | `packages/dool/` |
+| `execline` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch；详见 nix 注释 | 上游修 s6 stack 后去 pin；输出无 store 路径 | 56c02bc00adc | `packages/execline/`, `flake.nix` |
+| `exiftool` | 📦 本地 | 🟡 | `doInstallCheck=false` + sibling Perl/模块 bundling；详见 nix 注释 | 仅上游可运行 install check 时恢复 | 56c02bc00adc | `packages/exiftool/` |
+| `eza-ls` | 📦 本地 | ❌ | 自定义 `ls` 兼容层与 bundled eza | 独立产品行为，不是上游 bug | — | `packages/eza-ls/` |
 | `file` | 📦 本地 | ❌ | wrapper 相对定位 `magic.mgc` | 可搬运资源定位必须保留 | — | `packages/file/` |
-| `fuse` | 🩹 本地 | 🟡 | 实测不可回归：stock `pkgsStatic.fuse`（libfuse 2.9.9）把 `util/mount.fuse.c` 的 `"su"` 替换成 `${shadow.su}/bin/su`，并让 autotools 构建解析到完整 `util-linux`，两者都拉入 `shadow -> libbsd`，其 musl-static checkPhase 在 `explicit_bzero` 用例 `SIGABRT`（fuse3 用 meson 且已走 `util-linux-minimal`，无此问题）。override 保留 bare `"su"`（运行时走 PATH）并改用 `util-linuxMinimal` 定位 `mount`/`umount`，彻底去掉 shadow 依赖 | 上游 libbsd 的 `explicit_bzero` 用例在 musl-static 下通过、或 fuse2 不再引用完整 util-linux/shadow 后删除 override | 56c02bc00adc | `packages/fuse/` |
-| `gdb` | 📌 `25.11` | ❌ | 历史 pin；已验证：unstable gdb 17.2 的构建依赖 `dejagnu → expect` 在 musl-static 下链接失败（`undefined reference to tclStubsPtr`），连带 gdb 无法构建 | 已确认两平台都必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
-| `git` | 🩹 本地 | 🟡 | 实测无可回归项：stock `pkgsStatic.git` 构建走到 test 阶段后 `t3434-rebase-i18n.sh` locale 用例 FAIL（musl-static 缺 locale 支持）；静态传递依赖与 `-static -lnghttp2` 必需；相对资源 wrapper 保留 | 逐项删除构建 workaround，保留 wrapper | 56c02bc00adc | `packages/git/` |
+| `fuse` | 🩹 本地 | 🟡 | 去 shadow/完整 util-linux 依赖（explicit_bzero SIGABRT）；详见 nix 注释 | 上游 libbsd 通过或 fuse2 不引 shadow 后删 override | 56c02bc00adc | `packages/fuse/` |
+| `gdb` | 📌 `25.11` | ❌ | 历史 pin；unstable dejagnu→expect 链接失败（tclStubsPtr）；详见 manifest 注释 | 已确认必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
+| `git` | 🩹 本地 | 🟡 | test locale FAIL + 静态传递链接 + 相对资源 wrapper；详见 nix 注释 | 逐项删构建 workaround，保留 wrapper | 56c02bc00adc | `packages/git/` |
 | `git-filter-repo` | 📦 本地 | ❌ | Python sibling runtime | runtime packaging 不会因上游构建修复消失 | — | `packages/git-filter-repo/` |
 | `glibcLocales` | 📦 override | ❌ | 只发布裁剪后的 locale 数据 | 输出裁剪是产品决策 | — | `packages/local/linux/common.nix` |
 | `gnupg` | 📦 override | ❌ | 明确启用 minimal 并关闭 GUI | feature selection 是产品决策 | — | `packages/local/common.nix` |
-| `graphviz` | 🩹 + 📦 本地 | 🟡 | stock musl-static 的 `gd -> libwebp -> giflib` 链在 giflib 构建 `libgif.so` 时因 static crt relocation 失败；Graphviz 的 `dot_static` 又通过 libltdl `.la` 引入临时 build path。包关闭 LTDL、Pango/X11/GTK、Fontconfig 与 GIF/TIFF/WebP/AVIF，保留内建布局 plugins、GTS、PNG/JPEG/FreeType；相对 launcher 绑定同包 DejaVu Sans，补齐 `dot`/布局入口并移除开发输出与依赖 shell 的 `gvmap.sh` | stock unstable 直接满足 musl-static 构建后删除编译 workaround；入口、字体和 CLI-only packaging 保留 | 56c02bc00adc | `packages/graphviz/` |
-| `gnutar` | 🩹 本地 | ✅ | gnutar gnulib `xattr-at` 与静态 libacl 都定义 `*xattrat`，GCC 15 `-fno-common` 下链接冲突，需 `-Wl,--allow-multiple-definition` | stock unstable 无 flag 也能静态链接并保留 ACL/xattr | 56c02bc00adc | `packages/gnutar/` |
-| `gocryptfs` | 🩹 本地 | 🟡 | 实测均不可回归：stock `pkgsStatic.gocryptfs` 的 `propagatedBuildInputs = [ libfido2 ]` 拉入 `pcsclite`，其 `doc` output 在 musl-static 下构建失败；libfido2 并非链接依赖（FIDO2 支持通过 `os/exec` 调用宿主 `fido2-assert`/`fido2-cred`），故清空 `propagatedBuildInputs`。清空后 cgo 的 `#cgo pkg-config: libcrypto` 在 cross 构建下找不到 `libcrypto.pc`，需显式设 `PKG_CONFIG_PATH` 指向静态 openssl 的 dev output | 上游 pcsclite 的 doc output 在 musl-static 下可构建、且 cross cgo 能自动定位 openssl `.pc` 后删除对应 workaround | 56c02bc00adc | `packages/gocryptfs/` |
-| `gpgme` | 🩹 本地 | 🟡 | 实测均不可回归：stock 完整 gnupg 依赖树拖入 openldap 报 `Could not locate Cyrus SASL`，minimalGnuPG 必须保留；保留 minimal 后恢复 checks 又因静态 gpg-agent 无法启动报 `gpg: failed to start gpg-agent`，`--disable-gpg-test`+`doCheck=false` 保留 | 逐项恢复依赖与 checks，保持 musl-static | 56c02bc00adc | `packages/gpgme/` |
-| `libarchive` | 🩹 本地 | ✅ | stock 静态 `bsdtar`/`bsdcpio`/`bsdunzip` 内嵌 OpenSSL output 和 libxml2 catalog 的 Nix store 路径；本地 override 关闭 XAR/libxml2，并把静态 OpenSSL 的配置、engine 与 module 默认目录改为系统路径，保留 ZIP AES 支持 | stock unstable 四个 CLI 均不内嵌 Nix store 路径并保持 musl-static、TAR/ZIP/AES smoke test 通过 | 56c02bc00adc | `packages/libarchive/` |
-| `libewf` | 🩹 本地 | ✅ | radare2/rizin 依赖。stock `pkgsStatic.libewf` 的 configure 有两个 OpenSSL `AC_RUN_IFELSE` 探针（`xts_duplicate_keys`、`evp_zlib_compatible`），在我们的同 arch musl cross（`buildPlatform.canExecute hostPlatform` 为 true，但 triple 不同使 autoconf `cross_compiling=yes`）下报 "cannot run test program while cross compiling" 中断。nixpkgs 只在 `!canExecute` 时预置 cache，且只设了 `xts_duplicate_keys`；override 按 triple 差异（`hostPlatform.config != buildPlatform.config`）补齐两个 `ac_cv_*` cache 变量 | 上游 libewf 在同 arch cross 下不依赖运行探针（或 nixpkgs 按 `cross_compiling` 而非 `canExecute` 预置全部 cache）后删除 override | dc5d91f84032 | `packages/libewf/` |
+| `graphviz` | 🩹 + 📦 本地 | 🟡 | 关闭 LTDL/GIF/TIFF/WebP 等 + 相对字体入口；详见 nix 注释 | stock 直接 musl-static 后删编译 workaround；入口/字体/CLI packaging 保留 | 56c02bc00adc | `packages/graphviz/` |
+| `gnutar` | 🩹 本地 | ✅ | `-Wl,--allow-multiple-definition`（xattrat 符号冲突）；详见 nix 注释 | stock 无 flag 也能静态链接并保留 ACL/xattr | 56c02bc00adc | `packages/gnutar/` |
+| `gocryptfs` | 🩹 本地 | 🟡 | 清空 propagatedBuildInputs + 设 PKG_CONFIG_PATH；详见 nix 注释 | 上游 pcsclite doc 可构建、cross cgo 自动定位 openssl 后删 | 56c02bc00adc | `packages/gocryptfs/` |
+| `gpgme` | 🩹 本地 | 🟡 | minimalGnuPG + `--disable-gpg-test` + `doCheck=false`；详见 nix 注释 | 逐项恢复依赖与 checks，保持 musl-static | 56c02bc00adc | `packages/gpgme/` |
+| `libarchive` | 🩹 本地 | ✅ | 去 Nix store 路径、关 XAR/libxml2、保留 ZIP AES；详见 nix 注释 | stock 四 CLI 无 store 路径且 musl-static、smoke 通过 | 56c02bc00adc | `packages/libarchive/` |
+| `libewf` | 🩹 本地 | ✅ | radare2/rizin 依赖；补 cross OpenSSL 探针 cache；详见 nix 注释 | 上游同 arch cross 不依赖运行探针后删 override | dc5d91f84032 | `packages/libewf/` |
 | `libtool` | 📦 本地 | ❌ | 改写 `libtoolize` 的 baked data paths | 相对资源定位必须保留 | — | `packages/libtool/` |
-| `lua5_5` | 🩹 本地 | ✅ | stock Lua 把自身 Nix output 编译进默认 `package.path`/`package.cpath`；本地 override 恢复上游 `/usr/local` root，避免 standalone runtime 引用 Nix store | stock 默认 module paths 不再包含 Nix store 路径 | 56c02bc00adc | `packages/lua/` |
+| `lua5_5` | 🩹 本地 | ✅ | 恢复 `/usr/local` module paths，避免嵌 store 路径；详见 nix 注释 | stock 默认 module paths 无 store 路径 | 56c02bc00adc | `packages/lua/` |
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |
 | `markdownlint-cli2` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/markdownlint-cli2/` |
 | `miniserve` | 📦 本地 | ❌ | wrapper 设置仓库要求的默认功能开关 | 产品行为必须保留 | — | `packages/miniserve/` |
 | `music-decrypto` | ⚠️ glibc 动态 | 🟡 | Linux 仅长期审计 .NET AOT | Linux 出现 musl-static AOT | 56c02bc00adc | `packages/music-decrypto/` |
 | `netron` | 📦 本地 | ❌ | wheel 重打包并绑定 sibling/宿主 Python | runtime packaging 必须保留 | — | `packages/netron/` |
-| `nodejs-slim24` | 🩹 本地 | 🟡 | 已删 `uvwasi` 与 `hdrhistogram_c` override（stock 已传 `UVWASI_BUILD_SHARED=FALSE` 及 hdrhistogram 的 SHARED-off + `libhdr_histogram.a` symlink，重复 `ln -s` 会以 `File exists` 失败）；仍保留 `ada`/`libuv` 的 doCheck 与 node 级 configureFlags | 逐 patch 验证删除，保留 Node 24 runtime 产品 | 56c02bc00adc | `packages/nodejs/24/` |
-| `nodejs-slim26` | 🩹 本地 | 🟡 | 已删 `uvwasi` 与 `hdrhistogram_c` override（同 node24，stock 已处理 SHARED-off + symlink）；仍保留 `ada`/`libuv`/`lief`（maturin musl cdylib 失败）/`temporal_capi`（pkg-config 缺失）与 node 级 configureFlags | 逐 patch 删除，最终满足各平台动态依赖规则 | 56c02bc00adc | `packages/nodejs/26/` |
+| `nodejs-slim24` | 🩹 本地 | 🟡 | 保留 `ada`/`libuv` doCheck 与 node configureFlags；详见 nix 注释 | 逐 patch 验证删除，保留 Node 24 runtime | 56c02bc00adc | `packages/nodejs/24/` |
+| `nodejs-slim26` | 🩹 本地 | 🟡 | 保留 `ada`/`libuv`/`lief`/`temporal_capi` 与 configureFlags；详见 nix 注释 | 逐 patch 删除，满足各平台动态依赖规则 | 56c02bc00adc | `packages/nodejs/26/` |
 | `nsight-systems` | ⚠️ 预编译 glibc | ⏳ | NVIDIA 只提供 glibc 动态发行物 | 上游提供可用的 musl-static 发行物 | — | `packages/nsight-systems/` |
 | `opencommit` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/opencommit/` |
-| `openssh_gssapi` | 🩹 + 📦 本地 | ❌ | wrappers 相对定位 ssh 与 sshd helpers；服务端关闭预认证 sandbox，因为 QEMU user-mode 明确拒绝 guest seccomp，rlimit sandbox 也会让跨架构容器在 SSH 握手前断连；消费者必须把监听面限制在可信边界 | 可搬运 helper 定位与跨架构 SSH 必须保留 | — | `packages/openssh_gssapi/` |
-| `poppler` | 🩹 本地 | 🟡 | stock `poppler-utils` 在 musl-static 下先因默认 feature 拉入 `nss -> p11-kit` 而被 `badPlatforms = isStatic` 拒绝；改成 `minimal + utils` 后仍需关闭 `openjpeg`（否则走 `libtiff -> giflib` 共享库链）、显式 `BUILD_TESTING=OFF`，并在顶层 `CMakeLists.txt` 补 `fontconfig`/`freetype`/`expat`/`bzip2`/`brotli` 的静态传递链接 | unstable `poppler-utils` 直接满足 musl-static，或仅保留产品层命名差异 | 56c02bc00adc | `packages/poppler/` |
-| `pkgconf` | 🩹 本地 | ✅ | stock `pkgconf-unwrapped` 把自身 Nix output 的 `.pc`、system lib/include 与 personality 路径编译进二进制；本地 override 改用标准 `/usr` 与 `/usr/local` 路径，避免 standalone 产物残留 `/nix/store` | stock 二进制不再编译进 Nix store 路径 | 56c02bc00adc | `packages/pkgconf/` |
+| `openssh_gssapi` | 🩹 + 📦 本地 | ❌ | 相对定位 helpers + 关预认证 sandbox（QEMU 拒 seccomp）；详见 nix 注释 | 可搬运 helper 定位与跨架构 SSH 必须保留 | — | `packages/openssh_gssapi/` |
+| `poppler` | 🩹 本地 | 🟡 | minimal+utils、关 openjpeg、补静态传递链接；详见 nix 注释 | unstable 直接 musl-static 或仅保留命名差异 | 56c02bc00adc | `packages/poppler/` |
+| `pkgconf` | 🩹 本地 | ✅ | 改系统路径，避免二进制残留 store 路径；详见 nix 注释 | stock 二进制不再编译进 store 路径 | 56c02bc00adc | `packages/pkgconf/` |
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/parallel/` |
-| `patchelf` | 📌 `25.05` | ✅ | 历史 pin；已验证：unstable patchelf 0.15.2 `make check` 编译测试用 `.so` 时报 `R_X86_64_32 against hidden symbol __TMC_END__`（musl-static crt 与 PIC 冲突），构建失败 | Linux 用 unstable 构建并满足 musl-static portability | 56c02bc00adc | `manifests/default.nix` |
-| `perl` | 🩹 + 📦 本地 | 🟡 | 实测无可回归项：注入 Compress::Raw::Lzma + IO::Compress::Brotli 的静态 XS 必需，stock perl `require` 直接 `Can't locate Compress/Raw/Lzma.pm`（unstable 未 vendor 这两个模块）；wrapper 保留 | 只删除 stock 已覆盖的依赖/link patch | 56c02bc00adc | `packages/perl/` |
+| `patchelf` | 📌 `25.05` | ✅ | 历史 pin；unstable check `__TMC_END__` relocation 失败；详见 manifest 注释 | Linux 用 unstable 并满足 musl-static portability | 56c02bc00adc | `manifests/default.nix` |
+| `perl` | 🩹 + 📦 本地 | 🟡 | 注入 Compress::Raw::Lzma + IO::Compress::Brotli 静态 XS + wrapper；详见 nix 注释 | 只删 stock 已覆盖的依赖/link patch | 56c02bc00adc | `packages/perl/` |
 | `pnpm` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/pnpm/` |
-| `podman5` | 🩹 + 📦 本地 | 🟡 | 跟随 nixpkgs 5.x；保留 musl aardvark-dns、静态 runc 解包、sibling helper/PATH 限制、policy env backport（移除 libpod 宿主默认路径覆盖）、registry env 入口与 drop-in 封闭。共享 bin/conf/tests、独立 nix；固定 native overlay+sqlite、cgroupfs、crun、netavark+nftables；携带 nft、BusyBox、CA，seccomp 使用内置 profile；禁用宿主 LSM profile。统一内部双栈 bridge，适用双栈与 IPv6-only 宿主，无网络/backend 探测；CDI 仅 /etc/cdi；保留 socket activation 与停止容器边界 | 分别回归编译修正；packaging 保留。x86_64 完整构建与真实网络 loader 测试通过，aarch64 本轮仅 eval；真实网络受 Workspace CAP_NET_ADMIN 限制 | dc5d91f84032 | `packages/podman/AGENTS.md`、`packages/podman/podman5.nix` |
-| `podman6` | 📌 + 🩹 + 📦 本地 | 🟡 | 固定 6.1.0；共享 bin/conf/tests、独立 nix；保留 musl aardvark-dns、静态 runc 解包、sibling helper/PATH 限制。registry 显式路径仍加载 drop-ins，使用 DoNotLoadDropInFiles 封闭；policy env 原生支持。固定 native overlay+sqlite、cgroupfs、crun、netavark+nftables，携带 nft、BusyBox、CA，seccomp 使用内置 profile；统一内部双栈 bridge，无 backend 探测；要求 cgroup v2 | 分别回归 pin/编译修正；packaging 保留。x86_64 完整构建与真实网络 loader 测试通过，aarch64 本轮仅 eval；当前 Workspace cgroup v1 不能验证 v6 runtime | dc5d91f84032 | `packages/podman/AGENTS.md`、`packages/podman/podman6.nix` |
-| `postgresql` | 🩹 + 📦 本地 | 🟡 | 实测无可回归项：`gccAsClang`（否则 generic.nix 切 clang 报 `C compiler cannot create executables`）与其绑定的去 `-flto` 必需；`curlSupport=false`（打开报 library 'curl' does not provide curl_multi_init）、`gssSupport=false`（gss_store_cred_into 缺失）必需；psql-only 产品边界保留 | 逐项删 workaround，保留 psql-only 输出 | 56c02bc00adc | `packages/postgresql/` |
+| `podman5` | 🩹 + 📦 本地 | 🟡 | 跟随 5.x；packaging 与产品边界见 podman AGENTS.md | 分别回归编译修正；packaging 保留 | dc5d91f84032 | `packages/podman/AGENTS.md`、`packages/podman/podman5.nix` |
+| `podman6` | 📌 + 🩹 + 📦 本地 | 🟡 | 固定 6.1.0；packaging 与产品边界见 podman AGENTS.md | 分别回归 pin/编译修正；packaging 保留 | dc5d91f84032 | `packages/podman/AGENTS.md`、`packages/podman/podman6.nix` |
+| `postgresql` | 🩹 + 📦 本地 | 🟡 | `gccAsClang`、关 curl/gss、psql-only 边界；详见 nix 注释 | 逐项删 workaround，保留 psql-only 输出 | 56c02bc00adc | `packages/postgresql/` |
 | `prettier` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/prettier/` |
-| `protobuf3_20` | 📌 `24.05` | ❌ | unstable 已删除该版本：属性不存在，去 pin 后 `base.${name} or null` 静默产出空包，非有效回归 | 只能改指 unstable 现存版本别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
-| `protobuf3_21` | 📌 `24.05` | ❌ | unstable 已把该属性改为 throwing alias（renamed to `protobuf_21`），去 pin 后 eval 报错 | 只能改指 unstable 现存版本别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
-| `protobuf_23` | 📌 `24.05` | ❌ | unstable 已删除该版本：属性不存在，去 pin 后静默产出空包，非有效回归 | 只能改指 unstable 现存版本别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
-| `protobuf_24` | 📌 `25.05` | ❌ | unstable 已 removed 该版本（throwing alias），去 pin 后 eval 报错 | 只能改指 unstable 现存版本别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
-| `protobuf_26` | 📌 `25.05` | ❌ | unstable 已 removed 该版本（throwing alias），去 pin 后 eval 报错 | 只能改指 unstable 现存版本别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
-| `protobuf_28` | 📌 `25.05` | ❌ | unstable 已 removed 该版本（throwing alias），去 pin 后 eval 报错 | 只能改指 unstable 现存版本别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
+| `protobuf3_20` | 📌 `24.05` | ❌ | unstable 已删除该版本，去 pin 静默产出空包；详见 manifest 注释 | 只能改指现存别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
+| `protobuf3_21` | 📌 `24.05` | ❌ | unstable 已改 throwing alias，去 pin eval 报错；详见 manifest 注释 | 只能改指现存别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
+| `protobuf_23` | 📌 `24.05` | ❌ | unstable 已删除该版本，去 pin 静默产出空包；详见 manifest 注释 | 只能改指现存别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
+| `protobuf_24` | 📌 `25.05` | ❌ | unstable 已 removed（throwing alias），去 pin eval 报错；详见 manifest 注释 | 只能改指现存别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
+| `protobuf_26` | 📌 `25.05` | ❌ | unstable 已 removed（throwing alias），去 pin eval 报错；详见 manifest 注释 | 只能改指现存别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
+| `protobuf_28` | 📌 `25.05` | ❌ | unstable 已 removed（throwing alias），去 pin eval 报错；详见 manifest 注释 | 只能改指现存别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |
 | `protobuf_3_8_0` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.8.0 | 版本化产品，不回到最新 upstream | — | `packages/protobuf/3_8_0/` |
 | `protobuf_3_9_2` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.9.2 | 版本化产品，不回到最新 upstream | — | `packages/protobuf/3_9_2/` |
 | `python311` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/python/` |
@@ -89,26 +80,26 @@ libpod 运行目录沿用 `/run/libpod`，确保宿主重启后由上游刷新�
 | `python313` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/python/` |
 | `python314` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/python/` |
 | `python315` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/python/` |
-| `radare2` | 🩹 本地 | ✅ | 除共享的 libewf override 外，其 bundled sdb 子项目用 meson `both_libraries()`，即使 `default_library=static` 也会构建 libsdb `.so`，musl 纯静态链接该 `.so` 报 `R_X86_64_32 against hidden symbol __TMC_END__`；postUnpack 把 sdb 的 `both_libraries`→`library`（只出 `.a`）并把随之失效的 `.get_shared_lib()`/`.get_static_lib()` 改为直接用 library 对象，同时把 radare2 自身 meson 里 `libsdb_dynamic` 指向 `libsdb_static` | 上游 sdb 在静态构建下不再产出 `.so`（或 nixpkgs 传 `default_library=static` 时改用 `library`）后删除 override | dc5d91f84032 | `packages/radare2/` |
+| `radare2` | 🩹 本地 | ✅ | libewf override + sdb `both_libraries`→`library`；详见 nix 注释 | 上游 sdb 静态构建不产 `.so` 后删 override | dc5d91f84032 | `packages/radare2/` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
-| `rizin` | 🩹 本地 | ✅ | 除共享的 libewf/tree-sitter override 外还有三处 cross-static 修复：(a) meson.build 调 `meson.get_compiler('c', native: true)`，stock 缺 `depsBuildBuild`，报 "Tried to access compiler for language c, not specified for build machine"，补 `buildPackages.stdenv.cc`；(b) cross 构建下 rizin 编译 native rz_util（build 期跑 sdb_gen），需 `pcre2_cross_native`/`softfloat_cross_native` wrap 子项目，被 `-Dwrap_mode=nodownload` 禁止下载，postPatch 从 tarball 已含的 `pcre2-10.47`+packagefiles 与 `softfloat` 拷出这两个目录；(c) bundled libdemangle 用 `both_libraries()` 强制 `.so`，musl-static 链接报 "failed to set dynamic section sizes: bad value"，改成 `library()` 并把 `.get_static_lib()`/`.get_shared_lib()` 改为直接用 library 对象 | 上游 rizin 补齐 native cc 的 build inputs、cross 不再需要下载 wrap、libdemangle 静态构建不产出 `.so` 后逐项删除 | dc5d91f84032 | `packages/rizin/` |
-| `runc` | 📦 native selection | ❌ | Linux 容器运行时，依赖 namespaces/cgroups，无 macOS 构建目标 | 无 macOS 端可回归空间（平台固有） | — | `manifests/default.nix` |
-| `s6` | 📌 `s6-pin` + 🩹 本地 | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。此外 stock s6 2.15.1.0 产物多数二进制文本 baked 自身 `/nix/store/.../bin`（如 s6-svscan 引用 s6-supervise），仍需 patch 去 baked prefix | 后续 unstable 修复 s6 stack 编译后去掉 pin；stock 输出不再写入 Nix store 路径 | 56c02bc00adc | `packages/s6/`, `flake.nix` |
-| `s6-linux-init` | 📌 `s6-pin` + 🩹 本地 | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。此外 stock `s6-linux-init-maker` baked `#!/nix/store/...execlineb` 及 execline/s6 helper 绝对路径，会写进生成的 init 脚本，仍需 patch；额外的 out+bin symlinkJoin 属结构性 packaging | 后续 unstable 修复 s6 stack 编译后去掉 pin；stock 产物与生成脚本无 Nix store 路径 | 56c02bc00adc | `packages/s6-linux-init/`, `flake.nix` |
-| `s6-rc` | 📌 `s6-pin` + 🩹 本地 | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。此外 stock `s6-rc-compile` baked `#!/nix/store/...execlineb -S0` 及 fdmove/s6-fdholder-retrieve 等绝对路径，会写进 compile 生成的 service scripts，仍需 patch | 后续 unstable 修复 s6 stack 编译后去掉 pin；stock 产物与生成服务无 Nix store 路径 | 56c02bc00adc | `packages/s6-rc/`, `flake.nix` |
-| `s6-dns` | 📌 `s6-pin` | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。除 pin 外直接用 manifest 上游包，无本地 patch | 后续 unstable 修复 s6 stack 编译后去掉 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
-| `s6-linux-utils` | 📌 `s6-pin` | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。除 pin 外直接用 manifest 上游包，无本地 patch | 后续 unstable 修复 s6 stack 编译后去掉 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
-| `s6-networking` | 📌 `s6-pin` | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。除 pin 外直接用 manifest 上游包，无本地 patch | 后续 unstable 修复 s6 stack 编译后去掉 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
-| `s6-portable-utils` | 📌 `s6-pin` | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。除 pin 外直接用 manifest 上游包，无本地 patch | 后续 unstable 修复 s6 stack 编译后去掉 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
-| `skalibs` | 📌 `s6-pin` | 🟡 | pin 到 `nixpkgs-s6` 固定 unstable rev `56c02bc00adc`（s6 stack 统一，见 `execline` 行）。除 pin 外直接用 manifest 上游包，无本地 patch | 后续 unstable 修复 s6 stack 编译后去掉 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
-| `starship` | 📦 本地 | ❌ | 随二进制预生成 `share/starship/init.zsh`（build 期用 native `starship init zsh` 生成），并注入 prologue 用 `${(%):-%x}` 相对定位同包 `bin/starship`，把上游 baked 的绝对二进制路径改写为该相对路径，使可搬运产物无 Nix store 路径 | 预生成 init 与相对定位属产品行为，无上游回归空间 | — | `packages/starship/` |
-| `sudo` | 🩹 本地 | 🟡 | stock `pkgsStatic.sudo` 无条件 `buildInputs = [ pam ]`，linux-pam 的 `badPlatforms` 含 `isStatic`，musl-static 下 eval 即被拒。override 用 `sudo.override { pam = null; }` 去掉 pam 引用（解除 fail-closed）并 `--disable-pam`，得到 musl 纯静态产物。setuid 位无法在 tarball 中保留，主 `sudo` 运行时会因 "must be owned by uid 0" 拒绝执行（提权需外部设置 setuid）；`visudo`/`cvtsudoers` 等子命令可直接运行 | 上游 pam 可静态化（或 stock sudo 提供无 pam 的静态路径）后删除 override；setuid 与产品边界保留 | dc5d91f84032 | `packages/sudo/` |
+| `rizin` | 🩹 本地 | ✅ | libewf/tree-sitter override + 三处 cross-static 修复；详见 nix 注释 | 上游补齐 native cc/wrap/静态构建后逐项删 | dc5d91f84032 | `packages/rizin/` |
+| `runc` | 📦 native selection | ❌ | Linux 容器运行时，无 macOS 构建目标 | 无 macOS 端可回归空间（平台固有） | — | `manifests/default.nix` |
+| `s6` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch；详见 nix 注释 | 上游修 s6 stack 后去 pin；输出无 store 路径 | 56c02bc00adc | `packages/s6/`, `flake.nix` |
+| `s6-linux-init` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch + symlinkJoin；详见 nix 注释 | 上游修 s6 stack 后去 pin；产物与生成脚本无 store 路径 | 56c02bc00adc | `packages/s6-linux-init/`, `flake.nix` |
+| `s6-rc` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch；详见 nix 注释 | 上游修 s6 stack 后去 pin；产物与生成服务无 store 路径 | 56c02bc00adc | `packages/s6-rc/`, `flake.nix` |
+| `s6-dns` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch；详见 flake.nix | 上游修 s6 stack 后去 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
+| `s6-linux-utils` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch；详见 flake.nix | 上游修 s6 stack 后去 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
+| `s6-networking` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch；详见 flake.nix | 上游修 s6 stack 后去 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
+| `s6-portable-utils` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch；详见 flake.nix | 上游修 s6 stack 后去 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
+| `skalibs` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch；详见 flake.nix | 上游修 s6 stack 后去 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
+| `starship` | 📦 本地 | ❌ | 预生成相对定位 init.zsh；详见 nix 注释 | 预生成 init 与相对定位属产品行为，无回归空间 | — | `packages/starship/` |
+| `sudo` | 🩹 本地 | 🟡 | 去 pam（`--disable-pam`）纯静态；setuid 外部设置；详见 nix 注释 | 上游 pam 可静态化后删 override；setuid 边界保留 | dc5d91f84032 | `packages/sudo/` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
-| `tree-sitter` | 🩹 本地 | ✅ | rizin 依赖。stock `pkgsStatic.tree-sitter` 的 postPatch 用 `sed` 的 range（`/^install:/,/^[^[:space:]]/`）想删掉 Makefile 里的共享库安装行，但该 range 在 `install:` 行本身立即终止，`.so` 安装/软链行未被删除，静态构建下 `make install` 报 `install: cannot stat 'libtree-sitter.so'`；override 用精确 `sed` 删除 3 行 `.so` 安装/软链 | 上游 nixpkgs 修正 sed range（或 tree-sitter 静态构建不安装 `.so`）后删除 override | dc5d91f84032 | `packages/tree-sitter/` |
+| `tree-sitter` | 🩹 本地 | ✅ | rizin 依赖；精确删 `.so` 安装行（sed range 缺陷）；详见 nix 注释 | 上游修正 sed range 或静态不装 `.so` 后删 override | dc5d91f84032 | `packages/tree-sitter/` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |
-| `watchexec` | 🩹 本地 | ✅ | stock 在 workspace 根执行裸 `cargo build`，install hook 会把测试 crate `test-socketfd` 一并发布；本地 override 用 `--package=watchexec-cli` 只构建产品 CLI | stock 输出不再包含 `test-socketfd`，且最终产物满足 musl-static portability | 56c02bc00adc | `packages/watchexec/` |
-| `wget` | 🩹 + 📦 本地 | 🟡 | 实测无可回归项：恢复 checks 后 `wget_options_fuzzer` 段错误（exit 139）且缺 fuzzer corpus，`doCheck=false` 必需；CA wrapper packaging 保留 | 恢复 checks/build tool 后保留 CA packaging | 56c02bc00adc | `packages/wget/` |
-| `zellij` | 🩹 checks | 🟡 | 已去掉 `26.05` pin，改用 unstable `zellij-unwrapped`（0.44.3，static-pie musl 达标）；仍保留 `doCheck=false`/`doInstallCheck=false`（test target 静态链 libcurl 时 libssh2 符号未解析：`undefined reference to libssh2_crypto_engine` 等） | 上游 test target 静态链接修复后恢复 checks | 56c02bc00adc | `packages/zellij/`, `packages/local/linux/common.nix` |
-| `zsh` | 🩹 + 📦 本地 | 🟡 | 已删除过时的 fortify ICE workaround 与 termcap 源码 patch；实测无 module patch 时 `zmodload zsh/system`、`zsh/regex`、`zsh/mathfunc` 均失败，三个 `link=either` 必须保留；FPATH wrapper 和 zshenv policy 属 packaging | 上游静态构建默认内建三个 module 后删除剩余 patch，保留 relocation packaging | 56c02bc00adc | `packages/zsh/` |
+| `watchexec` | 🩹 本地 | ✅ | `--package=watchexec-cli` 排除 test crate；详见 nix 注释 | stock 输出不含 `test-socketfd` 且满足 portability | 56c02bc00adc | `packages/watchexec/` |
+| `wget` | 🩹 + 📦 本地 | 🟡 | `doCheck=false`（fuzzer segfault）+ CA wrapper packaging；详见 nix 注释 | 恢复 checks/build tool 后保留 CA packaging | 56c02bc00adc | `packages/wget/` |
+| `zellij` | 🩹 checks | 🟡 | 去 `26.05` pin 改 unstable，仍禁 checks（test 静态链符号未解析）；详见 nix 注释 | 上游 test 静态链接修复后恢复 checks | 56c02bc00adc | `packages/zellij/`, `packages/local/linux/common.nix` |
+| `zsh` | 🩹 + 📦 本地 | 🟡 | 三个 `link=either` module + FPATH wrapper/zshenv packaging；详见 nix 注释 | 上游默认内建三 module 后删 patch，保留 packaging | 56c02bc00adc | `packages/zsh/` |
 | `zsh-plugins` | 📦 本地 | ❌ | 聚合 oh-my-zsh 与 plugins | plugin bundle 是产品 | — | `packages/zsh-plugins/` |

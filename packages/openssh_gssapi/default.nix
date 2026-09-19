@@ -32,7 +32,9 @@ in
 openssh_gssapi.overrideAttrs (oldAttrs: {
   configureFlags = (oldAttrs.configureFlags or [ ]) ++ [
     # QEMU user-mode cannot run OpenSSH's seccomp or rlimit pre-authentication
-    # sandboxes. The service is restricted to the host loopback by devspace.
+    # sandboxes (the rlimit sandbox also drops cross-arch containers before the
+    # SSH handshake completes). The service is restricted to the host loopback
+    # by devspace.
     "--with-sandbox=none"
   ];
 

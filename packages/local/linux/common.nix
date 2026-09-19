@@ -33,17 +33,11 @@ rec {
   openssh_gssapi = pkgsStatic.callPackage ../../openssh_gssapi { };
   poppler = pkgsStatic.callPackage ../../poppler { };
   postgresql = pkgsStatic.callPackage ../../postgresql { };
-  # sudo drops pam (--disable-pam) to clear pkgsStatic's isStatic badPlatform and
-  # link fully static; ships a relocatable binary only (setuid applied out of
-  # band). See packages/sudo.
   sudo = pkgsStatic.callPackage ../../sudo { };
   wget = pkgsStatic.callPackage ../../wget/linux.nix { };
 
   # Rust.
   miniserve = pkgsStatic.callPackage ../../miniserve { };
-  # zellij builds against unstable but keeps checks disabled (the test target
-  # statically links libcurl against libssh2 and fails on unresolved symbols);
-  # see docs/package-strategies/rust.md.
   zellij = pkgsStatic.callPackage ../../zellij { };
 
   # Perl.
@@ -72,8 +66,7 @@ rec {
     version = "22.0.0";
   };
 
-  # Python. python311 is x86_64-only (its musl-static cross build currently
-  # fails on aarch64-linux); see ./x86_64.nix and the docs regression table.
+  # Python. python311 is x86_64-only; see ./x86_64.nix.
   python312 = mkPython {
     python = pkgsStatic.python312;
     setupLocal = ../../python/312/Setup.local;
@@ -95,10 +88,8 @@ rec {
   };
   dool = pkgs.callPackage ../../dool { };
 
-  # s6 stack. Pinned to s6PkgsStatic (a fixed unstable revision) instead of the
-  # default unstable pkgsStatic: a later unstable bump broke these builds. The
-  # manifest-driven s6 upstream packages are pinned to the same revision; see
-  # flake.nix (nixpkgs-s6) and manifests/default.nix.
+  # s6 stack. Built against s6PkgsStatic (a pinned static set) instead of
+  # unstable; see flake.nix (nixpkgs-s6) for why.
   execline = s6PkgsStatic.callPackage ../../execline { };
   s6 = s6PkgsStatic.callPackage ../../s6 {
     inherit execline;
@@ -115,9 +106,6 @@ rec {
   conmon = pkgsStatic.callPackage ../../conmon { };
   crun = pkgsStatic.callPackage ../../crun { };
   gpgme = pkgsStatic.callPackage ../../gpgme { };
-  # aardvark-dns 2.1.0 uses `libc::close_range`, which the musl bindings do not
-  # provide; the local override switches it to the raw syscall so podman's helper
-  # bundle builds under musl-static. See packages/aardvark-dns/.
   aardvark-dns = pkgsStatic.callPackage ../../aardvark-dns { };
   podman5 = pkgsStatic.callPackage ../../podman/podman5.nix {
     inherit
@@ -138,9 +126,8 @@ rec {
       ;
   };
 
-  # Node.js runtime and sibling-runtime tools. On Linux `pkgsStatic` is the
-  # musl64 cross static set (see flake.nix / mkEnv), so node's Rust deps reuse
-  # the cached glibc toolchain; see docs/package-strategies/nodejs.md.
+  # Node.js runtime and sibling-runtime tools; see
+  # docs/package-strategies/nodejs.md.
   nodejs-slim24 = pkgsStatic.callPackage ../../nodejs/24 {
     inherit (pkgs) python3;
   };

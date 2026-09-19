@@ -6,6 +6,14 @@
   pkg-config,
 }:
 
+# cmake 4.1.2 — versioned musl-static build.
+#
+# Workarounds still required (see also cmake/3_27_9):
+#   - `--no-system-libs`, `CMAKE_USE_OPENSSL = false`, `BUILD_CursesDialog =
+#     false`: build self-contained, dropping openssl and curses.
+#   - `BUILD_TESTING = false`: same shared-module test link failure under
+#     musl-static as 3.27.9.
+#
 # https://github.com/NixOS/nixpkgs/blob/59011787de6d841fcc5e3c0fd7f5d3247ff37a18/pkgs/by-name/cm/cmake/package.nix
 
 stdenv.mkDerivation (finalAttrs: {
