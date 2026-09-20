@@ -39,6 +39,7 @@ rec {
   wget = pkgsStatic.callPackage ../../wget/linux.nix { };
 
   # Rust.
+  codex = pkgsStatic.callPackage ../../codex { };
   miniserve = pkgsStatic.callPackage ../../miniserve { };
   zellij = pkgsStatic.callPackage ../../zellij { };
 
