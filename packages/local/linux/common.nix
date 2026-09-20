@@ -18,6 +18,7 @@ rec {
   nsight-systems = pkgsStatic.callPackage ../../nsight-systems { };
 
   # C / autotools.
+  busybox = pkgsStatic.callPackage ../../busybox { };
   cmake_3_27_9 = pkgsStatic.callPackage ../../cmake/3_27_9 { };
   cmake_4_1_2 = pkgsStatic.callPackage ../../cmake/4_1_2 { };
   diffutils = pkgsStatic.callPackage ../../diffutils { };

@@ -1,0 +1,18 @@
+diff --git a/networking/udhcp/dhcpc.c b/networking/udhcp/dhcpc.c
+index 1a7bcb7ca..6cbe6fc3f 100644
+--- a/networking/udhcp/dhcpc.c
++++ b/networking/udhcp/dhcpc.c
+@@ -1226 +1226,12 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
+-	client_data.script = CONFIG_UDHCPC_DEFAULT_SCRIPT;
++	{
++		char *busybox_path = xmalloc_readlink("/proc/self/exe");
++		char *slash;
++		if (!busybox_path)
++			bb_simple_perror_msg_and_die("/proc/self/exe");
++		slash = strrchr(busybox_path, '/');
++		if (!slash)
++			bb_simple_error_msg_and_die("invalid /proc/self/exe");
++		*slash = '\0';
++		client_data.script = xasprintf("%s/../share/udhcpc/default.script", busybox_path);
++		free(busybox_path);
++	}

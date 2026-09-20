@@ -13,6 +13,7 @@ Podman 的 systemd packaging 产品边界见 [`packages/podman/AGENTS.md`](../..
 | `aardvark-dns` | 🩹 本地 | ✅ | musl 无 `close_range` wrapper，patch 改用 raw syscall；详见 nix 注释 | 上游改用 musl-safe close_range 后删 patch | 56c02bc00adc | `packages/aardvark-dns/` |
 | `atuin` | 📦 本地 | 🟡 | 预生成相对定位 init.zsh；详见 nix 注释 | 预生成 init 属产品行为保留 | dc5d91f84032 | `packages/atuin/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
+| `busybox` | 🩹 + 📦 本地 | 🟡 | udhcpc 与配套脚本改为 sibling 相对定位；详见 nix 注释 | 上游支持可搬运资源定位后删 patch；保留脚本 packaging | dc5d91f84032 | `packages/busybox/` |
 | `catatonit` | 🩹 本地 | ✅ | 补 build-for-build binutils 让 installCheck 的 readelf 可用；详见 nix 注释 | 上游把 binutils 加进 nativeBuildInputs 后恢复 | dc5d91f84032 | `packages/catatonit/` |
 | `clang-tools-18` | 📦 本地 | ❌ | 固定 LLVM 18，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-19` | 📦 本地 | ❌ | 固定 LLVM 19，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
