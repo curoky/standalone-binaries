@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+root="@PODMAN_ROOT@"
+user="@PODMAN_USER@"
+exec @S6_SETUIDGID@ "$user" "$root/bin/podman-server" --stop-all

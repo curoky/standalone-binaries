@@ -1,11 +1,15 @@
 # Linux 回归表（跨架构共享）
 
+<!-- markdownlint-disable MD013 -->
+
 适用于 x86_64-linux 与 aarch64-linux，只列该平台有定制的包。仅 aarch64-linux 特有的差异见
 [`linux-aarch64.md`](linux-aarch64.md)。表格约定、状态/定制图例与批量回归命令见
 [`AGENTS.md`](AGENTS.md)。
 
 `原因与保留边界`、`回归判据` 两列只给摘要，完整说明见「来源」列指向的 nix 文件注释；
-Podman 的 systemd packaging 产品边界见 [`packages/podman/AGENTS.md`](../../packages/podman/AGENTS.md)。
+Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
+[`packages/podman/DESIGN.md`](../../packages/podman/DESIGN.md) 和
+[`packages/podman-rootless/DESIGN.md`](../../packages/podman-rootless/DESIGN.md)。
 
 | 包 | 定制 | 回归 | 原因与保留边界 | 回归判据 | commit | 来源 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -64,8 +68,10 @@ Podman 的 systemd packaging 产品边界见 [`packages/podman/AGENTS.md`](../..
 | `patchelf` | 📌 `25.05` | ✅ | 历史 pin；unstable check `__TMC_END__` relocation 失败；详见 manifest 注释 | Linux 用 unstable 并满足 musl-static portability | 56c02bc00adc | `manifests/default.nix` |
 | `perl` | 🩹 + 📦 本地 | 🟡 | 注入 Compress::Raw::Lzma + IO::Compress::Brotli 静态 XS + wrapper；详见 nix 注释 | 只删 stock 已覆盖的依赖/link patch | 56c02bc00adc | `packages/perl/` |
 | `pnpm` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/pnpm/` |
-| `podman5` | 🩹 + 📦 本地 | 🟡 | 跟随 5.x；packaging 与产品边界见 podman AGENTS.md | 分别回归编译修正；packaging 保留 | dc5d91f84032 | `packages/podman/AGENTS.md`、`packages/podman/podman5.nix` |
-| `podman6` | 📌 + 🩹 + 📦 本地 | 🟡 | 固定 6.1.0；packaging 与产品边界见 podman AGENTS.md | 分别回归 pin/编译修正；packaging 保留 | dc5d91f84032 | `packages/podman/AGENTS.md`、`packages/podman/podman6.nix` |
+| `podman5` | 🩹 + 📦 本地 | 🟡 | 跟随 5.x；packaging 与产品边界见 podman DESIGN.md | 分别回归编译修正；packaging 保留 | dc5d91f84032 | `packages/podman/DESIGN.md`、`packages/podman/podman5.nix` |
+| `podman5-rootless` | 📦 本地 | ❌ | per-user wrapper、宿主 ID-map 接口、状态与 s6 packaging | 独立 rootless 产品边界必须保留 | — | `packages/podman-rootless/` |
+| `podman6` | 📌 + 🩹 + 📦 本地 | 🟡 | 固定 6.1.0；packaging 与产品边界见 podman DESIGN.md | 分别回归 pin/编译修正；packaging 保留 | dc5d91f84032 | `packages/podman/DESIGN.md`、`packages/podman/podman6.nix` |
+| `podman6-rootless` | 📦 本地 | ❌ | per-user wrapper、宿主 ID-map 接口、状态与 s6 packaging | 独立 rootless 产品边界必须保留 | — | `packages/podman-rootless/` |
 | `postgresql` | 🩹 + 📦 本地 | 🟡 | `gccAsClang`、关 curl/gss、psql-only 边界；详见 nix 注释 | 逐项删 workaround，保留 psql-only 输出 | 56c02bc00adc | `packages/postgresql/` |
 | `prettier` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/prettier/` |
 | `protobuf3_20` | 📌 `24.05` | ❌ | unstable 已删除该版本，去 pin 静默产出空包；详见 manifest 注释 | 只能改指现存别名（改变版本语义），不属去 pin 回归 | 624af665418d | `manifests/default.nix` |

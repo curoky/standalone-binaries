@@ -1,12 +1,13 @@
 #!/bin/sh
-# Remote client: no writes to the root-owned server data directory.
+# Remote client for the current user's rootless API service.
 set -eu
 
 root=$(readlink -f -- "$0")
 root=$(CDPATH="" cd -- "${root%/*}/.." && pwd)
+uid=$("$root/libexec/podman/busybox" id -u)
 export CONTAINERS_CONF="$root/conf/containers.conf"
 export CONTAINERS_STORAGE_CONF="$root/conf/storage.conf"
 unset CONTAINERS_CONF_OVERRIDE STORAGE_DRIVER STORAGE_OPTS
 unset CONTAINER_CONNECTION CONTAINER_HOST CONTAINER_SSHKEY
 
-exec "$root/bin/_podman" --remote --url=unix:///run/podman/podman.sock "$@"
+exec "$root/bin/_podman" --remote --url="unix:///run/user/$uid/podman/podman.sock" "$@"

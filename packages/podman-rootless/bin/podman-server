@@ -1,11 +1,17 @@
 #!/bin/sh
-# Resolve bundle paths; all backend and network choices are fixed.
+# Per-user rootless API service. Persistent state follows the relocatable
+# bundle while volatile state stays under /run.
 set -eu
+
 root=$(readlink -f -- "$0")
 root=$(CDPATH="" cd -- "${root%/*}/.." && pwd)
-export PATH="$root/libexec/podman"
+export PATH="$root/libexec/podman:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+uid=$("$root/libexec/podman/busybox" id -u)
+user=$("$root/libexec/podman/busybox" id -un)
+export USER="$user"
+export LOGNAME="$user"
 export PODMAN_DATA_DIR="$root/data"
-export PODMAN_RUNTIME_DIR=/run/podman
+export PODMAN_RUNTIME_DIR="/run/user/$uid/podman"
 export HOME="$PODMAN_DATA_DIR/home"
 export XDG_RUNTIME_DIR="$PODMAN_RUNTIME_DIR"
 export TMPDIR="$PODMAN_RUNTIME_DIR/tmp"
@@ -16,19 +22,27 @@ export CONTAINERS_POLICY_JSON="$root/conf/policy.json"
 export REGISTRY_AUTH_FILE="$PODMAN_DATA_DIR/auth.json"
 export SSL_CERT_FILE="$root/conf/ca-bundle.crt"
 export SSL_CERT_DIR="$root/conf/certs"
-# netavark's nftables backend still attempts optional firewalld integration.
 export DBUS_SYSTEM_BUS_ADDRESS="unix:path=$PODMAN_RUNTIME_DIR/no-system-bus"
-# Use the upstream config/data/cache defaults under the bundle HOME.
 unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME
 unset CONTAINERS_CONF_OVERRIDE CONTAINERS_HELPER_BINARY_DIR
 unset CONTAINERS_REGISTRIES_CONF_OVERRIDE REGISTRIES_CONFIG_PATH
 unset CONTAINER_HOST CONTAINER_CONNECTION CONTAINER_SSHKEY STORAGE_DRIVER STORAGE_OPTS
 unset DOCKER_CONFIG
-umask 077
+umask 007
 mkdir -p "$HOME" "$XDG_RUNTIME_DIR" "$TMPDIR"
 
+if [ "${1-}" = "--stop-all" ]; then
+	shift
+	exec "$root/bin/_podman" \
+		--tmpdir="$PODMAN_RUNTIME_DIR/libpod" \
+		--network-config-dir="$root/conf/networks" \
+		--default-mounts-file="$root/conf/mounts.conf" \
+		stop --all "$@"
+fi
+
 exec "$root/bin/_podman" \
-	--network-config-dir="$root/conf/networks" \
 	--tmpdir="$PODMAN_RUNTIME_DIR/libpod" \
+	--network-config-dir="$root/conf/networks" \
 	--default-mounts-file="$root/conf/mounts.conf" \
-	system service "$@"
+	system service \
+	"unix://$PODMAN_RUNTIME_DIR/podman.sock" "$@"

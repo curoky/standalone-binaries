@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+root="@PODMAN_ROOT@"
+user="@PODMAN_USER@"
+uid="@PODMAN_UID@"
+runtime_root="/run/user/$uid"
+runtime_dir="$runtime_root/podman"
+
+# s6 starts this script as root. Prepare the bundle-relative data directory and
+# the volatile runtime/API directory before dropping all privileges.
+"$root/libexec/podman/busybox" mkdir -p \
+	"$root/data" \
+	"$root/conf/networks" \
+	"$runtime_dir"
+"$root/libexec/podman/busybox" rm -f "$runtime_dir/podman.sock"
+"$root/libexec/podman/busybox" chown "$user" \
+	"$root/data" \
+	"$root/conf/networks" \
+	"$runtime_root" \
+	"$runtime_dir"
+"$root/libexec/podman/busybox" chmod 0700 "$root/data" "$root/conf/networks"
+"$root/libexec/podman/busybox" chmod 0700 "$runtime_root" "$runtime_dir"
+
+exec @S6_SETUIDGID@ "$user" "$root/bin/podman-server"

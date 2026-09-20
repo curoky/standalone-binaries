@@ -1,0 +1,10 @@
+--- a/vendor/go.podman.io/common/pkg/config/config.go
++++ b/vendor/go.podman.io/common/pkg/config/config.go
+@@ -1239,5 +1239,2 @@ func (c *Config) FindInitBinary() (string, error) {
+-	// keep old default working to guarantee backwards compat
+-	if err := fileutils.Exists(DefaultInitPath); err == nil {
+-		return DefaultInitPath, nil
+-	}
+-	return c.FindHelperBinary(defaultInitName, true)
++	// Resolve the packaged init without falling back to the host PATH.
++	return c.FindHelperBinary(defaultInitName, false)

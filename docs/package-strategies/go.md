@@ -41,5 +41,10 @@ launcher，而 Podman 的 helper collection 会复制该 launcher。`packages/po
 删除这层替换前，必须确认 Podman 收集到的是静态入口，而不是 `wrapProgram` launcher。
 相关 helper 路径必须保持可搬运。
 
+per-user rootless API 作为独立的 `podman5-rootless` / `podman6-rootless` bundle
+发布。它是对应 rootful bundle 的薄 overlay，只替换 rootless 专属 wrapper 和 s6-rc service；
+持久数据使用 bundle 相对路径，易失状态与 socket 位于 `/run`。完整产品边界见
+[`packages/podman-rootless/DESIGN.md`](../../packages/podman-rootless/DESIGN.md)。
+
 容器栈的 C 组件见 [C / autotools](c-autotools.md)。pin 和 patch 状态见
 [回归清单](../regression/AGENTS.md)。

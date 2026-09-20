@@ -131,6 +131,8 @@ rec {
       aardvark-dns
       ;
   };
+  podman5-rootless = pkgsStatic.callPackage ../../podman-rootless { podman = podman5; };
+  podman6-rootless = pkgsStatic.callPackage ../../podman-rootless { podman = podman6; };
 
   # Node.js runtime and sibling-runtime tools; see
   # docs/package-strategies/nodejs.md.

@@ -40,7 +40,7 @@ in
     ];
 
     patches = [
-      ./strict-helper-search.patch
+      ./packaged-init.patch
       ./builtin-seccomp.patch
 
       # Keep registry drop-ins inside the package instead of scanning host paths.
@@ -56,7 +56,7 @@ in
       cp -Lf --remove-destination ${oldAttrs.passthru.helpersBin}/bin/* "$out/libexec/podman/"
       mv "$out/bin/.podman-wrapped" "$out/bin/_podman"
       rm -f "$out/bin/podmansh"
-      rm -rf "$out/lib/systemd" "$out/share/systemd"
+      rm -rf "$out/lib/systemd" "$out/lib/tmpfiles.d" "$out/share/systemd"
       # Complete tools for the fixed backend; no inherited host PATH.
       install -m755 ${lib.getBin nftables}/bin/nft "$out/libexec/podman/nft"
       install -m755 ${busybox}/bin/busybox "$out/libexec/podman/busybox"
@@ -78,7 +78,7 @@ in
       cp ${./tests/network_test.go} vendor/go.podman.io/common/libnetwork/netavark/standalone_test.go
       PODMAN_TEST_NETWORK_DIR=$out/conf/networks go test -mod=vendor -run '^TestStandaloneNetwork$' go.podman.io/common/libnetwork/netavark
       cp ${./tests/seccomp_test.go} libpod/standalone_seccomp_test.go
-      CONTAINERS_CONF=$out/conf/containers.conf CONTAINERS_STORAGE_CONF=$out/conf/storage.conf PODMAN_DATA_DIR=$TMPDIR/data go test -mod=vendor -tags containers_image_openpgp,seccomp -run '^TestStandaloneSeccomp$' ./libpod
+      CONTAINERS_CONF=$out/conf/containers.conf CONTAINERS_STORAGE_CONF=$out/conf/storage.conf PODMAN_DATA_DIR=$TMPDIR/data PODMAN_RUNTIME_DIR=$TMPDIR/runtime go test -mod=vendor -tags containers_image_openpgp,seccomp -run '^TestStandaloneSeccomp$' ./libpod
       bash ${./tests/package.sh} "$out"
       rm "$out/bin/config-check"
       runHook postInstallCheck
