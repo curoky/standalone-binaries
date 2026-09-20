@@ -35,6 +35,9 @@ rec {
   postgresql = pkgsStatic.callPackage ../../postgresql { };
   radare2 = pkgsStatic.callPackage ../../radare2 { };
   rizin = pkgsStatic.callPackage ../../rizin { };
+  shadow = pkgsStatic.callPackage ../../shadow {
+    inherit (pkgs) symlinkJoin;
+  };
   sudo = pkgsStatic.callPackage ../../sudo { };
   wget = pkgsStatic.callPackage ../../wget/linux.nix { };
 

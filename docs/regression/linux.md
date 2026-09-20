@@ -92,6 +92,7 @@ Podman 的 systemd packaging 产品边界见 [`packages/podman/AGENTS.md`](../..
 | `s6-linux-utils` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch；详见 flake.nix | 上游修 s6 stack 后去 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
 | `s6-networking` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch；详见 flake.nix | 上游修 s6 stack 后去 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
 | `s6-portable-utils` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch；详见 flake.nix | 上游修 s6 stack 后去 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
+| `shadow` | 🩹 + 📦 本地 | 🟡 | 关闭 libbsd 避免 musl `explicit_bzero` 测试 SIGABRT，并合并 `su` output；详见 nix 注释 | libbsd checks 修复后恢复 feature；保留完整命令集 packaging | dc5d91f84032 | `packages/shadow/` |
 | `skalibs` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch；详见 flake.nix | 上游修 s6 stack 后去 `version` pin | 56c02bc00adc | `manifests/default.nix`, `flake.nix` |
 | `starship` | 📦 本地 | ❌ | 预生成相对定位 init.zsh；详见 nix 注释 | 预生成 init 与相对定位属产品行为，无回归空间 | — | `packages/starship/` |
 | `sudo` | 🩹 本地 | 🟡 | 去 pam（`--disable-pam`）纯静态；setuid 外部设置；详见 nix 注释 | 上游 pam 可静态化后删 override；setuid 边界保留 | dc5d91f84032 | `packages/sudo/` |
