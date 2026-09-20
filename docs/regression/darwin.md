@@ -30,7 +30,6 @@ Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md
 | `gost` | 📦 native selection | ✅ | native；resolver 由 artifact 修正；详见 manifest 注释 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
 | `krb5` | 🩹 本地 | ❌ | 禁 CCAPI + 移 DES const（静态 darwin 两处 undefined symbol）；详见 nix 注释 | 上游修复 CCAPI/DES 静态可见性后删 patch | 624af665418d | `packages/krb5/` |
 | `lark-cli` | 📦 native selection | ❌ | macOS 选 unstable native（关 CGO 反而 disallowed reference）；详见 manifest 注释 | 当前没有 pin 或 patch 可回归 | — | `manifests/default.nix` |
-| `libarchive` | 🩹 本地 + ⏸️ 停用 darwin | 🟡 | macOS 编译失败暂仅接入 Linux；Linux 去 store 路径、关 XAR/libxml2；详见 nix 注释 | macOS 构建修复且四 CLI 无 store 路径、只依赖系统库、smoke 通过 | — | `packages/local/linux/common.nix`, `packages/libarchive/` |
 | `libtool` | 📦 本地 | ❌ | 改写 `libtoolize` 的 baked data paths | 相对资源定位必须保留 | — | `packages/libtool/` |
 | `lima` | 📦 native selection | ✅ | darwin-only native；artifact 去 qemu wrapper/resolver、保留 entitlement；仍有 Go 资源 store 引用（见下方记录） | 产物不再保留资源 store 引用后恢复默认；resolver 特例独立回归 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/normalize.go`, `cmd/artifact/binary.go` |
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |

@@ -89,6 +89,7 @@
     output = [ "bin" ];
   };
   less = { };
+  libarchive = { };
   lsof = { };
   m4 = { };
   ncdu_1 = { };

@@ -1,8 +1,16 @@
-# catatonit — musl-static build with the stock installCheck cleared.
+# catatonit — musl-static build with binutils added for the installCheck.
 #
-# Upstream's installCheck runs `readelf` but never adds binutils to
-# `nativeBuildInputs`; under the musl64 cross `strictDeps` build that fails with
-# "readelf: command not found". Clear `installCheckPhase` to skip it.
+# Upstream's installCheck runs `readelf -d` to assert the binary is statically
+# linked, but never adds binutils to `nativeBuildInputs`. Under the musl64
+# cross `strictDeps` build the native PATH is isolated, so `readelf` is missing
+# and the check fails with "readelf: command not found". Add binutils so the
+# check runs instead of clearing it.
+#
+# The check invokes the unprefixed `readelf`, which only the build-for-build
+# binutils provides: the direct `buildPackages.binutils` still targets the musl
+# host and installs `x86_64-unknown-linux-musl-readelf`, so we reach one level
+# deeper (`buildPackages.buildPackages`, targetPrefix = "") for a plain
+# `readelf`.
 {
   lib,
   stdenv,
@@ -11,8 +19,11 @@
   glib,
   libseccomp,
   pkg-config,
+  buildPackages,
 }:
 
-catatonit.overrideAttrs (oldAttrs: rec {
-  installCheckPhase = "";
+catatonit.overrideAttrs (oldAttrs: {
+  nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [
+    buildPackages.buildPackages.binutils
+  ];
 })
