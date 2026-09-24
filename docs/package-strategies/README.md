@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | C / autotools | [c-autotools.md](c-autotools.md) | 静态链接、资源路径、s6 |
 | Go | [go.md](go.md) | podman、macOS CGO |
+| Java | [java.md](java.md) | 外部 JDK、包内 native 静态编译 |
 | Node.js | [nodejs.md](nodejs.md) | 静态 runtime、同级 Node wrapper |
 | `pkgsStatic.extend` | [pkgsstatic-extend.md](pkgsstatic-extend.md) | target 与 build platform 边界 |
 | Perl | [perl.md](perl.md) | 平台拆分解释器、纯 Perl 工具、XS 模块 |

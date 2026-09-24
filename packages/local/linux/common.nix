@@ -28,6 +28,7 @@ rec {
     inherit (pkgs) python3;
   };
   gnutar = pkgsStatic.callPackage ../../gnutar { };
+  go = pkgsStatic.callPackage ../../go { go = pkgsStatic.go_latest; };
   gocryptfs = pkgsStatic.callPackage ../../gocryptfs { };
   lua5_5 = pkgsStatic.callPackage ../../lua { };
   openssh_gssapi = pkgsStatic.callPackage ../../openssh_gssapi { };

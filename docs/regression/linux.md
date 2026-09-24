@@ -47,6 +47,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `gnupg` | 📦 override | ❌ | 明确启用 minimal 并关闭 GUI | feature selection 是产品决策 | — | `packages/local/common.nix` |
 | `graphviz` | 🩹 + 📦 本地 | 🟡 | 关闭 LTDL/GIF/TIFF/WebP 等 + 相对字体入口；详见 nix 注释 | stock 直接 musl-static 后删编译 workaround；入口/字体/CLI packaging 保留 | 56c02bc00adc | `packages/graphviz/` |
 | `gnutar` | 🩹 本地 | ✅ | `-Wl,--allow-multiple-definition`（xattrat 符号冲突）；详见 nix 注释 | stock 无 flag 也能静态链接并保留 ACL/xattr | 56c02bc00adc | `packages/gnutar/` |
+| `go` | 🩹 + 📦 本地 | 🟡 | musl-static compiler；在 bootstrap 生成官方默认配置，对 race 强制外链，移除测试专用 dynamic ELF fixtures | 上游 static Go 默认值与 race link mode 对齐后删 patch；SDK packaging 与严格 ELF 门禁保留 | dc5d91f84032 | `packages/go/` |
 | `gocryptfs` | 🩹 本地 | 🟡 | 清空 propagatedBuildInputs + 设 PKG_CONFIG_PATH；详见 nix 注释 | 上游 pcsclite doc 可构建、cross cgo 自动定位 openssl 后删 | 56c02bc00adc | `packages/gocryptfs/` |
 | `gpgme` | 🩹 本地 | 🟡 | minimalGnuPG + `--disable-gpg-test` + `doCheck=false`；详见 nix 注释 | 逐项恢复依赖与 checks，保持 musl-static | 56c02bc00adc | `packages/gpgme/` |
 | `libewf` | 🩹 本地 | ✅ | radare2/rizin 依赖；补 cross OpenSSL 探针 cache；详见 nix 注释 | 上游同 arch cross 不依赖运行探针后删 override | dc5d91f84032 | `packages/libewf/` |

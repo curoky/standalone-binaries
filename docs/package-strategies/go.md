@@ -4,6 +4,25 @@ Linux Go 工具默认使用 manifest 的 `pkgsStatic`。macOS 可选择 native C
 最终产物仅依赖系统 dylib；不要为了“更静态”机械设置 `CGO_ENABLED=0`，因为这可能把
 Go compiler store path 写入产物并触发 `disallowedReferences`。
 
+## Go Compiler
+
+`go` 只在 Linux 发布，使用 unstable 的 `pkgsStatic.go_latest` 从源码构建完整 SDK。编译器
+和内部工具本身是 musl 静态 ELF，但公开默认值与官方 Linux Go 对齐：native build 自动
+探测 CGO，C/C++ compiler 是 `gcc` / `g++`，external linking 保持 auto，动态 loader 不固定
+为 Nix 构建机的 musl loader，`GO386` 默认 `sse2`。与官方安装相同，使用 CGO 或 race 时
+需要宿主另行提供 GCC。
+
+nixpkgs 的 Go 补丁会改变资源查找、vendor 校验、GOTOOLDIR 和动态 loader 行为，因此这个
+SDK 不应用这些补丁。`cmd/dist` 在完整 bootstrap 期间直接生成官方默认配置，避免把 Nix
+cross compiler 名称和构建期 musl loader 带入最终 SDK。静态构建的 linker 不能自动识别
+bundled race object 必须外链，因此仅对 `-race` 强制 external linking；普通纯 Go 交叉编译
+仍保持官方的 auto 行为。
+
+SDK 保留 `bin`、`src`、`pkg/tool`、`lib` 等标准 GOROOT 内容，让 `cmd/go` 能从搬迁后的
+`bin/go` 自动推导 GOROOT。`debug/dwarf` 与 `debug/elf` 的标准库 testdata 含故意构造的
+glibc-dynamic ELF fixtures，既不参与编译器运行，也不应放宽 artifact 的 ELF 门禁，因此
+由 `packages/go` 在安装期移除。
+
 ## Darwin CGO Resolver
 
 native Go/CGO 的 Nix `libresolv.9.dylib` 路径统一由
