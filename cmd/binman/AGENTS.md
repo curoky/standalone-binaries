@@ -1,100 +1,87 @@
 # Binman Agent Guide
 
-`cmd/binman/` 实现 OCI artifact client `bm`。用户安装与命令说明见
-[`USAGE.md`](USAGE.md)，全局产物约束见根 [`AGENTS.md`](../../AGENTS.md)；本文件是
-该组件的设计与修改契约。
+`cmd/binman/` 实现 OCI package installer `bm`。用户说明见 [`USAGE.md`](USAGE.md)，
+全局 artifact 约束见根 [`AGENTS.md`](../../AGENTS.md)。
 
-## 不变量
+## 产品边界
 
-- `bm` 使用 `CGO_ENABLED=0` 构建，运行时不调用 `curl`、`tar`、`oras`、`jq` 或 Nix。
-- package 和 profile 只为叶子文件创建相对 symlink，目录按需创建，因此整个 prefix
-  可以直接移动。指向 package 内目录的 symlink 按其最终文件树展开。
-- package 彼此独立，client 不解析依赖。
-- OCI layer digest 是版本标识；digest 相同只调和 link 状态，除非指定 `--force`。
-- 多包操作先 resolve 全部 tag；任一失败时不写入安装状态。
-- 同一批多包 resolve 共享一个 anonymous OCI Puller，以复用认证和连接；外层并发不得
-  超过 `maxParallel`。
-- 支持的平台只有 `linux-x86_64`、`linux-arm64` 和 `darwin-arm64`。
+- Registry 固定为 `ghcr.io/curoky/standalone-binaries`，只使用 anonymous pull。
+- 仅提供 `install` 和 `remove`；重新 install 即 upgrade。
+- 支持的平台只有 `linux-x86_64`、`linux-arm64` 和 `darwin-arm64`，由运行平台自动选择。
+- package 相互独立，不解析依赖、版本约束或 Nix cache。
+- YAML 是批量安装计划，不是完整 desired state；删除 YAML 条目不会卸载 package。
 
 ## OCI Artifact
 
-包发布为：
+Package tag 是 `<package>-<architecture>`。Manifest 必须恰好包含一个
+`application/vnd.oci.image.layer.v1.tar+gzip` layer，archive 必须以 package 名为唯一
+顶层目录。Client 使用 layer digest 判断已安装内容是否需要重新下载。
+
+一次 install 只创建一个共享 `remote.Puller`，通常只触发一次 token exchange。Manifest
+resolve 并发为 4，blob download 并发为 16，解压并发为
+`runtime.GOMAXPROCS(0)`。所有下载和解压成功后，store replacement 与 link 按声明顺序串行
+执行。
+
+## Layout 与状态
 
 ```text
-ghcr.io/curoky/standalone-binaries:<package>-<architecture>
+<prefix>/
+├── .binman/
+│   ├── lock
+│   └── store/<package>/
+│       └── .binman-meta
+├── bin/
+└── <其他 link-to 目录>/
 ```
 
-Image 的最后一个 layer 是 tar.gz，归档顶层目录是 package 名。Client 使用 anonymous
-auth，不读取 Docker credential config。发布 workflow 在 manifest 上添加
-`dev.curoky.standalone.system`、`dev.curoky.standalone.out-path`、
-`dev.curoky.standalone.archive-path` 供 CI 判定发布身份；`bm` 仍以 layer digest 判断版本，
-不要求这些 annotations，也不解析 Nix cache。
+`.binman-meta` 只记录 layer digest 和 link targets。它用于跳过未变化的 blob，并在 package
+升级、改变 link target 或 remove 时清理旧链接。它是 client 保留的唯一本地状态。
 
-Darwin 包在发布前由 [`artifact`](../artifact/AGENTS.md#darwin-cgo-resolver) 完成有限的
-Go/CGO resolver 路径修正和必要重签；`bm` 只解压归档，不改写 Mach-O 或重新签名。
+`link-to` 是相对 prefix 的目录：`.` 表示 prefix，自定义值如 `profile/go`。省略表示只安装
+到 store。同一 package 可以有多个 target；同一 target 中的文件冲突由后执行的 link
+覆盖。所有链接都使用相对 symlink，因此 prefix 可整体移动。
 
-`bm` 自身使用 `binman-<architecture>` tag，归档路径是 `binman/bin/bm`。
-`install.sh` 是唯一允许依赖宿主 `curl` 和 `tar` 的路径。
+修改 prefix 的阶段持有 `<prefix>/.binman/lock` 文件锁；网络与解压阶段不持锁。同一批次
+不会在下载或解压失败后修改 prefix，但串行 commit 不提供整批回滚，失败后重新执行相同命令
+必须能够调和状态。
 
-`search <query>` 和 `list --all` 通过 OCI tags API 分页读取完整 tag 列表，只保留
-`-<architecture>` 后缀对应的合法 package 名并稳定排序。Search 使用不区分大小写的
-子串匹配；`list --all` 列出当前架构的全部远端 package。
+## YAML
 
-`bm version` 打印 link 时注入的构建信息：`buildCommit`、`buildCommitDate`、
-`buildDate`、`buildHost`。这些是 `main` 包级变量，默认 `"unknown"`，由发布 workflow
-通过 `-ldflags -X main.<var>=...` 填充；`go build`/`go test` 无需注入。改变变量名或
-新增字段时，同步 `build-binman.yaml`。
+```yaml
+prefix: /opt/bm
+installs:
+  - packages: [ripgrep, fd]
+    link-to: .
+  - packages: [gopls, delve]
+    link-to: profile/go
+  - packages: [python314]
+```
 
-## 状态与事务
-
-安装状态位于 `<prefix>/store/<package>/`，`.binman-meta` 记录 package、architecture、
-digest、link 状态和安装时间。Prefix 根目录与 `<prefix>/profile/<profile>/` 只包含
-指向 store 的聚合 link。
-
-安装事务：
-
-1. 有限并发 resolve，并保留该次 resolve 得到的 layer。
-2. 有限并发下载到临时 cache 后原子替换。
-3. 串行解压到 staged store，写 metadata，再交换 store 和调和 link。
-
-不同 package 提供同一路径时后 link 的 package 覆盖已有文件；manifest 顺序决定最终
-结果。`upgrade` 复用同一状态机；`outdated` 并发 resolve，但按 package 名稳定输出。
-
-## Manifest
-
-Schema、precedence 和命令行为统一维护在 [`USAGE.md`](USAGE.md)。实现必须保持 strict
-single-document decoding、确定性的去重 install plan（root link 优先），并在 sync 时
-按 manifest 完整重建 profile tree。`remove` 必须清理 profile link，prune 只保留
-manifest 引用的 package。
+Schema 使用 strict single-document decoding。未知字段、空 group、非法 package 名和越过
+prefix 的 link target 必须报错。CLI packages 追加在 YAML groups 后，因此其 link 冲突
+优先级更高。相同 package 只 resolve/download 一次，link target 去重后全部应用。
 
 ## 安全边界
 
-- Tar entry、symlink target、hardlink target 及既有 symlink parent 必须留在
-  staged store 内；未支持的 entry type 直接报错。
-- `.binman-meta` 只能由 client 创建，不能继承归档内容。
-- Link 只创建目录和叶子 symlink；已有叶子文件或目录 symlink parent 直接替换，不做
-  owner 冲突检查。unlink 只删除仍指向该 package 的 symlink。
-- Link 不沿聚合根目录内的 symlink parent 写入外部路径；unlink 遇到 symlink parent
-  直接拒绝。
-- 修改解压、link 或事务逻辑时，先添加能复现边界的测试。
+- Tar path、symlink target 和 hardlink target 必须留在 staged package 内。
+- Archive 顶层必须准确匹配 package 名，拒绝特殊 entry type 和 archive 自带的
+  `.binman-meta`。
+- Package 不得向 link tree 暴露 `.binman` 路径；`link-to` 也不得指向 `.binman`。
+- Link parent 必须是真实目录，不能沿 symlink 写出 target。
+- Link 可以覆盖另一个 package 创建的 symlink，但不得覆盖普通文件或真实目录。
+- Unlink 只删除仍然指向目标 package store 的 symlink。
+- Stage 必须位于 `.binman` 内，确保 store replacement 不跨 filesystem。
 
 ## 实现边界
 
-- `main.go`：Cobra 命令构造与执行；`client` 持有 registry、输出和日志，测试不替换全局状态。
-- `registry.go`：OCI resolve、digest 和原子 cache 下载；沿用 go-containerregistry 和 errgroup。
-- `store.go`：metadata、安全解压、store 交换和文件聚合；gzip 使用标准库，每次解压复用 copy buffer。
-- `install.go`：安装任务准备、批量下载、按顺序提交，以及 package 命令。
-- `manifest.go`：strict YAML、install plan、profile 和 prune。
-- `download.go`：下载到独立目录，不创建安装状态。
-- `install.sh`：首次安装 bootstrap。
+- `main.go`：Cobra command、平台检测和默认 prefix。
+- `manifest.go`：strict YAML、install plan 和 link target 校验。
+- `registry.go`：共享 Puller、manifest resolve 和 blob 下载。
+- `install.go`：分阶段并发、串行 commit 和 remove。
+- `store.go`：metadata、文件锁、安全解压、store replacement 与 link。
 
-遍历使用 DirEntry，仅对 symlink 解析目标；目录 symlink 仍检查越界和循环。聚合目录仅在
-同目录连续文件间复用检查，正确的相对 link 不重建。Profile 重建与 remove 的文件清单
-只在本次操作内复用，不跨安装提交或命令缓存；store 变化后必须重新收集。
-
-保持同一个 `package main`，不为假设中的 backend、registry 或 package graph 预造
-interface。修改 registry、tag、layer、归档布局或 metadata 格式时，同步
-`registry.go`、`install.sh` 和发布 workflow。
+不要重新引入 profile、search/list、outdated、独立 download、archive cache、依赖解析或兼容
+旧布局的迁移逻辑。
 
 ## 验证
 
@@ -103,7 +90,6 @@ CGO_ENABLED=0 go test ./cmd/binman
 CGO_ENABLED=1 go test -race ./cmd/binman
 CGO_ENABLED=0 go vet ./cmd/binman
 CGO_ENABLED=0 go build ./cmd/binman
-CGO_ENABLED=0 go test ./cmd/binman -run '^$' -bench . -benchmem -count=3
 bash -n cmd/binman/install.sh
 shellcheck cmd/binman/install.sh
 ```

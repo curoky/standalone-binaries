@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 
-# Bootstrap installer for `bm`; user instructions live in USAGE.md.
-# It pulls the OCI layer directly because a fresh host may only have curl and
-# tar. Afterwards `bm` manages itself like any other package.
+# Bootstrap installer for bm. It uses curl and tar because bm is not available yet.
 set -euo pipefail
 
-INSTALL_DIR="${BINMAN_INSTALL_DIR:-$HOME/.local/bin}"
+PREFIX="${BINMAN_PREFIX:-$HOME/.local}"
 ARCH="${BINMAN_ARCH:-}"
-PACKAGES=()
 
 die() {
   echo "error: $*" >&2
@@ -17,33 +14,33 @@ die() {
 usage() {
   cat <<'EOF'
 Usage:
-  install.sh [--prefix DIR] [--arch ARCH] [package...]
+  install.sh [--prefix DIR] [--arch ARCH]
 
 Options:
-  --prefix DIR  Install directory (default: ~/.local/bin)
+  --prefix DIR  Package prefix (default: ~/.local)
   --arch ARCH   linux-x86_64 | linux-arm64 | darwin-arm64
-  package...    Download and extract packages into the current directory
 
 Environment:
-  BINMAN_INSTALL_DIR
+  BINMAN_PREFIX
   BINMAN_ARCH
 EOF
 }
 
-# Parse flags (allow `bash -s -- --prefix ... --arch ...`).
 while [ $# -gt 0 ]; do
   case "$1" in
     --prefix | --prefix=*)
       if [ "$1" = "--prefix" ]; then
-        INSTALL_DIR="$2"
+        [ $# -ge 2 ] || die "--prefix requires a value"
+        PREFIX="$2"
         shift 2
       else
-        INSTALL_DIR="${1#*=}"
+        PREFIX="${1#*=}"
         shift
       fi
       ;;
     --arch | --arch=*)
       if [ "$1" = "--arch" ]; then
+        [ $# -ge 2 ] || die "--arch requires a value"
         ARCH="$2"
         shift 2
       else
@@ -55,46 +52,31 @@ while [ $# -gt 0 ]; do
       usage
       exit 0
       ;;
-    --) # everything after -- is a package name
-      shift
-      while [ $# -gt 0 ]; do
-        PACKAGES+=("$1")
-        shift
-      done
-      ;;
-    -*) die "unknown argument: $1" ;;
-    *) # positional: treat as a package name
-      PACKAGES+=("$1")
-      shift
-      ;;
+    *) die "unexpected argument: $1" ;;
   esac
 done
 
+[ -n "$PREFIX" ] || die "prefix must not be empty"
 command -v curl >/dev/null 2>&1 || die "curl is required"
 command -v tar >/dev/null 2>&1 || die "tar is required"
 
-# Detect the publish arch tag, mirroring detectArch() in main.go. Only
-# linux-x86_64, linux-arm64 and darwin-arm64 are published; anything else must
-# use --arch.
 if [ -z "$ARCH" ]; then
-  os="$(uname -s)"
-  machine="$(uname -m)"
-  case "$os/$machine" in
+  case "$(uname -s)/$(uname -m)" in
     Linux/x86_64 | Linux/amd64) ARCH="linux-x86_64" ;;
     Linux/aarch64 | Linux/arm64) ARCH="linux-arm64" ;;
     Darwin/arm64 | Darwin/aarch64) ARCH="darwin-arm64" ;;
-    *) die "unsupported platform $os/$machine; pass --arch linux-x86_64, linux-arm64 or darwin-arm64" ;;
+    *) die "unsupported platform; pass --arch linux-x86_64, linux-arm64 or darwin-arm64" ;;
   esac
 fi
 
-TAG="binman-$ARCH"
-
-echo "> Installing bm ($ARCH) into $INSTALL_DIR"
+case "$ARCH" in
+  linux-x86_64 | linux-arm64 | darwin-arm64) ;;
+  *) die "unsupported arch: $ARCH" ;;
+esac
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-# 1. Anonymous pull token for ghcr.
 curl -fsSL \
   -o "$tmp/token.json" \
   "https://ghcr.io/token?scope=repository:curoky/standalone-binaries:pull"
@@ -102,56 +84,35 @@ token="$(tr ',' '\n' <"$tmp/token.json" |
   grep -o '"token":"[^"]*"' | head -n1 | cut -d'"' -f4)"
 [ -n "$token" ] || die "failed to obtain registry token"
 
-# 2. Resolve the manifest and pull out the single layer digest.
 curl -fsSL \
   -H "Authorization: Bearer ${token}" \
   -H "Accept: application/vnd.oci.image.manifest.v1+json" \
-  -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
   -o "$tmp/manifest.json" \
-  "https://ghcr.io/v2/curoky/standalone-binaries/manifests/${TAG}"
-
-# The artifact has one content layer; take the last digest in the layers array.
+  "https://ghcr.io/v2/curoky/standalone-binaries/manifests/binman-${ARCH}"
 digest="$(tr ',' '\n' <"$tmp/manifest.json" |
   grep -o '"digest":"sha256:[a-f0-9]*"' | tail -n1 | cut -d'"' -f4)"
-[ -n "$digest" ] || die "could not find layer digest for $TAG (is it published?)"
+[ -n "$digest" ] || die "could not resolve binman-$ARCH"
 
-# 3. Download the blob into a temp dir, then move the bm binary into place.
-# The archive layout is ./binman/bin/bm; extracting to a tmp dir avoids tar
-# member-match quirks (leading "./", matching the dir as well as the file).
 curl -fsSL \
   -H "Authorization: Bearer ${token}" \
   -o "$tmp/binman.tar.gz" \
   "https://ghcr.io/v2/curoky/standalone-binaries/blobs/${digest}"
 tar -xzf "$tmp/binman.tar.gz" -C "$tmp"
 [ -f "$tmp/binman/bin/bm" ] || die "archive did not contain binman/bin/bm"
-mkdir -p "$INSTALL_DIR"
-mv -f "$tmp/binman/bin/bm" "$INSTALL_DIR/bm"
+chmod +x "$tmp/binman/bin/bm"
+printf '{"digest":"%s","linkTo":["."]}\n' "$digest" >"$tmp/binman/.binman-meta"
 
-chmod +x "$INSTALL_DIR/bm"
+mkdir -p "$PREFIX/.binman/store" "$PREFIX/bin"
+rm -rf "$PREFIX/.binman/store/binman"
+mv "$tmp/binman" "$PREFIX/.binman/store/binman"
+rm -f "$PREFIX/bin/bm"
+ln -s "../.binman/store/binman/bin/bm" "$PREFIX/bin/bm"
 
-echo "> Installed: $INSTALL_DIR/bm"
-
-# A failing self-check below must not change the installer's exit status: the
-# binary is already in place. Probe it, but always report success for the
-# install itself.
-if "$INSTALL_DIR/bm" --help >/dev/null 2>&1; then
-  case ":$PATH:" in
-    *":$INSTALL_DIR:"*) echo "> bm is on PATH and ready." ;;
-    *)
-      echo "> Note: $INSTALL_DIR is not on PATH. Add it, e.g.:"
-      echo "    export PATH=\"$INSTALL_DIR:\$PATH\""
-      ;;
-  esac
-  if [ "${#PACKAGES[@]}" -gt 0 ]; then
-    "$INSTALL_DIR/bm" download --arch "$ARCH" "${PACKAGES[@]}" ||
-      die "bm download failed for: ${PACKAGES[*]}"
-  fi
-else
-  echo "> Warning: $INSTALL_DIR/bm was installed but could not be executed here" >&2
-  echo "  (possible noexec mount or libc mismatch). Try running it directly." >&2
-  if [ "${#PACKAGES[@]}" -gt 0 ]; then
-    die "cannot download packages (${PACKAGES[*]}): bm is not runnable here"
-  fi
-fi
-
-exit 0
+echo "> Installed: $PREFIX/bin/bm"
+case ":$PATH:" in
+  *":$PREFIX/bin:"*) echo "> bm is on PATH and ready." ;;
+  *)
+    echo "> Add bm to PATH:"
+    echo "    export PATH=\"$PREFIX/bin:\$PATH\""
+    ;;
+esac

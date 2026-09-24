@@ -1,13 +1,9 @@
 # bm Usage
 
-`bm` 从 `ghcr.io/curoky/standalone-binaries` 安装和管理可搬运的 standalone
-packages。支持的平台：
+`bm` 从 `ghcr.io/curoky/standalone-binaries` 安装 standalone packages。支持
+`linux-x86_64`、`linux-arm64` 和 `darwin-arm64`，平台自动检测。
 
-- `linux-x86_64`
-- `linux-arm64`
-- `darwin-arm64`
-
-## Install
+## Bootstrap
 
 首次安装需要 `curl` 和 `tar`：
 
@@ -15,146 +11,87 @@ packages。支持的平台：
 curl -fsSL https://raw.githubusercontent.com/curoky/standalone-binaries/master/cmd/binman/install.sh | bash
 ```
 
-默认把 `bm` 安装到 `~/.local/bin/bm`。可通过 flag 或环境变量修改：
+默认安装到 `~/.local/bin/bm`。bootstrap 与 `bm` 的 `--prefix` 含义一致，都是 package
+prefix：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/curoky/standalone-binaries/master/cmd/binman/install.sh |
-  bash -s -- --prefix /usr/local/bin
-
-curl -fsSL https://raw.githubusercontent.com/curoky/standalone-binaries/master/cmd/binman/install.sh |
-  BINMAN_INSTALL_DIR=/usr/local/bin bash
+  bash -s -- --prefix /usr/local
 ```
 
-也可以在 bootstrap 后直接下载 package 到当前目录，不创建安装状态：
+## Install
+
+默认 package prefix 是 `~/.local`，CLI `--prefix` 可以覆盖：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/curoky/standalone-binaries/master/cmd/binman/install.sh |
-  bash -s -- ripgrep fd
+bm install ripgrep fd jq
+bm --prefix /opt/bm install ripgrep fd
 ```
 
-`install.sh` 的 `--prefix` 是 `bm` 可执行文件的安装目录；`bm --prefix` 则是 package
-store、profile 和聚合链接的根目录，两者含义不同。
+默认将 package 安装到 `<prefix>/.binman/store/<package>`，并把其中的叶子文件以相对
+symlink 链接到 prefix。重新执行 install 会检查远端 layer digest：内容未变化时只调和
+链接，内容变化时下载并替换 store。
 
-## Global Options
-
-```text
---prefix DIR   package 安装根目录
---arch ARCH    覆盖自动检测的平台
---verbose      同时把详细日志输出到 stderr
-```
-
-当 `bm` 已由自身管理时，`--prefix` 默认从
-`<prefix>/store/binman/bin/bm` 推导；bootstrap binary 不在该布局中时默认使用
-`/opt/bm`。普通用户通常应显式设置可写目录，例如：
+自定义 link target 或只安装到 store：
 
 ```bash
-bm --prefix "$HOME/.local" install ripgrep
+bm install --link-to profile/go gopls delve
+bm install --no-link python314
 ```
 
-涉及安装状态的命令会把详细日志追加到 `<prefix>/binman.log`。
+`link-to` 必须是 prefix 内的相对路径。`.` 表示 prefix；绝对路径、`..` 和 `.binman`
+均不允许。同一个 package 需要链接到多个 target 时使用 YAML。
 
-## Package Commands
-
-搜索和查看当前平台可用的 packages：
-
-```bash
-bm search rip
-bm list --all
-```
-
-安装 package。默认在 store 中保存 package，并在 prefix 下创建相对 symlink：
-
-```bash
-bm --prefix "$HOME/.local" install ripgrep fd
-bm install --link=false python314
-bm install --force ripgrep
-```
-
-查看、列出和删除已安装 package：
-
-```bash
-bm info ripgrep
-bm list
-bm remove ripgrep
-```
-
-检查和升级：
-
-```bash
-bm outdated
-bm upgrade
-bm upgrade ripgrep fd
-```
-
-`upgrade` 不带参数时升级全部已安装 packages，并保留各 package 原有的 link 状态和
-architecture。显式传入 `--arch` 可覆盖升级目标的平台。
-
-只下载并解压，不写入 store 或安装状态：
-
-```bash
-bm download ripgrep fd
-bm download --output ./tools ripgrep
-```
-
-每个 package 会解压为输出目录下的同名目录，例如 `./tools/ripgrep/`。
-
-查看 `bm` 的构建信息：
-
-```bash
-bm version
-```
-
-所有命令和选项可通过 `bm --help` 或 `bm <command> --help` 查看。
-
-## Manifest
-
-`bm sync` 使用 YAML manifest 声明完整环境，默认读取当前目录的 `binman.yaml`：
+## YAML
 
 ```yaml
 prefix: /opt/bm
-arch: linux-x86_64
-packages:
-  link:
-    - ripgrep
-    - fd
-  unlink:
-    - python314
-profiles:
-  go:
-    - gopls
-    - delve
+
+installs:
+  - packages:
+      - ripgrep
+      - fd
+    link-to: .
+
+  - packages:
+      - gopls
+      - delve
+    link-to: profile/go
+
+  - packages:
+      - python314
 ```
 
-- `packages.link` 安装 package，并把内容链接到 prefix。
-- `packages.unlink` 只安装到 store，不链接到 prefix。
-- `profiles.<name>` 安装 package，并链接到 `<prefix>/profile/<name>/`。
-- `prefix` 和 `arch` 可省略；命令行显式传入的值优先于 manifest。
-- 同一 package 可出现在多个位置，最终只安装一次；`packages.link` 优先。
-- YAML 只允许一个 document，未知字段会报错。
-
-同步默认 manifest 或指定文件：
+安装 YAML 中的 packages：
 
 ```bash
-bm sync
-bm sync ./toolchain.yaml
-bm sync --force
-bm sync --prune
+bm install --file binman.yaml
 ```
 
-`--prune` 会删除当前 prefix 中未被 manifest 引用的 packages。Profile tree 在每次
-sync 时按 manifest 完整重建。
+也可以追加 CLI packages；它们默认链接到 prefix，并在文件冲突时后执行：
 
-## Layout
-
-给定 `--prefix <prefix>`，主要路径如下：
-
-```text
-<prefix>/
-├── store/<package>/       package 内容与 .binman-meta
-├── profile/<name>/        profile 聚合链接
-├── binman.log             操作日志
-└── ...                    packages.link 创建的聚合链接
+```bash
+bm install --file binman.yaml yq bat
 ```
 
-Package 之间相互独立，`bm` 不解析或自动安装运行时依赖。多个 packages 提供同一路径
-时，后安装或 manifest 中靠后的 package 覆盖该聚合链接。
+CLI 显式 `--prefix` 优先于 YAML。相同 package 只下载一次，但会链接到所有声明的
+targets。YAML 是安装计划，不会卸载从文件中删除的 package。
+
+## Remove
+
+```bash
+bm remove ripgrep fd
+```
+
+Remove 会清理仍指向这些 packages 的 symlink，然后删除对应 store。若一个链接后来被其他
+package 覆盖，不会误删它。
+
+## Concurrency
+
+- Manifest resolve：4
+- Blob download：16
+- Archive extraction：当前 Go runtime 可用 CPU 数量
+- Store replacement 和 link：1，按声明顺序执行
+
+同一批次共享一个 registry Puller，以复用认证 token 和连接。所有下载和解压成功后才开始
+修改 prefix。
