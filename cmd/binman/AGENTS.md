@@ -26,10 +26,9 @@ resolve 并发为 4，blob download 并发为 16，解压并发为
 
 ```text
 <prefix>/
-├── .binman/
-│   ├── lock
-│   └── store/<package>/
-│       └── .binman-meta
+├── store/
+│   ├── .lock
+│   └── <package>/.binman-meta
 ├── bin/
 └── <其他 link-to 目录>/
 ```
@@ -41,7 +40,7 @@ resolve 并发为 4，blob download 并发为 16，解压并发为
 到 store。同一 package 可以有多个 target；同一 target 中的文件冲突由后执行的 link
 覆盖。所有链接都使用相对 symlink，因此 prefix 可整体移动。
 
-修改 prefix 的阶段持有 `<prefix>/.binman/lock` 文件锁；网络与解压阶段不持锁。同一批次
+修改 prefix 的阶段持有 `<prefix>/store/.lock` 文件锁；网络与解压阶段不持锁。同一批次
 不会在下载或解压失败后修改 prefix，但串行 commit 不提供整批回滚，失败后重新执行相同命令
 必须能够调和状态。
 
@@ -66,11 +65,11 @@ prefix 的 link target 必须报错。CLI packages 追加在 YAML groups 后，�
 - Tar path、symlink target 和 hardlink target 必须留在 staged package 内。
 - Archive 顶层必须准确匹配 package 名，拒绝特殊 entry type 和 archive 自带的
   `.binman-meta`。
-- Package 不得向 link tree 暴露 `.binman` 路径；`link-to` 也不得指向 `.binman`。
-- Link parent 必须是真实目录，不能沿 symlink 写出 target。
+- Package 不得向 prefix 根目录暴露 `store` 路径；`link-to` 也不得指向 `store`。
+- Link parent 可以使用 prefix 内部 symlink，但不能沿 symlink 写出 prefix。
 - Link 可以覆盖另一个 package 创建的 symlink，但不得覆盖普通文件或真实目录。
 - Unlink 只删除仍然指向目标 package store 的 symlink。
-- Stage 必须位于 `.binman` 内，确保 store replacement 不跨 filesystem。
+- Stage 必须位于 `store` 内，确保 store replacement 不跨 filesystem。
 
 ## 实现边界
 
@@ -78,7 +77,7 @@ prefix 的 link target 必须报错。CLI packages 追加在 YAML groups 后，�
 - `manifest.go`：strict YAML、install plan 和 link target 校验。
 - `registry.go`：共享 Puller、manifest resolve 和 blob 下载。
 - `install.go`：分阶段并发、串行 commit 和 remove。
-- `store.go`：metadata、文件锁、安全解压、store replacement 与 link。
+- `store.go`：metadata、文件锁、基于 Go `os.Root` 的安全解压、store replacement 与 link。
 
 不要重新引入 profile、search/list、outdated、独立 download、archive cache、依赖解析或兼容
 旧布局的迁移逻辑。

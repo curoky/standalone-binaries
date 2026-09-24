@@ -91,7 +91,6 @@ func (config manifest) plan() (installPlan, error) {
 	}
 	return plan, nil
 }
-
 func cleanLinkTo(value string) (string, error) {
 	if value == "" {
 		return "", nil
@@ -103,7 +102,7 @@ func cleanLinkTo(value string) (string, error) {
 	if clean == ".." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
 		return "", fmt.Errorf("link-to %q escapes the prefix", value)
 	}
-	if clean == ".binman" || strings.HasPrefix(clean, ".binman"+string(os.PathSeparator)) {
+	if clean == "store" || strings.HasPrefix(clean, "store"+string(os.PathSeparator)) {
 		return "", fmt.Errorf("link-to %q overlaps binman's internal directory", value)
 	}
 	return clean, nil

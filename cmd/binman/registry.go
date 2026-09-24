@@ -13,7 +13,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/google/go-containerregistry/pkg/v1/types"
-	"golang.org/x/sync/errgroup"
 )
 
 type artifact struct {
@@ -33,17 +32,12 @@ func (c *client) resolve(ctx context.Context, names []string, arch string) ([]ar
 	}
 
 	artifacts := make([]artifact, len(names))
-	errs := make([]error, len(names))
-	var group errgroup.Group
-	group.SetLimit(resolveParallel)
-	for index, packageName := range names {
-		group.Go(func() error {
-			artifacts[index], errs[index] = c.resolveOne(packageName, arch, puller)
-			return nil
-		})
-	}
-	_ = group.Wait()
-	return artifacts, errors.Join(errs...)
+	err = runParallel(len(names), resolveParallel, func(index int) error {
+		var resolveErr error
+		artifacts[index], resolveErr = c.resolveOne(names[index], arch, puller)
+		return resolveErr
+	})
+	return artifacts, err
 }
 
 func (c *client) resolveOne(packageName, arch string, puller *remote.Puller) (artifact, error) {

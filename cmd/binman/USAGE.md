@@ -28,7 +28,7 @@ bm install ripgrep fd jq
 bm --prefix /opt/bm install ripgrep fd
 ```
 
-默认将 package 安装到 `<prefix>/.binman/store/<package>`，并把其中的叶子文件以相对
+默认将 package 安装到 `<prefix>/store/<package>`，并把其中的叶子文件以相对
 symlink 链接到 prefix。重新执行 install 会检查远端 layer digest：内容未变化时只调和
 链接，内容变化时下载并替换 store。
 
@@ -39,7 +39,7 @@ bm install --link-to profile/go gopls delve
 bm install --no-link python314
 ```
 
-`link-to` 必须是 prefix 内的相对路径。`.` 表示 prefix；绝对路径、`..` 和 `.binman`
+`link-to` 必须是 prefix 内的相对路径。`.` 表示 prefix；绝对路径、`..` 和 `store`
 均不允许。同一个 package 需要链接到多个 target 时使用 YAML。
 
 ## YAML

@@ -179,7 +179,7 @@ func TestManifestIsStrict(t *testing.T) {
 		{"multiple documents", "installs: []\n---\ninstalls: []\n"},
 		{"empty group", "installs:\n  - packages: []\n"},
 		{"unsafe target", "installs:\n  - packages: [tool]\n    link-to: ../outside\n"},
-		{"internal target", "installs:\n  - packages: [tool]\n    link-to: .binman/store\n"},
+		{"internal target", "installs:\n  - packages: [tool]\n    link-to: store\n"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			filename := filepath.Join(t.TempDir(), "binman.yaml")

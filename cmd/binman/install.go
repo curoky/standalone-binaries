@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -51,10 +50,10 @@ func (c *client) install(ctx context.Context, prefix string, plan installPlan) e
 		}
 	}
 
-	if err := ensureDirectory(prefix, internalPath(prefix)); err != nil {
+	if err := ensureStore(prefix); err != nil {
 		return err
 	}
-	workspace, err := os.MkdirTemp(internalPath(prefix), ".install-")
+	workspace, err := os.MkdirTemp(storeRoot(prefix), ".install-")
 	if err != nil {
 		return err
 	}
@@ -107,17 +106,12 @@ func (c *client) install(ctx context.Context, prefix string, plan installPlan) e
 }
 
 func runParallel(count, limit int, operation func(int) error) error {
-	errs := make([]error, count)
 	var group errgroup.Group
 	group.SetLimit(max(1, limit))
 	for index := range count {
-		group.Go(func() error {
-			errs[index] = operation(index)
-			return nil
-		})
+		group.Go(func() error { return operation(index) })
 	}
-	_ = group.Wait()
-	return errors.Join(errs...)
+	return group.Wait()
 }
 
 func commitInstall(prefix string, jobs []installJob, links []linkOperation) error {

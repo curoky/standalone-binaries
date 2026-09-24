@@ -102,11 +102,11 @@ tar -xzf "$tmp/binman.tar.gz" -C "$tmp"
 chmod +x "$tmp/binman/bin/bm"
 printf '{"digest":"%s","linkTo":["."]}\n' "$digest" >"$tmp/binman/.binman-meta"
 
-mkdir -p "$PREFIX/.binman/store" "$PREFIX/bin"
-rm -rf "$PREFIX/.binman/store/binman"
-mv "$tmp/binman" "$PREFIX/.binman/store/binman"
+mkdir -p "$PREFIX/store" "$PREFIX/bin"
+rm -rf "$PREFIX/store/binman"
+mv "$tmp/binman" "$PREFIX/store/binman"
 rm -f "$PREFIX/bin/bm"
-ln -s "../.binman/store/binman/bin/bm" "$PREFIX/bin/bm"
+ln -s "../store/binman/bin/bm" "$PREFIX/bin/bm"
 
 echo "> Installed: $PREFIX/bin/bm"
 case ":$PATH:" in
