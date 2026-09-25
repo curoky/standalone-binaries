@@ -44,6 +44,9 @@ rec {
 
   # Rust.
   codex = pkgsStatic.callPackage ../../codex { };
+  mise = pkgsStatic.callPackage ../../mise {
+    nativeGit = pkgs.gitMinimal;
+  };
   miniserve = pkgsStatic.callPackage ../../miniserve { };
   zellij = pkgsStatic.callPackage ../../zellij { };
 

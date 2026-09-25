@@ -9,7 +9,7 @@
   vim-plugins = pkgs.callPackage ../vim-plugins { };
   zsh-plugins = pkgsStatic.callPackage ../zsh-plugins { };
 
-  # Rust tools shipping a pre-generated, relocatable zsh init script.
+  # Rust tools with relocatable shell integration.
   atuin = pkgsStatic.callPackage ../atuin { nativeAtuin = pkgs.atuin; };
   starship = pkgsStatic.callPackage ../starship { nativeStarship = pkgs.starship; };
 
