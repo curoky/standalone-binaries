@@ -34,7 +34,6 @@ Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md
 | `lima` | 📦 native selection | ✅ | darwin-only native；artifact 去 qemu wrapper/resolver、保留 entitlement；仍有 Go 资源 store 引用（见下方记录） | 产物不再保留资源 store 引用后恢复默认；resolver 特例独立回归 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/normalize.go`, `cmd/artifact/binary.go` |
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |
 | `markdownlint-cli2` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/markdownlint-cli2/` |
-| `music-decrypto` | 🩹 ICU 路径 | 🟡 | macOS 可回归系统 ICU patch | macOS stock 仅用系统 dylib | — | `packages/music-decrypto/` |
 | `netron` | 📦 本地 | ❌ | wheel 重打包并绑定 sibling/宿主 Python | runtime packaging 必须保留 | — | `packages/netron/` |
 | `nixfmt` | ⏸️ 停用 darwin | 🟡 | stock pkgsStatic macOS 编译失败，暂仅接入 Linux；详见 manifest 注释 | macOS 构建修复后恢复 `aarch64-darwin` | — | `manifests/default.nix` |
 | `nodejs-slim26` | 🩹 本地 | 🟡 | 修 static deps/LIEF/Temporal/system libs/checks；darwin 未验证；详见 nix 注释 | 逐 patch 删除，满足各平台动态依赖规则 | — | `packages/nodejs/26/` |

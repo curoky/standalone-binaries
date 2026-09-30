@@ -30,9 +30,8 @@ build-time override 必须只替换构建工具，不得改变 target 包的链�
 
 ## Linux 动态例外
 
-当前只允许两个动态 ELF 例外：
+当前只允许一个动态 ELF 例外：
 
-- `music-decrypto`：依赖宿主 glibc ABI 的 .NET AOT 可执行文件；
 - `nsight-systems`：NVIDIA 提供的预编译 glibc 分发物。
 
 这些包仍必须满足：

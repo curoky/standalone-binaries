@@ -17,7 +17,7 @@
 4. 资源和 helper 使用相对路径；脚本工具通过同级 runtime wrapper 绑定解释器。
 5. 纯脚本、字体和数据包没有静态链接要求，但仍不得保留 Nix store 路径。
 
-Linux 当前只有 `music-decrypto` 和 `nsight-systems` 两个动态 ELF 例外。路径含
+Linux 当前只有 `nsight-systems` 一个动态 ELF 例外。路径含
 `openssl` 的文件保留既有 binary validation 豁免。改变这些例外前必须先确认。
 
 Darwin 的 `git-filter-repo` 和 `netron` 使用宿主 `python3`，`eza-ls` 可回退

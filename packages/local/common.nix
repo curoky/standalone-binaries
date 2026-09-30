@@ -38,6 +38,4 @@
   cloc = pkgs.callPackage ../cloc { };
   parallel = pkgs.callPackage ../parallel { };
 
-  # glibc-dynamic AOT exception.
-  music-decrypto = pkgs.callPackage ../music-decrypto { };
 }

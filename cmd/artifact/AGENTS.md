@@ -56,7 +56,7 @@ resolver 替换是临时 workaround，以 `artifact-darwin-cgo-resolv` 独立进
 
 - 只检查当前构建平台的原生格式：Linux 检查 ELF，Darwin 检查 Mach-O。打包的跨平台
   binary 不得触发另一平台工具链。
-- Linux ELF 默认必须静态链接；`music-decrypto` 和 `nsight-systems` 由
+- Linux ELF 默认必须静态链接；`nsight-systems` 由
   `lib/make-artifacts.nix` 显式传入动态例外。
 - Darwin dependency 只允许 `/usr/lib`、`/System/Library/Frameworks`、
   `@loader_path` 和 `@rpath`。

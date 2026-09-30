@@ -5,10 +5,7 @@
 name: drv:
 let
   isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
-  allowDynamicElf = pkgs.lib.elem name [
-    "music-decrypto"
-    "nsight-systems"
-  ];
+  allowDynamicElf = name == "nsight-systems";
 in
 pkgs.runCommand "${name}-standalone"
   {

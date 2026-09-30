@@ -57,7 +57,6 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `markdownlint-cli2` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/markdownlint-cli2/` |
 | `mise` | 🩹 本地 | 🟡 | native Git 检查工具 + 跳过代理相关 DNS 测试 + PATH helper；详见 nix 注释 | static Git 与 DNS 测试修复后删 build workaround；保留 PATH portability patch | dc5d91f84032 | `packages/mise/` |
 | `miniserve` | 📦 本地 | ❌ | wrapper 设置仓库要求的默认功能开关 | 产品行为必须保留 | — | `packages/miniserve/` |
-| `music-decrypto` | ⚠️ glibc 动态 | 🟡 | Linux 仅长期审计 .NET AOT | Linux 出现 musl-static AOT | 56c02bc00adc | `packages/music-decrypto/` |
 | `netron` | 📦 本地 | ❌ | wheel 重打包并绑定 sibling/宿主 Python | runtime packaging 必须保留 | — | `packages/netron/` |
 | `nodejs-slim24` | 🩹 本地 | 🟡 | 保留 `ada`/`libuv` doCheck 与 node configureFlags；详见 nix 注释 | 逐 patch 验证删除，保留 Node 24 runtime | 56c02bc00adc | `packages/nodejs/24/` |
 | `nodejs-slim26` | 🩹 本地 | 🟡 | 保留 `ada`/`libuv`/`lief`/`temporal_capi` 与 configureFlags；详见 nix 注释 | 逐 patch 删除，满足各平台动态依赖规则 | 56c02bc00adc | `packages/nodejs/26/` |
