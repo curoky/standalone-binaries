@@ -5,7 +5,7 @@
 # as a sibling directory at deploy time (the same convention dool/netron use for
 # the `python311` package: $store/<pkg-name>/bin/<interpreter>).
 #
-# This package owns the static-build patches. The ada / libuv / hdrhistogram_c tweaks
+# This package owns the static-build patches. The ada / lief / temporal_capi tweaks
 # must be applied to the *dependencies* node is compiled against, which are not
 # exposed as overridable args of nodejs-slim (they are args of the inner
 # nodejs.nix, pulled in via callPackage). So `.override` can't reach them and we
@@ -37,10 +37,9 @@
 let
   # pkgsStatic with the static-build patches needed to compile a fully static
   # (musl) nodejs-slim:
-  #   - ada / libuv: tests disabled. Under pkgsStatic their test suites fail
-  #     inside the Nix build sandbox (ada's `basic_fuzzer` exe isn't built in
-  #     the static toolchain; libuv's `udp_try_send` fails with -98/EADDRINUSE
-  #     due to the sandbox's restricted network).
+  #   - ada: tests disabled. Under pkgsStatic its test suite expects
+  #     `basic_fuzzer` and `max_length_fuzzer`, but neither executable is built
+  #     by the static toolchain.
   #
   # hdrhistogram_c no longer needs a local override: unstable nixpkgs already
   # disables the shared target (HDR_HISTOGRAM_BUILD_SHARED / BUILD_PROGRAMS) and
@@ -59,11 +58,11 @@ let
   # applies to the musl-static target copy; the glibc build-platform copies are
   # left untouched and keep hitting the upstream cache.
   # Full write-up: ../../../docs/package-strategies/pkgsstatic-extend.md
-  onlyStatic = pkg: overrides: if pkg.stdenv.hostPlatform.isStatic then pkg.overrideAttrs overrides else pkg;
+  onlyStatic =
+    pkg: overrides: if pkg.stdenv.hostPlatform.isStatic then pkg.overrideAttrs overrides else pkg;
   pkgsStaticNode = pkgsStatic.extend (
     _: prev: {
       ada = onlyStatic prev.ada { doCheck = false; };
-      libuv = onlyStatic prev.libuv { doCheck = false; };
       # lief (linked by node since 25.6 via `useSharedLief`): the nixpkgs lief
       # package hardcodes `LIEF_PYTHON_API true` and builds Python bindings,
       # pulling in python3 + pydantic -> pydantic-core (a Rust/maturin cdylib).

@@ -1,14 +1,13 @@
 # markdownlint-cli2 (on static node)
 #
 # markdownlint-cli2 running on our fully-static (musl) `nodejs-slim26` package,
-# instead of being `nix bundle`'d into a self-extracting executable. Same
-# runtime approach as packages/pnpm: reuse the upstream nixpkgs JS distribution
-# and ship a relative-path wrapper that invokes the sibling static node
-# explicitly, so the static node travels with the deployed tool instead of
-# depending on a node on the host PATH after artifact assembly rewrites the
-# upstream shebang.
+# instead of being `nix bundle`'d into a self-extracting executable. Reuse the
+# upstream nixpkgs JS distribution and ship a relative-path wrapper that invokes
+# the sibling static node explicitly. The static node then travels with the
+# deployed tool instead of depending on a node on the host PATH after artifact
+# assembly rewrites the upstream shebang.
 #
-# Unlike pnpm/prettier, the interpreter is NOT overridden at build time: this is
+# Unlike prettier, the interpreter is NOT overridden at build time: this is
 # an npm-based buildNpmPackage tool whose build needs `npm`, which nodejs-slim
 # lacks. So it is built with the regular node and only switches to the sibling
 # static node at runtime via the wrapper below.

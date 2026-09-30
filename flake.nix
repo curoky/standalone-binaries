@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-gcc15-2026-09-07.url = "github:NixOS/nixpkgs/dc5d91f840324650bac8c379428c7037a416959a";
     # Pinned unstable revision for the s6 stack (execline / s6 / s6-linux-init /
     # s6-rc / s6-dns / s6-linux-utils / s6-networking / s6-portable-utils /
     # skalibs). A later unstable bump broke these builds, so they stay on the
@@ -64,6 +65,7 @@
             };
           envs = {
             "unstable" = mkEnv inputs.nixpkgs-unstable;
+            "gcc15-pin" = mkEnv inputs.nixpkgs-gcc15-2026-09-07;
             "s6-pin" = mkEnv inputs.nixpkgs-s6-2026-08-23;
             "26.05" = mkEnv inputs.nixpkgs-2605;
             "25.11" = mkEnv inputs.nixpkgs-2511;

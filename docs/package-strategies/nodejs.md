@@ -28,8 +28,8 @@ macOS 必须从 `pkgsStatic` 构建依赖，最终 Mach-O 只能加载系统库�
 <store>/<tool>/libexec/<tool>/<entry>
 ```
 
-因此运行时不依赖 shebang 或宿主 `node`。`pnpm` 和 `prettier` 可在 build-time 使用静态
+因此运行时不依赖 shebang 或宿主 `node`。`prettier` 可在 build-time 使用静态
 Node；需要 npm 的 `markdownlint-cli2` 和 `opencommit` 使用普通 Node 构建，只在运行时
-切换到同级静态 runtime。
+切换到同级静态 runtime。`pnpm` 12 已是 Rust 原生程序，不属于 Node CLI。
 
 新增 Node CLI 必须至少 smoke test shipped JS 在同级 runtime 上可执行。

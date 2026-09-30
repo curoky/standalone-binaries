@@ -9,6 +9,7 @@ Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md
 
 | 包 | 定制 | 回归 | 原因与保留边界 | 回归判据 | commit | 来源 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `7zz` | 📌 `gcc15-pin` | ✅ | 与 Linux 共用经全平台验证的 GCC 15 nixpkgs revision；当前 pin 的直接原因是 Linux 静态链接失败 | Darwin 用 unstable 构建且只动态链接系统库 | — | `manifests/default.nix`, `flake.nix` |
 | `artifact-darwin-cgo-resolv` | 🩹 公共 artifact patch | ✅ | libresolv.9 dependency 由 artifact 改指系统库；临时 portability workaround；详见 cmd/artifact/AGENTS.md | 按下方 [Darwin CGO Resolver 回归](#darwin-cgo-resolver-回归) 绕过后全部宿主 Mach-O 无需替换、smoke 通过再删 | — | `cmd/artifact/binary.go`, `cmd/artifact/binary_test.go`, `lib/make-artifacts.nix` |
 | `aria2` | 📌 `24.11` | ❌ | unstable 静态 darwin 缺 iconv 符号链接失败；详见 manifest 注释 | 已确认必要，两平台都无可回归空间 | 624af665418d | `manifests/default.nix` |
 | `atuin` | 📦 本地 | 🟡 | 预生成相对定位 init.zsh；darwin 未验证；详见 nix 注释 | 预生成 init 保留 | — | `packages/atuin/` |
@@ -22,7 +23,7 @@ Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md
 | `exiftool` | 📦 本地 | 🟡 | sibling Perl/压缩模块 bundling；install checks 禁用；darwin 未验证 | 仅上游可运行 install check 时恢复 | — | `packages/exiftool/` |
 | `eza-ls` | 📦 本地 | ❌ | 自定义 `ls` 兼容层与 bundled eza | 独立产品行为，不是上游 bug | — | `packages/eza-ls/` |
 | `ffmpeg` | 🩹 本地 | 🟡 | 关无法静态化的 codec/network + 修 x265；`doCheck=false`（FATE flaky）；详见 nix 注释 | 逐 feature 恢复只依赖系统 dylib；上游修 flaky 后恢复检查 | — | `packages/ffmpeg/` |
-| `file` | 📦 本地 | ❌ | wrapper 相对定位 `magic.mgc` | 可搬运资源定位必须保留 | — | `packages/file/` |
+| `file` | 🩹 + 📦 本地 | 🟡 | version check 直指真实二进制；wrapper 相对定位 `magic.mgc` | 上游检查可兼容 wrapper 后删除检查修正；资源定位必须保留 | b4fd65b198c5 | `packages/file/` |
 | `gdb` | 📌 `25.11` | ❌ | unstable dejagnu→expect 静态 darwin 缺 tclStubsPtr；详见 manifest 注释 | 已确认两平台都必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
 | `git-filter-repo` | 📦 本地 | ❌ | Python sibling runtime；macOS 暂用宿主 Python | runtime packaging 不会因上游构建修复消失 | — | `packages/git-filter-repo/` |
 | `gnupg` | 📦 override | ❌ | 明确启用 minimal 并关闭 GUI | feature selection 是产品决策 | — | `packages/local/common.nix` |
@@ -41,7 +42,6 @@ Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md
 | `pkgconf` | 🩹 本地 | ✅ | 改系统路径，避免二进制残留 store 路径；详见 nix 注释 | stock 二进制不再嵌 store 路径且只依赖系统 dylib | — | `packages/pkgconf/` |
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/parallel/` |
 | `perl` | 🩹 + 📦 本地 | 🟡 | macOS 静态替换 + install-name relocation + wrapper；darwin 未验证；详见 nix 注释 | 只删除 stock 已覆盖的依赖/link patch | — | `packages/perl/` |
-| `pnpm` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/pnpm/` |
 | `postgresql` | 🩹 + 📦 本地 | 🟡 | 基于 `pkgsStatic.libpq` 追加 psql，改系统 OpenSSL 目录；详见 nix 注释 | `pkgsStatic.libpq` 上游提供 psql 且不嵌依赖路径 | dc5d91f84032 | `packages/postgresql/` |
 | `prettier` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/prettier/` |
 | `protobuf_3_8_0` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.8.0 | 版本化产品，不回到最新 upstream | — | `packages/protobuf/3_8_0/` |

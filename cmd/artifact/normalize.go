@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	storeShebangPattern   = regexp.MustCompile(`(?m)^#![[:space:]]*/nix/store/[a-z0-9._-]+/bin/([^[:space:]]+)`)
+	storeShebangPattern   = regexp.MustCompile(`(?m)^#![ \t]*/nix/store/[a-z0-9._-]+/bin/([^ \t\r\n]+)([^\r\n]*)`)
 	storeBinPattern       = regexp.MustCompile(`/nix/store/[a-z0-9._-]+/bin/`)
 	storePathPattern      = regexp.MustCompile(`/nix/store/[a-z0-9]{32}-[^[:space:]:/()<>]*`)
 	storeReferencePattern = regexp.MustCompile(
@@ -187,13 +187,22 @@ func rewriteTextFile(path string) error {
 		return nil
 	}
 
-	rewritten := storeShebangPattern.ReplaceAll(data, []byte("#!/usr/bin/env $1"))
+	rewritten := storeShebangPattern.ReplaceAllFunc(data, rewriteStoreShebang)
 	rewritten = storeBinPattern.ReplaceAll(rewritten, nil)
 	rewritten = storePathPattern.ReplaceAll(rewritten, nil)
 	if bytes.Equal(data, rewritten) {
 		return nil
 	}
 	return replaceFile(path, rewritten, mode)
+}
+
+func rewriteStoreShebang(shebang []byte) []byte {
+	parts := storeShebangPattern.FindSubmatch(shebang)
+	arguments := bytes.TrimSpace(parts[2])
+	if len(arguments) == 0 {
+		return []byte("#!/usr/bin/env " + string(parts[1]))
+	}
+	return []byte("#!/usr/bin/env -S " + string(parts[1]) + " " + string(arguments))
 }
 
 func nukeStoreReferences(path string) error {

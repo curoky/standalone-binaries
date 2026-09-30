@@ -24,6 +24,7 @@
 
   _7zz = {
     alias = "7zz";
+    version = "gcc15-pin";
   };
   # bash/coreutils temporarily skip aarch64-linux: the musl-static cross build
   # currently fails there (see docs regression table). x86_64-linux and darwin
@@ -163,12 +164,20 @@
   fd = { };
   git-absorb = { };
   mcfly = { };
+  pnpm = { };
   procs = { };
   ripgrep = { };
   ruff = { };
   tokei = { };
   yazi-unwrapped = {
     alias = "yazi";
+  };
+  zellij-unwrapped = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
+    alias = "zellij";
   };
 
   ## ---- linux only -------------------------------------------------------

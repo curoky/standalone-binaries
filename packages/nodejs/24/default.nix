@@ -5,8 +5,8 @@
 # as a sibling directory at deploy time (the same convention dool/netron use for
 # the `python311` package: $store/<pkg-name>/bin/<interpreter>).
 #
-# This package owns the static-build patches. The ada / libuv / hdrhistogram_c
-# tweaks must be applied to the *dependencies* node is compiled against, which are not
+# This package owns the static-build patches. The ada tweak
+# must be applied to the *dependencies* node is compiled against, which are not
 # exposed as overridable args of nodejs-slim (they are args of the inner
 # nodejs.nix, pulled in via callPackage). So `.override` can't reach them and we
 # extend the static package set with an overlay, then take its patched
@@ -37,10 +37,9 @@
 let
   # pkgsStatic with the static-build patches needed to compile a fully static
   # (musl) nodejs-slim:
-  #   - ada / libuv: tests disabled. Under pkgsStatic their test suites fail
-  #     inside the Nix build sandbox (ada's `basic_fuzzer` exe isn't built in
-  #     the static toolchain; libuv's `udp_try_send` fails with -98/EADDRINUSE
-  #     due to the sandbox's restricted network).
+  #   - ada: tests disabled. Under pkgsStatic its test suite expects
+  #     `basic_fuzzer` and `max_length_fuzzer`, but neither executable is built
+  #     by the static toolchain.
   #
   # hdrhistogram_c no longer needs a local override: unstable nixpkgs already
   # disables the shared target (HDR_HISTOGRAM_BUILD_SHARED / BUILD_PROGRAMS) and
@@ -50,7 +49,6 @@ let
   pkgsStaticNode = pkgsStatic.extend (
     _: prev: {
       ada = prev.ada.overrideAttrs { doCheck = false; };
-      libuv = prev.libuv.overrideAttrs { doCheck = false; };
     }
   );
 

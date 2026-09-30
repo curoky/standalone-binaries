@@ -13,9 +13,10 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 
 | 包 | 定制 | 回归 | 原因与保留边界 | 回归判据 | commit | 来源 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `7zz` | 📌 `gcc15-pin` | ✅ | unstable 7zip 26.02 + GCC 16 链接 `7z.so` 时命中非 PIC 静态 libstdc++ 重定位错误 | 两个 Linux 架构用 unstable 构建并满足 musl-static portability | b4fd65b198c5 | `manifests/default.nix`, `flake.nix` |
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
 | `aardvark-dns` | 🩹 本地 | ✅ | musl 无 `close_range` wrapper，patch 改用 raw syscall；详见 nix 注释 | 上游改用 musl-safe close_range 后删 patch | 56c02bc00adc | `packages/aardvark-dns/` |
-| `atuin` | 📦 本地 | 🟡 | 预生成相对定位 init.zsh；详见 nix 注释 | 预生成 init 属产品行为保留 | dc5d91f84032 | `packages/atuin/` |
+| `atuin` | 📦 本地 | ❌ | 预生成相对定位 init.zsh；详见 nix 注释 | 预生成 init 属产品行为，无上游回归空间 | — | `packages/atuin/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
 | `busybox` | 🩹 + 📦 本地 | 🟡 | udhcpc 与配套脚本改为 sibling 相对定位；详见 nix 注释 | 上游支持可搬运资源定位后删 patch；保留脚本 packaging | dc5d91f84032 | `packages/busybox/` |
 | `catatonit` | 🩹 本地 | ✅ | 补 build-for-build binutils 让 installCheck 的 readelf 可用；详见 nix 注释 | 上游把 binutils 加进 nativeBuildInputs 后恢复 | dc5d91f84032 | `packages/catatonit/` |
@@ -24,7 +25,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `clang-tools-20` | 📦 本地 | ❌ | 固定 LLVM 20，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-21` | 📦 本地 | ❌ | 固定 LLVM 21，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-22` | 📦 本地 | ❌ | 固定 LLVM 22，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `cloc` | 📦 本地 | 🟡 | `doInstallCheck=false`（沙箱无 sibling perl）+ Perl wrapper packaging；详见 nix 注释 | 只恢复可运行的 install check | 56c02bc00adc | `packages/cloc/` |
+| `cloc` | 📦 本地 | ❌ | sibling Perl wrapper 使 install check 在无 sibling runtime 的沙箱中不可运行；详见 nix 注释 | runtime packaging 与对应的 check 边界必须保留 | — | `packages/cloc/` |
 | `codex` | 🩹 本地 | 🟡 | 仅构建 `codex-cli`（丢弃 V8 backed code-mode-host）+ 去 wrapProgram store 路径 + 补 perl 建 vendored openssl；详见 nix 注释 | 上游 CLI 不再需要 code-mode-host 或 denoland 出 musl librusty_v8 后回 stock | dc5d91f84032 | `packages/codex/` |
 | `cmake_3_27_9` | 📌 源码版本 + 🩹 | 🟡 | 保留 cstdint patch、`BUILD_TESTING=false`、openssl/curses 关闭；详见 nix 注释 | 上游修复后删剩余 workaround，保留版本化 output | 56c02bc00adc | `packages/cmake/3_27_9/` |
 | `cmake_4_1_2` | 📌 源码版本 + 🩹 | 🟡 | 保留 `--no-system-libs`、openssl/curses 关闭、`BUILD_TESTING=false`；详见 nix 注释 | 上游支持静态 shared-module test 后删剩余 workaround | 56c02bc00adc | `packages/cmake/4_1_2/` |
@@ -36,9 +37,9 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `dive` | 📌 `25.11` | ✅ | 去 pin 失败（openldap 缺 Cyrus SASL）；详见 manifest 注释 | Linux 用 unstable 并满足 musl-static portability | 56c02bc00adc | `manifests/default.nix` |
 | `dool` | 📦 本地 | ❌ | Python sibling runtime wrapper，默认追加 `--bytes` | runtime 与产品默认行为必须保留 | — | `packages/dool/` |
 | `execline` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch；详见 nix 注释 | 上游修 s6 stack 后去 pin；输出无 store 路径 | 56c02bc00adc | `packages/execline/`, `flake.nix` |
-| `exiftool` | 📦 本地 | 🟡 | `doInstallCheck=false` + sibling Perl/模块 bundling；详见 nix 注释 | 仅上游可运行 install check 时恢复 | 56c02bc00adc | `packages/exiftool/` |
+| `exiftool` | 📦 本地 | ❌ | sibling Perl wrapper 与模块 bundling 使 install check 在构建沙箱中不可运行；详见 nix 注释 | runtime packaging 与对应的 check 边界必须保留 | — | `packages/exiftool/` |
 | `eza-ls` | 📦 本地 | ❌ | 自定义 `ls` 兼容层与 bundled eza | 独立产品行为，不是上游 bug | — | `packages/eza-ls/` |
-| `file` | 📦 本地 | ❌ | wrapper 相对定位 `magic.mgc` | 可搬运资源定位必须保留 | — | `packages/file/` |
+| `file` | 🩹 + 📦 本地 | 🟡 | version check 直指真实二进制；wrapper 相对定位 `magic.mgc` | 上游检查可兼容 wrapper 后删除检查修正；资源定位必须保留 | b4fd65b198c5 | `packages/file/` |
 | `fuse` | 🩹 本地 | 🟡 | 去 shadow/完整 util-linux 依赖（explicit_bzero SIGABRT）；详见 nix 注释 | 上游 libbsd 通过或 fuse2 不引 shadow 后删 override | 56c02bc00adc | `packages/fuse/` |
 | `gdb` | 📌 `25.11` | ❌ | 历史 pin；unstable dejagnu→expect 链接失败（tclStubsPtr）；详见 manifest 注释 | 已确认必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
 | `git` | 🩹 本地 | 🟡 | test locale FAIL + 静态传递链接 + 相对资源 wrapper；详见 nix 注释 | 逐项删构建 workaround，保留 wrapper | 56c02bc00adc | `packages/git/` |
@@ -58,8 +59,8 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `mise` | 🩹 本地 | 🟡 | native Git 检查工具 + 跳过代理相关 DNS 测试 + PATH helper；详见 nix 注释 | static Git 与 DNS 测试修复后删 build workaround；保留 PATH portability patch | dc5d91f84032 | `packages/mise/` |
 | `miniserve` | 📦 本地 | ❌ | wrapper 设置仓库要求的默认功能开关 | 产品行为必须保留 | — | `packages/miniserve/` |
 | `netron` | 📦 本地 | ❌ | wheel 重打包并绑定 sibling/宿主 Python | runtime packaging 必须保留 | — | `packages/netron/` |
-| `nodejs-slim24` | 🩹 本地 | 🟡 | 保留 `ada`/`libuv` doCheck 与 node configureFlags；详见 nix 注释 | 逐 patch 验证删除，保留 Node 24 runtime | 56c02bc00adc | `packages/nodejs/24/` |
-| `nodejs-slim26` | 🩹 本地 | 🟡 | 保留 `ada`/`libuv`/`lief`/`temporal_capi` 与 configureFlags；详见 nix 注释 | 逐 patch 删除，满足各平台动态依赖规则 | 56c02bc00adc | `packages/nodejs/26/` |
+| `nodejs-slim24` | 🩹 本地 | 🟡 | 保留 `ada` doCheck 与 node configureFlags；详见 nix 注释 | 逐 patch 验证删除，保留 Node 24 runtime | 56c02bc00adc | `packages/nodejs/24/` |
+| `nodejs-slim26` | 🩹 本地 | 🟡 | 保留 `ada`/`lief`/`temporal_capi` 与 configureFlags；详见 nix 注释 | 逐 patch 删除，满足各平台动态依赖规则 | 56c02bc00adc | `packages/nodejs/26/` |
 | `nsight-systems` | ⚠️ 预编译 glibc | ⏳ | NVIDIA 只提供 glibc 动态发行物 | 上游提供可用的 musl-static 发行物 | — | `packages/nsight-systems/` |
 | `opencommit` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/opencommit/` |
 | `openssh_gssapi` | 🩹 + 📦 本地 | ❌ | 相对定位 helpers + 关预认证 sandbox（QEMU 拒 seccomp）；详见 nix 注释 | 可搬运 helper 定位与跨架构 SSH 必须保留 | — | `packages/openssh_gssapi/` |
@@ -68,7 +69,6 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/parallel/` |
 | `patchelf` | 📌 `25.05` | ✅ | 历史 pin；unstable check `__TMC_END__` relocation 失败；详见 manifest 注释 | Linux 用 unstable 并满足 musl-static portability | 56c02bc00adc | `manifests/default.nix` |
 | `perl` | 🩹 + 📦 本地 | 🟡 | 注入 Compress::Raw::Lzma + IO::Compress::Brotli 静态 XS + wrapper；详见 nix 注释 | 只删 stock 已覆盖的依赖/link patch | 56c02bc00adc | `packages/perl/` |
-| `pnpm` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/pnpm/` |
 | `podman5` | 🩹 + 📦 本地 | 🟡 | 跟随 5.x；packaging 与产品边界见 podman DESIGN.md | 分别回归编译修正；packaging 保留 | dc5d91f84032 | `packages/podman/DESIGN.md`、`packages/podman/podman5.nix` |
 | `podman5-rootless` | 📦 本地 | ❌ | per-user wrapper、宿主 ID-map 接口、状态与 s6 packaging | 独立 rootless 产品边界必须保留 | — | `packages/podman-rootless/` |
 | `podman6` | 📌 + 🩹 + 📦 本地 | 🟡 | 固定 6.1.0；packaging 与产品边界见 podman DESIGN.md | 分别回归 pin/编译修正；packaging 保留 | dc5d91f84032 | `packages/podman/DESIGN.md`、`packages/podman/podman6.nix` |
@@ -109,6 +109,5 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |
 | `watchexec` | 🩹 本地 | ✅ | `--package=watchexec-cli` 排除 test crate；详见 nix 注释 | stock 输出不含 `test-socketfd` 且满足 portability | 56c02bc00adc | `packages/watchexec/` |
 | `wget` | 🩹 + 📦 本地 | 🟡 | `doCheck=false`（fuzzer segfault）+ CA wrapper packaging；详见 nix 注释 | 恢复 checks/build tool 后保留 CA packaging | 56c02bc00adc | `packages/wget/` |
-| `zellij` | 🩹 checks | 🟡 | 去 `26.05` pin 改 unstable，仍禁 checks（test 静态链符号未解析）；详见 nix 注释 | 上游 test 静态链接修复后恢复 checks | 56c02bc00adc | `packages/zellij/`, `packages/local/linux/common.nix` |
 | `zsh` | 🩹 + 📦 本地 | 🟡 | 三个 `link=either` module + FPATH wrapper/zshenv packaging；详见 nix 注释 | 上游默认内建三 module 后删 patch，保留 packaging | 56c02bc00adc | `packages/zsh/` |
 | `zsh-plugins` | 📦 本地 | ❌ | 聚合 oh-my-zsh 与 plugins | plugin bundle 是产品 | — | `packages/zsh-plugins/` |

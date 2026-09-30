@@ -48,7 +48,6 @@ rec {
     nativeGit = pkgs.gitMinimal;
   };
   miniserve = pkgsStatic.callPackage ../../miniserve { };
-  zellij = pkgsStatic.callPackage ../../zellij { };
 
   # Perl.
   perl = pkgsStatic.callPackage ../../perl/linux.nix { };
@@ -147,7 +146,6 @@ rec {
   inherit (nodeTools)
     markdownlint-cli2
     opencommit
-    pnpm
     prettier
     ;
 

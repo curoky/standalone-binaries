@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -117,6 +118,33 @@ func TestRunNormalizesTreeAndCreatesArchive(t *testing.T) {
 	modes := readArchiveModes(t, archive)
 	if modes["fixture/"] != 0o755 || modes["fixture/.hidden"] != 0o644 || modes["fixture/bin/tool"] != 0o755 {
 		t.Fatalf("archive modes=%v", modes)
+	}
+}
+
+func TestRewriteTextFilePreservesShebangArguments(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "script")
+	mustWriteFile(t, path, "#! /nix/store/0123456789abcdfghijklmnpqrsvwxyz-bash/bin/bash -eu\nprintf 'executed\\n'\n", 0o555)
+	if err := rewriteTextFile(path); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "#!/usr/bin/env -S bash -eu\nprintf 'executed\\n'\n"
+	if string(data) != want {
+		t.Fatalf("rewritten script=%q want=%q", data, want)
+	}
+
+	output, err := exec.Command(path).CombinedOutput()
+	if err != nil {
+		t.Fatalf("execute rewritten script: %v\n%s", err, output)
+	}
+	if string(output) != "executed\n" {
+		t.Fatalf("script output=%q", output)
 	}
 }
 

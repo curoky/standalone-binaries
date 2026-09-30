@@ -39,7 +39,6 @@ in
   inherit (nodeTools)
     markdownlint-cli2
     opencommit
-    pnpm
     prettier
     ;
 }

@@ -20,7 +20,8 @@ Artifact name 必须是安全的相对路径。Archive 固定 uid、gid、时间
 - 删除 `nix-support`、man page、文档、shell completion、`.a` 和 `.pyc`。
 - 保留内部 symlink，物化外部 symlink，删除 dangling symlink。
 - 恢复 `.*-wrapped` 入口。
-- 文本 shebang 改为 `/usr/bin/env`，删除文本中的 Nix store binary path。
+- 文本 shebang 改为 `/usr/bin/env`；原 shebang 带解释器参数时使用
+  `/usr/bin/env -S` 保留参数。删除文本中的 Nix store binary path。
 - Linux ELF 执行 strip；二进制中的 store hash 被稳定替换。
 - Darwin Mach-O 删除 Nix rpath；Go CGO resolver 的有限修正规则见下文。
 - 统一目录和文件权限，再生成归档。
