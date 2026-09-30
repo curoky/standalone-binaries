@@ -24,18 +24,21 @@ Nix cache 的 segment schema、serving 和 retention 细节见
 
 ## 发布流程
 
-1. `discover` eval 当前平台的 `cacheRoots`，包含各包 out、archive 和 source roots，排除聚合输出。
-2. 本地 `nixcache serve` 作为 GHCR-backed substituter，分别检查当前 out、archive、source
-   roots；另用 `nixcache publication` 核对工具 artifact 的输出身份。
+1. `discover` 从 GHCR 生成一次当前平台的冻结 cache index；普通模式再 eval 当前平台的
+   `cacheRoots`，包含各包 out、archive 和 source roots，排除聚合输出。
+2. 普通模式由本地 `nixcache serve --index` 作为 GHCR-backed substituter，分别检查当前
+   out、archive、source roots；另用 `nixcache publication` 核对工具 artifact 的输出身份。
 3. 仅当缓存 roots 和发布状态都匹配时跳过；任一缺失的包进入 build matrix。
-4. 每个包构建 `packages.<system>.<name>` 和
+4. `discover` 将冻结 index 作为单日 Actions artifact 传给同平台全部 matrix leg；每个 build
+   job 直接加载该 index，避免并发重复读取全部 segment metadata。
+5. 每个包构建 `packages.<system>.<name>` 和
    `tarballs.<system>.<name>`。两者是同一 multi-output derivation 的 `out` 与
    `archive` output。
-5. standalone、archive 和 source 输出的 closure 推送到 cache repository；归档另发布为
+6. standalone、archive 和 source 输出的 closure 推送到 cache repository；归档另发布为
    `ghcr.io/curoky/standalone-binaries:<name>-<arch>`，单 layer 布局不变。工具 manifest 标注
    `dev.curoky.standalone.system`、`dev.curoky.standalone.out-path` 和
    `dev.curoky.standalone.archive-path`，精确关联当前输出。
-6. `summary` 汇总发现数量和各 matrix leg 的最终状态。
+7. `summary` 汇总发现数量和各 matrix leg 的最终状态。
 
 归档必须由 `lib/make-artifacts.nix` 在 Nix build 内生成。workflow 不得自行重新打包或修改
 归档内容。
@@ -50,8 +53,14 @@ identity。
 现存 snapshot 的 segment；snapshot 只决定上传归属和 retention 分组，不隔离读取。
 因此 lock 改变后，未改变的 outPath 仍可命中；不同 outPath 不按包名或版本替代。
 
-每个 `serve` 进程在内存中复用已验证的不可变 segment，每 5 分钟列举 tag，只读取新增项，
-移除已删除项并原子更新索引。刷新失败保留完整旧索引；NAR payload 仍按需下载。
+未指定 `--index` 的 live `serve` 进程在内存中复用已验证的不可变 segment，每 5 分钟列举
+tag，只读取新增项，移除已删除项并原子更新索引。刷新失败保留完整旧索引；NAR payload
+仍按需下载。
+
+CI 的 build job 使用 `discover` 生成的冻结 index，不执行上述 live refresh。该 index
+只包含已验证的 narinfo 与 NAR descriptor，NAR payload 仍按需从 GHCR 下载；build 和 prune
+的 concurrency 边界保证其使用期间 segment 不会被清理。冻结视图不包含同一 run 内新上传的
+segment，这只减少跨 matrix leg 的临时复用，不影响构建与发布正确性。
 
 缓存命中不代表发布成功：cache 上传成功但 artifact 发布失败时，下次仍进入 job，用缓存
 补发。旧 artifact 缺少身份 annotations 也进入发布；远端查询错误终止 discovery。Archive
@@ -81,12 +90,12 @@ identity。
 | `schedule` | 运行 | 全部包 | 跳过（强制重建） | `discover` 输出 |
 | dispatch 全部，普通 | 运行 | 全部包 | 做 | `discover` 输出 |
 | dispatch 全部，强制 | 运行 | 全部包 | 跳过 | `discover` 输出 |
-| dispatch 具体包 | 跳过 | 仅该包 | 不适用 | 入口预检后的 `inputs.name` |
+| dispatch 具体包 | 只生成 index | 仅该包 | 不适用 | `discover` 输出 |
 
-具体包 dispatch 先在入口 workflow 验证所选平台是否暴露该包，再为可用平台直接构造
-单包 matrix，不做 cache 探测。不存在该包的平台显示为 skipped，其他平台继续；如果所有
-所选平台都不可用，入口 job 失败，避免错误包名静默成功。新增触发方式或改变选择语义时，
-必须同步两个 build workflow 和本表。
+具体包 dispatch 先在入口 workflow 验证所选平台是否暴露该包，再由各平台的 `discover`
+输出单包 matrix，不做 cache 与 publication 探测。不存在该包的平台显示为 skipped，其他
+平台继续；如果所有所选平台都不可用，入口 job 失败，避免错误包名静默成功。新增触发方式
+或改变选择语义时，必须同步两个 build workflow 和本表。
 
 Node.js 运行时和同级 runtime 工具（`nodejs-slim*`、`markdownlint-cli2`、`opencommit`、
 `pnpm`、`prettier`）以及 `nil`、`nixfmt`、`shellcheck`、`gdb`、`clang-tools-{18..22}`

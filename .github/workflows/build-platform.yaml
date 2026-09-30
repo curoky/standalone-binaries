@@ -19,7 +19,7 @@ on:
         required: true
         type: string
       name:
-        default: ''
+        default: ""
         required: false
         type: string
       skip_discover:
@@ -33,7 +33,6 @@ env:
 
 jobs:
   discover:
-    if: ${{ inputs.name == '' || inputs.name == '*' }}
     runs-on: ${{ inputs.runner }}
     permissions:
       contents: read
@@ -63,22 +62,34 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.26'
+          go-version: "1.26"
           cache-dependency-path: go.sum
 
       - uses: DeterminateSystems/nix-installer-action@v22
         with:
           summarize: false
 
+      - name: Build Nix cache client
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          go build -trimpath -ldflags="-s -w" -o "$RUNNER_TEMP/bin/nixcache" ./cmd/nixcache
+
+      - name: Create Nix cache index
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          "$RUNNER_TEMP/bin/nixcache" index "$RUNNER_TEMP/nixcache-index.json"
+
       - name: Start Nix cache
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CGO_ENABLED: '0'
         run: |
-          mkdir -p "$RUNNER_TEMP/bin"
-          go build -trimpath -ldflags="-s -w" -o "$RUNNER_TEMP/bin/nixcache" ./cmd/nixcache
-          "$RUNNER_TEMP/bin/nixcache" serve >"$RUNNER_TEMP/nixcache.log" 2>&1 &
+          "$RUNNER_TEMP/bin/nixcache" serve --index "$RUNNER_TEMP/nixcache-index.json" \
+            >"$RUNNER_TEMP/nixcache.log" 2>&1 &
           curl --retry 90 --retry-delay 1 --retry-all-errors -fsS \
             "$NIXCACHE_STORE/nix-cache-info" || {
               cat "$RUNNER_TEMP/nixcache.log"
@@ -89,6 +100,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           SKIP_DISCOVER: ${{ inputs.skip_discover }}
+          PACKAGE_NAME: ${{ inputs.name }}
           SYSTEM: ${{ inputs.system }}
           EXCLUDE_PKGS: ${{ inputs.exclude_pkgs }}
           PUSH_EXCLUDE_PKGS: ${{ inputs.push_exclude_pkgs }}
@@ -98,64 +110,71 @@ jobs:
         run: |
           set -euo pipefail
 
-          nix eval --accept-flake-config --json ".#cacheRoots.${SYSTEM}" >roots.json
-          jq -r 'to_entries[] | [.key, .value.out, .value.archive, (.value.sources | join(" "))] | @tsv' roots.json >pkgs.tsv
+          if [[ -n "$PACKAGE_NAME" && "$PACKAGE_NAME" != "*" ]]; then
+            printf '%s\n' "$PACKAGE_NAME" >selected.txt
+            candidates=1
+            hits=not-checked
+            published=not-checked
+          else
+            nix eval --accept-flake-config --json ".#cacheRoots.${SYSTEM}" >roots.json
+            jq -r 'to_entries[] | [.key, .value.out, .value.archive, (.value.sources | join(" "))] | @tsv' roots.json >pkgs.tsv
 
-          for name in $EXCLUDE_PKGS; do
-            grep -vP "^${name}\t" pkgs.tsv >pkgs.tsv.tmp && mv pkgs.tsv.tmp pkgs.tsv
-          done
-
-          if [[ "$EVENT_NAME" == "push" ]]; then
-            for name in $PUSH_EXCLUDE_PKGS; do
+            for name in $EXCLUDE_PKGS; do
               grep -vP "^${name}\t" pkgs.tsv >pkgs.tsv.tmp && mv pkgs.tsv.tmp pkgs.tsv
             done
-          fi
 
-          check() {
-            local name out_path archive_path sources status path
-            local cache_ready=1 published=1
-            local -a source_paths
-            IFS=$'\t' read -r name out_path archive_path sources <<<"$1"
-            read -r -a source_paths <<<"$sources"
-            for path in "$out_path" "$archive_path" "${source_paths[@]}"; do
-              if "$RUNNER_TEMP/bin/nixcache" probe "$path"; then
+            if [[ "$EVENT_NAME" == "push" ]]; then
+              for name in $PUSH_EXCLUDE_PKGS; do
+                grep -vP "^${name}\t" pkgs.tsv >pkgs.tsv.tmp && mv pkgs.tsv.tmp pkgs.tsv
+              done
+            fi
+
+            check() {
+              local name out_path archive_path sources status path
+              local cache_ready=1 published=1
+              local -a source_paths
+              IFS=$'\t' read -r name out_path archive_path sources <<<"$1"
+              read -r -a source_paths <<<"$sources"
+              for path in "$out_path" "$archive_path" "${source_paths[@]}"; do
+                if "$RUNNER_TEMP/bin/nixcache" probe "$path"; then
+                  :
+                else
+                  status=$?
+                  [[ "$status" == 1 ]] || return "$status"
+                  cache_ready=0
+                fi
+              done
+              if "$RUNNER_TEMP/bin/nixcache" publication "${name}-${ARTIFACT_SUFFIX}" "$SYSTEM" "$out_path" "$archive_path"; then
                 :
               else
                 status=$?
                 [[ "$status" == 1 ]] || return "$status"
-                cache_ready=0
+                published=0
               fi
-            done
-            if "$RUNNER_TEMP/bin/nixcache" publication "${name}-${ARTIFACT_SUFFIX}" "$SYSTEM" "$out_path" "$archive_path"; then
-              :
+              printf '%s\t%s\t%s\n' "$name" "$cache_ready" "$published"
+            }
+            export -f check
+            export RUNNER_TEMP SYSTEM ARTIFACT_SUFFIX
+            if [[ "$SKIP_DISCOVER" == "true" || "$EVENT_NAME" == "schedule" ]]; then
+              cut -f1 pkgs.tsv >selected.txt
+              hits=not-checked
+              published=not-checked
             else
-              status=$?
-              [[ "$status" == 1 ]] || return "$status"
-              published=0
+              if ! xargs -P 16 -d '\n' -I {} bash -c 'check "$@"' _ {} <pkgs.tsv >status.tsv; then
+                echo "::error::discovery aborted because a cache or publication query failed"
+                exit 1
+              fi
+              jq -R -s '[split("\n")[] | select(length > 0) | split("\t")]' status.tsv >status.json
+              jq -r '.[] | select(.[1] != "1" or .[2] != "1") | .[0]' status.json >selected.txt
+              hits=$(jq '[.[] | select(.[1] == "1")] | length' status.json)
+              published=$(jq '[.[] | select(.[2] == "1")] | length' status.json)
             fi
-            printf '%s\t%s\t%s\n' "$name" "$cache_ready" "$published"
-          }
-          export -f check
-          export RUNNER_TEMP SYSTEM ARTIFACT_SUFFIX
-          if [[ "$SKIP_DISCOVER" == "true" || "$EVENT_NAME" == "schedule" ]]; then
-            cut -f1 pkgs.tsv >selected.txt
-            hits=not-checked
-            published=not-checked
-          else
-            if ! xargs -P 16 -d '\n' -I {} bash -c 'check "$@"' _ {} <pkgs.tsv >status.tsv; then
-              echo "::error::discovery aborted because a cache or publication query failed"
-              exit 1
-            fi
-            jq -R -s '[split("\n")[] | select(length > 0) | split("\t")]' status.tsv >status.json
-            jq -r '.[] | select(.[1] != "1" or .[2] != "1") | .[0]' status.json >selected.txt
-            hits=$(jq '[.[] | select(.[1] == "1")] | length' status.json)
-            published=$(jq '[.[] | select(.[2] == "1")] | length' status.json)
+            candidates=$(grep -c . pkgs.tsv || true)
           fi
 
           matrix=$(jq -R -s -c \
             'split("\n") | map(select(length > 0)) | {include: map({name: .})}' \
             <selected.txt)
-          candidates=$(grep -c . pkgs.tsv || true)
           count=$(grep -c . selected.txt || true)
 
           {
@@ -168,20 +187,28 @@ jobs:
           echo "selected packages ($count of $candidates candidates, cache=$hits, published=$published):"
           cat selected.txt
 
+      - name: Upload Nix cache index
+        uses: actions/upload-artifact@v7
+        with:
+          name: nixcache-index-${{ inputs.system }}
+          path: ${{ runner.temp }}/nixcache-index.json
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Dump Nix cache log
         if: always()
         run: sed 's/^/[nixcache] /' "$RUNNER_TEMP/nixcache.log" || true
 
   build:
     needs: discover
-    if: ${{ always() && needs.discover.result != 'failure' && needs.discover.result != 'cancelled' && ((needs.discover.outputs.count != '0' && needs.discover.outputs.count != '') || (inputs.name != '' && inputs.name != '*')) }}
+    if: ${{ needs.discover.result == 'success' && needs.discover.outputs.count != '0' && needs.discover.outputs.count != '' }}
     runs-on: ${{ inputs.runner }}
     permissions:
       contents: read
       packages: write
     strategy:
       fail-fast: false
-      matrix: ${{ needs.discover.result == 'skipped' && fromJSON(format('{{"include":[{{"name":"{0}"}}]}}', inputs.name)) || fromJSON(needs.discover.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -197,22 +224,33 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.26'
+          go-version: "1.26"
           cache-dependency-path: go.sum
 
       - uses: DeterminateSystems/nix-installer-action@v22
         with:
           summarize: false
 
+      - name: Build Nix cache client
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          go build -trimpath -ldflags="-s -w" -o "$RUNNER_TEMP/bin/nixcache" ./cmd/nixcache
+
+      - name: Download Nix cache index
+        uses: actions/download-artifact@v8
+        with:
+          name: nixcache-index-${{ inputs.system }}
+          path: ${{ runner.temp }}
+
       - name: Start Nix cache
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CGO_ENABLED: '0'
         run: |
-          mkdir -p "$RUNNER_TEMP/bin"
-          go build -trimpath -ldflags="-s -w" -o "$RUNNER_TEMP/bin/nixcache" ./cmd/nixcache
-          "$RUNNER_TEMP/bin/nixcache" serve >"$RUNNER_TEMP/nixcache.log" 2>&1 &
+          "$RUNNER_TEMP/bin/nixcache" serve --index "$RUNNER_TEMP/nixcache-index.json" \
+            >"$RUNNER_TEMP/nixcache.log" 2>&1 &
           curl --retry 90 --retry-delay 1 --retry-all-errors -fsS \
             "$NIXCACHE_STORE/nix-cache-info" || {
               cat "$RUNNER_TEMP/nixcache.log"

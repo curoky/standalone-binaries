@@ -87,10 +87,16 @@ func TestNixRoundTrip(t *testing.T) {
 	}
 
 	t.Chdir(t.TempDir())
-	index := newCacheIndex(client, currentSystem())
-	if _, err := index.refresh(context.Background()); err != nil {
+	indexPath := filepath.Join(t.TempDir(), "index.json")
+	if err := createFrozenIndex(context.Background(), client, currentSystem(), indexPath); err != nil {
 		t.Fatal(err)
 	}
+	current, err := loadFrozenIndex(indexPath, currentSystem())
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := newCacheIndex(client, currentSystem())
+	index.current.Store(current)
 	server := httptest.NewServer(withAccessLog(http.HandlerFunc(index.serveHTTP)))
 	t.Cleanup(server.Close)
 

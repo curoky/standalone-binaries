@@ -182,7 +182,7 @@ func TestRegistryRoundTrip(t *testing.T) {
 	if _, err := index.refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := index.current.Load().entries[hash]; got != entry.NARInfo {
+	if got := index.current.Load().entries[hash].NARInfo; got != entry.NARInfo {
 		t.Fatalf("loaded entry=%#v", got)
 	}
 
@@ -228,8 +228,8 @@ func TestNewestSegmentWins(t *testing.T) {
 		t.Fatal(err)
 	}
 	entries := index.current.Load().entries
-	if !strings.Contains(entries[hash], "System: new") {
-		t.Fatalf("newest entry=%q", entries[hash])
+	if !strings.Contains(entries[hash].NARInfo, "System: new") {
+		t.Fatalf("newest entry=%q", entries[hash].NARInfo)
 	}
 }
 

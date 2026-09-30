@@ -317,38 +317,46 @@ func validateSegment(tag string, item segment, manifest manifestRef) error {
 		return fmt.Errorf("segment has %d entries but %d NAR layers", len(item.Entries), len(manifest.NARLayers))
 	}
 	for hash, entry := range item.Entries {
-		actualHash, err := storeHash(entry.StorePath)
-		if err != nil {
-			return fmt.Errorf("entry %s has invalid store path: %w", hash, err)
+		if err := validateCacheEntry(hash, entry); err != nil {
+			return err
 		}
-		if actualHash != hash {
-			return fmt.Errorf("entry key %q does not match store path hash %q", hash, actualHash)
-		}
-		if path.Clean(entry.NARURL) != entry.NARURL || !strings.HasPrefix(entry.NARURL, "nar/") {
-			return fmt.Errorf("entry %s has invalid NAR URL %q", hash, entry.NARURL)
-		}
-		narDigest, err := digest.Parse(entry.NARDigest)
-		if err != nil || narDigest.Algorithm() != digest.SHA256 || entry.NARSize <= 0 {
-			return fmt.Errorf("entry %s has invalid NAR digest or size", hash)
-		}
+		narDigest := digest.Digest(entry.NARDigest)
 		layer, ok := manifest.NARLayers[hash]
 		if !ok || layer.MediaType != narMediaType || layer.Annotations[storeHashAnnotation] != hash ||
 			layer.Digest != narDigest || layer.Size != entry.NARSize {
 			return fmt.Errorf("entry %s does not match its manifest NAR layer", hash)
 		}
-		info, err := narinfo.Parse(strings.NewReader(entry.NARInfo))
-		if err != nil {
-			return fmt.Errorf("entry %s has invalid narinfo: %w", hash, err)
-		}
-		if err := info.Check(); err != nil {
-			return fmt.Errorf("entry %s has invalid narinfo: %w", hash, err)
-		}
-		if info.StorePath != entry.StorePath || info.URL != entry.NARURL ||
-			info.FileHash == nil || info.FileHash.Algo().String() != digest.SHA256.String() ||
-			digest.NewDigestFromEncoded(digest.SHA256, digest.SHA256.Encode(info.FileHash.Digest())).String() != entry.NARDigest ||
-			int64(info.FileSize) != entry.NARSize {
-			return fmt.Errorf("entry %s metadata does not match narinfo", hash)
-		}
+	}
+	return nil
+}
+
+func validateCacheEntry(hash string, entry cacheEntry) error {
+	actualHash, err := storeHash(entry.StorePath)
+	if err != nil {
+		return fmt.Errorf("entry %s has invalid store path: %w", hash, err)
+	}
+	if actualHash != hash {
+		return fmt.Errorf("entry key %q does not match store path hash %q", hash, actualHash)
+	}
+	if path.Clean(entry.NARURL) != entry.NARURL || !strings.HasPrefix(entry.NARURL, "nar/") {
+		return fmt.Errorf("entry %s has invalid NAR URL %q", hash, entry.NARURL)
+	}
+	narDigest, err := digest.Parse(entry.NARDigest)
+	if err != nil || narDigest.Algorithm() != digest.SHA256 || entry.NARSize <= 0 {
+		return fmt.Errorf("entry %s has invalid NAR digest or size", hash)
+	}
+	info, err := narinfo.Parse(strings.NewReader(entry.NARInfo))
+	if err != nil {
+		return fmt.Errorf("entry %s has invalid narinfo: %w", hash, err)
+	}
+	if err := info.Check(); err != nil {
+		return fmt.Errorf("entry %s has invalid narinfo: %w", hash, err)
+	}
+	if info.StorePath != entry.StorePath || info.URL != entry.NARURL ||
+		info.FileHash == nil || info.FileHash.Algo().String() != digest.SHA256.String() ||
+		digest.NewDigestFromEncoded(digest.SHA256, digest.SHA256.Encode(info.FileHash.Digest())).String() != entry.NARDigest ||
+		int64(info.FileSize) != entry.NARSize {
+		return fmt.Errorf("entry %s metadata does not match narinfo", hash)
 	}
 	return nil
 }

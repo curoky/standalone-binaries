@@ -1,7 +1,7 @@
 # Nixcache Agent Guide
 
 `cmd/nixcache/` 是本仓库专用的 GHCR-backed Nix binary cache，提供 `push`、
-`serve`、`probe`、`publication`、`prune` 和 `size`。全局约束见根 [`AGENTS.md`](../../AGENTS.md)，CI
+`index`、`serve`、`probe`、`publication`、`prune` 和 `size`。全局约束见根 [`AGENTS.md`](../../AGENTS.md)，CI
 触发与发布流程见 [`docs/release-model.md`](../../docs/release-model.md)。
 
 ## 设计
@@ -67,12 +67,20 @@ digest、size、media type 和 annotation 一致。Manifest 和 metadata 正文�
 发布 metadata 和按 store hash 排序的 layer。`--key` 或
 `NIXCACHE_PACKAGE_KEY` 必填；`NIX_SIGNING_KEY_FILE` 传给 Nix。
 
+`index <path>` 从 GHCR 加载并校验当前平台全部 segment，将合并后的 narinfo 和 NAR
+descriptor 写入版本化的冻结索引文件。索引不包含 NAR payload；空 cache 也会生成合法文件。
+该文件是同一 workflow run 内的临时 fan-out 数据，不是新的持久 cache schema。
+
 `serve [--host <host>] [--port <port>]` 默认监听 `127.0.0.1:37515`。支持 IPv6
 （例如 `--host ::1`）；port 范围为 0–65535，`--port 0` 自动分配可用端口，日志输出实际
 监听地址。服务没有认证，非 loopback 监听仅用于可信网络，不得直接暴露公网；自定义地址时
 须同步设置客户端 `probe --cache` 和 Nix substituter，CI 默认地址不变。
 
-首次并发加载同平台所有现存 segment 的 manifest 和 metadata，不预下载 NAR payload。
+`serve --index <path>` 严格校验版本、平台、narinfo 和 NAR descriptor 后直接加载冻结索引，
+不列举 segment，也不周期刷新 metadata；NAR payload 仍按需从 GHCR 流式读取。文件缺失、
+损坏或平台不匹配必须失败，不得回退到远端全量加载。未指定 `--index` 时维持 live 模式。
+
+Live 模式首次并发加载同平台所有现存 segment 的 manifest 和 metadata，不预下载 NAR payload。
 每 5 分钟重新列举 tag，仅读取新增 segment，并从内存移除已消失的 tag；未变化的不可变
 segment 不重复请求 manifest 或 metadata，集合无变化时直接复用已发布的 index snapshot。
 ORAS 使用独立连接池和内置 HTTP 重试；metadata 操作的超时覆盖正文读取，NAR streaming

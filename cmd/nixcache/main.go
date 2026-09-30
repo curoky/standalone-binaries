@@ -47,6 +47,19 @@ func newCommand() *cobra.Command {
 	}
 	push.Flags().StringVar(&packageKey, "key", "", "stable package identity for retention")
 
+	index := &cobra.Command{
+		Use:   "index <path>",
+		Short: "Write a frozen index of the current platform cache",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := newRegistryClient(cacheRepository, false)
+			if err != nil {
+				return err
+			}
+			return createFrozenIndex(cmd.Context(), client, currentSystem(), args[0])
+		},
+	}
+
 	config := serveConfig{host: defaultHost, port: defaultPort}
 	serve := &cobra.Command{
 		Use:   "serve",
@@ -62,6 +75,7 @@ func newCommand() *cobra.Command {
 	}
 	serve.Flags().StringVar(&config.host, "host", defaultHost, "listen host (no authentication; use trusted networks only)")
 	serve.Flags().IntVar(&config.port, "port", defaultPort, "listen port (0 selects an available port)")
+	serve.Flags().StringVar(&config.indexPath, "index", "", "serve a frozen cache index without metadata refresh")
 
 	var cacheURL string
 	probe := &cobra.Command{
@@ -147,7 +161,7 @@ func newCommand() *cobra.Command {
 		},
 	}
 
-	root.AddCommand(push, serve, probe, publication, prune, size)
+	root.AddCommand(push, index, serve, probe, publication, prune, size)
 	return root
 }
 

@@ -27,8 +27,9 @@ const (
 )
 
 type serveConfig struct {
-	host string
-	port int
+	host      string
+	port      int
+	indexPath string
 }
 
 func (config serveConfig) listen() (net.Listener, error) {
@@ -44,12 +45,12 @@ func (config serveConfig) listen() (net.Listener, error) {
 }
 
 type narBlob struct {
-	digest string
-	size   int64
+	Digest string `json:"digest"`
+	Size   int64  `json:"size"`
 }
 
 type indexSnapshot struct {
-	entries   map[string]string
+	entries   map[string]cacheEntry
 	nars      map[string]narBlob
 	snapshots int
 }
@@ -113,16 +114,16 @@ func (index *cacheIndex) refresh(ctx context.Context) (int, error) {
 }
 
 func mergeSegments(segments map[string]segmentRef) (*indexSnapshot, error) {
-	current := &indexSnapshot{entries: make(map[string]string), nars: make(map[string]narBlob)}
+	current := &indexSnapshot{entries: make(map[string]cacheEntry), nars: make(map[string]narBlob)}
 	snapshots := make(map[string]struct{})
 	for _, ref := range slices.SortedFunc(maps.Values(segments), compareSegments) {
 		snapshots[ref.Snapshot] = struct{}{}
 		for hash, entry := range ref.Entries {
-			blob := narBlob{digest: entry.NARDigest, size: entry.NARSize}
+			blob := narBlob{Digest: entry.NARDigest, Size: entry.NARSize}
 			if previous, ok := current.nars[entry.NARURL]; ok && previous != blob {
 				return nil, fmt.Errorf("conflicting NAR URL %s", entry.NARURL)
 			}
-			current.entries[hash] = entry.NARInfo
+			current.entries[hash] = entry
 			current.nars[entry.NARURL] = blob
 		}
 	}
@@ -151,13 +152,13 @@ func (index *cacheIndex) serveHTTP(writer http.ResponseWriter, request *http.Req
 			http.NotFound(writer, request)
 			return
 		}
-		info, ok := current.entries[hash]
+		entry, ok := current.entries[hash]
 		if !ok {
 			log.Printf("narinfo miss: %s (index has %d entries)", hash, len(current.entries))
 			http.NotFound(writer, request)
 			return
 		}
-		serveBytes(writer, request, "text/x-nix-narinfo", info)
+		serveBytes(writer, request, "text/x-nix-narinfo", entry.NARInfo)
 	case strings.HasPrefix(path, "nar/"):
 		if current == nil {
 			http.NotFound(writer, request)
@@ -173,9 +174,9 @@ func (index *cacheIndex) serveHTTP(writer http.ResponseWriter, request *http.Req
 			writer.WriteHeader(http.StatusOK)
 			return
 		}
-		reader, err := index.client.blobReader(request.Context(), blob.digest)
+		reader, err := index.client.blobReader(request.Context(), blob.Digest)
 		if err != nil {
-			log.Printf("read cache blob %s: %v", blob.digest, err)
+			log.Printf("read cache blob %s: %v", blob.Digest, err)
 			http.Error(writer, "read cache blob", http.StatusBadGateway)
 			return
 		}
@@ -196,13 +197,21 @@ func serveBytes(writer http.ResponseWriter, request *http.Request, contentType, 
 
 func setNARHeaders(writer http.ResponseWriter, blob narBlob) {
 	writer.Header().Set("Content-Type", "application/x-nix-nar")
-	writer.Header().Set("Content-Length", strconv.FormatInt(blob.size, 10))
-	writer.Header().Set("ETag", `"`+blob.digest+`"`)
+	writer.Header().Set("Content-Length", strconv.FormatInt(blob.Size, 10))
+	writer.Header().Set("ETag", `"`+blob.Digest+`"`)
 }
 
 func serveCache(ctx context.Context, client *registryClient, system string, config serveConfig) error {
 	index := newCacheIndex(client, system)
-	// Listen before loading so readiness reports 503 instead of refusing connections.
+	if config.indexPath != "" {
+		current, err := loadFrozenIndex(config.indexPath, system)
+		if err != nil {
+			return fmt.Errorf("load frozen cache index: %w", err)
+		}
+		index.current.Store(current)
+		log.Printf("frozen cache index loaded: %d entries", len(current.entries))
+	}
+	// Live mode listens before loading so readiness reports 503 instead of refusing connections.
 	listener, err := config.listen()
 	if err != nil {
 		return err
@@ -217,25 +226,27 @@ func serveCache(ctx context.Context, client *registryClient, system string, conf
 	go func() { serveErr <- server.Serve(listener) }()
 	log.Printf("serving Nix cache at http://%s", listener.Addr())
 
-	if _, err := index.refresh(ctx); err != nil {
-		_ = server.Close()
-		return fmt.Errorf("load initial cache index: %w", err)
-	}
+	if config.indexPath == "" {
+		if _, err := index.refresh(ctx); err != nil {
+			_ = server.Close()
+			return fmt.Errorf("load initial cache index: %w", err)
+		}
 
-	go func() {
-		ticker := time.NewTicker(refreshEvery)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if _, err := index.refresh(ctx); err != nil {
-					log.Printf("refresh cache index: %v", err)
+		go func() {
+			ticker := time.NewTicker(refreshEvery)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if _, err := index.refresh(ctx); err != nil {
+						log.Printf("refresh cache index: %v", err)
+					}
 				}
 			}
-		}
-	}()
+		}()
+	}
 
 	return <-serveErr
 }
