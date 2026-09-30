@@ -490,6 +490,11 @@
       isStatic = false;
     };
   };
+  glab = {
+    "aarch64-darwin" = {
+      isStatic = false;
+    };
+  };
   go-task = {
     "aarch64-darwin" = {
       isStatic = false;
