@@ -37,6 +37,17 @@
 #     acceptable degradation (no built-in TLS for https, no sftp, no SRT/RIST
 #     transport) and are disabled.
 #
+#   * LAME 4.0's optional decoder backend adds mpg123 references to
+#     libmp3lame.a, but ffmpeg's libmp3lame probe links only -lmp3lame and -lm.
+#     Disable the decoder backend because ffmpeg only consumes LAME's MP3 encoder
+#     API; this keeps MP3 encoding while removing the undeclared static
+#     dependency.
+#
+#   * static libiconv and libxml2 embed absolute paths to their conversion tables
+#     and XML catalog. Those resources are not part of this standalone package,
+#     so disable iconv, XML, and zvbi (which transitively uses libiconv) instead
+#     of retaining runtime store references.
+#
 # x265 (H.265/HEVC encoder) is KEPT, but needs two fixes to link statically:
 #
 #   1. nixpkgs' x265 `postInstall` unconditionally runs `rm -f $out/lib/*.a`.
@@ -58,18 +69,20 @@
 #
 # Kept codecs of note: H.264 (libx264), HEVC/H.265 8-bit encode (libx265), AV1
 # (libaom + libsvtav1), VP8/VP9 decode, plus vorbis/theora/mp3(lame)/webp/
-# openjpeg/soxr/xml2/zvbi and the VideoToolbox hardware encoders. The resulting
+# openjpeg/soxr and the VideoToolbox hardware encoders. The resulting
 # ffmpeg binary depends only on /usr/lib/* and /System/Library/Frameworks/*.
 {
   stdenv,
   ffmpeg-headless,
+  lame,
+  removeReferencesTo,
   x265,
 }:
 
 let
   ffmpeg_static =
-    (
-      (ffmpeg-headless.override {
+    (ffmpeg-headless.override {
+      lame = lame.override { decoderSupport = false; };
       x265 = (x265.override { multibitdepthSupport = false; }).overrideAttrs (_: {
         postInstall = "";
       });
@@ -77,7 +90,9 @@ let
       withOpus = false;
       withDav1d = false;
       withFontconfig = false;
+      withFribidi = false;
       withHarfbuzz = false;
+      withIconv = false;
       withAss = false;
       withFreetype = false;
       withSpeex = false;
@@ -91,6 +106,8 @@ let
       withSsh = false;
       withSrt = false;
       withRist = false;
+      withXml2 = false;
+      withZvbi = false;
     }).overrideAttrs (_: {
       # nixpkgs enables ffmpeg's FATE suite whenever the build platform can
       # execute the host binaries, which is the case for native aarch64-darwin.
@@ -99,8 +116,7 @@ let
       # failure aborts the whole build. The test suite validates upstream ffmpeg,
       # not our packaging, so disable it.
       doCheck = false;
-    })
-    ).bin;
+    });
 in
 
 stdenv.mkDerivation {
@@ -109,8 +125,15 @@ stdenv.mkDerivation {
 
   dontUnpack = true;
 
+  nativeBuildInputs = [ removeReferencesTo ];
+
   installPhase = ''
     mkdir -p $out
-    cp -r ${ffmpeg_static}/bin $out/bin
+    cp -r ${ffmpeg_static.bin}/bin $out/bin
+    chmod -R u+w $out/bin
+
+    # This standalone package does not ship the disabled libvpx presets or the
+    # development-only data files, so remove their compiled-in fallback path.
+    remove-references-to -t ${ffmpeg_static.data} $out/bin/*
   '';
 }

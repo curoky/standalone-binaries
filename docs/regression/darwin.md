@@ -9,7 +9,7 @@ Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md
 维护严格门禁，移除步骤见下方 [Darwin CGO Resolver 回归](#darwin-cgo-resolver-回归)。
 
 | 包 | 定制 | 回归 | 原因与保留边界 | 回归判据 | commit | 来源 |
-| --- | --- | --- | --- | --- | --- | --- |
+| ---------------------------- | -------------------- | -- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------ | ---------------------------------------------------------------------------------- |
 | `7zz` | 📌 `gcc15-pin` | ✅ | 与 Linux 共用经全平台验证的 GCC 15 nixpkgs revision；当前 pin 的直接原因是 Linux 静态链接失败 | Darwin 用 unstable 构建且只动态链接系统库 | — | `manifests/default.nix`, `flake.nix` |
 | `artifact-darwin-cgo-resolv` | 🩹 公共 artifact patch | ✅ | libresolv.9 dependency 由 artifact 改指系统库；临时 portability workaround；详见 cmd/artifact/AGENTS.md | 按下方 [Darwin CGO Resolver 回归](#darwin-cgo-resolver-回归) 绕过后全部宿主 Mach-O 无需替换、smoke 通过再删 | — | `cmd/artifact/binary.go`, `cmd/artifact/binary_test.go`, `lib/make-artifacts.nix` |
 | `aria2` | 📌 `24.11` | ❌ | unstable 静态 darwin 缺 iconv 符号链接失败 | 已确认必要，两平台都无可回归空间 | 624af665418d | `manifests/default.nix` |
@@ -22,7 +22,7 @@ Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md
 | `docker-compose` | 📦 native selection | ✅ | darwin native（pkgsStatic Go 缺 libresolv） | `pkgsStatic` 可构建并满足 portability 后恢复默认 | 624af665418d | `manifests/default.nix` |
 | `exiftool` | 📦 本地 | 🟡 | sibling Perl/压缩模块 bundling；install checks 禁用；darwin 未验证 | 仅上游可运行 install check 时恢复 | — | `packages/exiftool/` |
 | `eza-ls` | 📦 本地 | ❌ | 自定义 `ls` 兼容层与 bundled eza | 独立产品行为，不是上游 bug | — | `packages/eza-ls/` |
-| `ffmpeg` | 🩹 本地 | 🟡 | 关无法静态化的 codec/network + 修 x265；`doCheck=false`（FATE flaky）；详见 nix 注释 | 逐 feature 恢复只依赖系统 dylib；上游修 flaky 后恢复检查 | — | `packages/ffmpeg/` |
+| `ffmpeg` | 🩹 本地 | 🟡 | 关无法静态化/可搬运的 feature；LAME 关 decoder；修 x265；`doCheck=false`（FATE flaky）；详见 nix 注释 | 逐 feature 恢复且无 store 引用；LAME 不再漏 mpg123 后恢复 decoder；上游修 flaky 后恢复检查 | b4fd65b198c5 | `packages/ffmpeg/` |
 | `file` | 🩹 + 📦 本地 | 🟡 | version check 直指真实二进制；wrapper 相对定位 `magic.mgc` | 上游检查可兼容 wrapper 后删除检查修正；资源定位必须保留 | b4fd65b198c5 | `packages/file/` |
 | `git-filter-repo` | 📦 本地 | ❌ | Python sibling runtime；macOS 暂用宿主 Python | runtime packaging 不会因上游构建修复消失 | — | `packages/git-filter-repo/` |
 | `gnupg` | 📦 override | ❌ | 明确启用 minimal 并关闭 GUI | feature selection 是产品决策 | — | `packages/local/common.nix` |
