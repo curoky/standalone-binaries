@@ -94,7 +94,7 @@ fi
 
 session="trae-$(date -u +%Y%m%dT%H%M%SZ)-${RANDOM}"
 title="debug ARM $session on $runner"
-artifact="tmate-$session"
+artifact="upterm-$session"
 
 gh workflow run debug-arm.yaml \
   --repo "$repo" \

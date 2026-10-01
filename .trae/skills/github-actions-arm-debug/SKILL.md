@@ -1,6 +1,6 @@
 ---
 name: github-actions-arm-debug
-description: 在 GitHub Actions 临时 ARM runner 上通过受 SSH key 限制的 tmate 会话复现、诊断或回归测试本仓库问题。用户要求使用远程 Linux ARM64 或 macOS ARM64 环境、启动 ARM 测试机、通过 SSH 调试 GitHub Actions、复现仅在 ARM 上出现的问题，或本地缺少 ARM 环境时使用。
+description: 在 GitHub Actions 临时 ARM runner 上通过受 SSH key 限制的 Upterm 会话复现、诊断或回归测试本仓库问题。用户要求使用远程 Linux ARM64 或 macOS ARM64 环境、启动 ARM 测试机、通过 SSH 调试 GitHub Actions、复现仅在 ARM 上出现的问题，或本地缺少 ARM 环境时使用。
 ---
 
 # GitHub Actions ARM Debug
@@ -16,7 +16,7 @@ description: 在 GitHub Actions 临时 ARM runner 上通过受 SSH key 限制的
 4. 确认待测代码已经存在于远程 ref。runner 无法看到本地未提交修改；未经用户授权不要自行 commit 或 push。
 
 私钥默认路径是 `/workspace/.secrets/github-actions-debug`。不得把 private key 放入仓库、
-workflow input 或 GitHub Actions secret。public key 不是 secret；runner 通过 `tmate -a`
+workflow input 或 GitHub Actions secret。public key 不是 secret；runner 的 Upterm session
 只接受该 key。
 
 ## 启动并连接
@@ -34,7 +34,7 @@ macOS ARM64 使用 `--runner macos-26`。脚本会：
 
 1. 从 private key 派生本次 session 使用的 public key。
 2. 生成唯一 session，携带 public key 触发 `debug-arm.yaml`。
-3. 等待对应 run 和 `tmate-<session>` artifact。
+3. 等待对应 run 和 `upterm-<session>` artifact。
 4. 使用 `IdentitiesOnly=yes` 建立交互式 SSH 会话。
 
 首次使用或排查参数时先执行无副作用检查：

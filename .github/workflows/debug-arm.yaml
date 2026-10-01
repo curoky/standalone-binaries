@@ -42,15 +42,30 @@ jobs:
           uname -m
           nix --version
 
-      - name: Install tmate
+      - name: Install Upterm
         shell: bash
         run: |
-          if [[ "$RUNNER_OS" == Linux ]]; then
-            sudo apt-get update
-            sudo apt-get install --yes tmate
-          else
-            brew install tmate
-          fi
+          set -euo pipefail
+
+          case "$RUNNER_OS" in
+            Linux)
+              archive=upterm_linux_arm64.tar.gz
+              checksum=a3ade243cd33a3e5518a007ce5ac69d06b01bd988690d2d01d13be9bc61a1f64
+              ;;
+            macOS)
+              archive=upterm_darwin_arm64.tar.gz
+              checksum=2863bdd4d8f86e20925121bd9aee269c87e1a84e935b68431dc90cce33e80572
+              ;;
+          esac
+
+          mkdir -p "$RUNNER_TEMP/upterm-bin"
+          curl -fsSL \
+            -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/owenthereal/upterm/releases/download/v0.33.0/$archive"
+          printf '%s  %s\n' "$checksum" "$RUNNER_TEMP/$archive" | shasum -a 256 -c
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/upterm-bin" upterm
+          chmod +x "$RUNNER_TEMP/upterm-bin/upterm"
+          echo "UPTERM=$RUNNER_TEMP/upterm-bin/upterm" >>"$GITHUB_ENV"
 
       - name: Start SSH session
         env:
@@ -80,16 +95,41 @@ jobs:
           printf '%s %s\n' "$key_type" "$key_body" >"$RUNNER_TEMP/authorized_keys"
           ssh-keygen -l -f "$RUNNER_TEMP/authorized_keys"
 
-          socket="$RUNNER_TEMP/tmate.sock"
-          echo "TMATE_SOCKET=$socket" >>"$GITHUB_ENV"
-          tmate -S "$socket" -a "$RUNNER_TEMP/authorized_keys" new-session -d
-          tmate -S "$socket" wait tmate-ready
-          tmate -S "$socket" display -p '#{tmate_ssh}' >"$RUNNER_TEMP/ssh-command"
+          runtime_dir=$(mktemp -d /tmp/upterm-rt-XXXXXX)
+          state_dir=$(mktemp -d "$RUNNER_TEMP/upterm-state-XXXXXX")
+          mkdir -p "$state_dir/state" "$state_dir/config"
+          session_name="gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          {
+            echo "XDG_RUNTIME_DIR=$runtime_dir"
+            echo "XDG_STATE_HOME=$state_dir/state"
+            echo "XDG_CONFIG_HOME=$state_dir/config"
+            echo "UPTERM_SESSION_NAME=$session_name"
+          } >>"$GITHUB_ENV"
+          export XDG_RUNTIME_DIR=$runtime_dir
+          export XDG_STATE_HOME=$state_dir/state
+          export XDG_CONFIG_HOME=$state_dir/config
+
+          cat >"$state_dir/known_hosts" <<'EOF'
+          @cert-authority uptermd.upterm.dev ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICiecex8Dq718eSe1CCLgLvDmI7AagvCtax7brPFWkh4
+          EOF
+
+          session_json=$("$UPTERM" host \
+            --detach \
+            --accept \
+            --name "$session_name" \
+            --server ssh://uptermd.upterm.dev:22 \
+            --known-hosts "$state_dir/known_hosts" \
+            --authorized-keys "$RUNNER_TEMP/authorized_keys" \
+            --join-timeout 10m \
+            -o json)
+          jq -r '.sshCommand // empty' <<<"$session_json" >"$RUNNER_TEMP/ssh-command"
+          test -s "$RUNNER_TEMP/ssh-command"
 
       - name: Publish SSH connection
         uses: actions/upload-artifact@v7
         with:
-          name: tmate-${{ inputs.session }}
+          name: upterm-${{ inputs.session }}
           path: ${{ runner.temp }}/ssh-command
           retention-days: 1
 
@@ -98,27 +138,26 @@ jobs:
         run: |
           set -euo pipefail
 
-          connected=false
-          remaining=600
-          while tmate -S "$TMATE_SOCKET" has-session 2>/dev/null; do
+          while session_json=$("$UPTERM" session info "$UPTERM_SESSION_NAME" -o json 2>/dev/null); do
             if [[ -e /continue || -e "$GITHUB_WORKSPACE/continue" ]]; then
+              "$UPTERM" session stop "$UPTERM_SESSION_NAME"
               break
             fi
 
-            clients=$(tmate -S "$TMATE_SOCKET" display -p '#{tmate_num_clients}')
-            if ((clients > 0)); then
-              connected=true
-            elif [[ "$connected" == false ]]; then
-              remaining=$((remaining - 5))
-              if ((remaining <= 0)); then
-                echo "no SSH client connected within 10 minutes" >&2
-                exit 1
-              fi
-            fi
+            status=$(jq -r .status <<<"$session_json")
+            case "$status" in
+              disconnected|ending|ended) break ;;
+            esac
             sleep 5
           done
 
       - name: Stop SSH session
         if: ${{ always() }}
-        run: tmate -S "$TMATE_SOCKET" kill-session || true
+        run: |
+          if [[ -n "${UPTERM:-}" && -n "${UPTERM_SESSION_NAME:-}" ]]; then
+            "$UPTERM" session stop "$UPTERM_SESSION_NAME" || true
+          fi
+          if [[ -n "${XDG_RUNTIME_DIR:-}" && "$XDG_RUNTIME_DIR" == /tmp/upterm-rt-* ]]; then
+            rm -rf -- "$XDG_RUNTIME_DIR"
+          fi
 
