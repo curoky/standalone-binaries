@@ -6,10 +6,10 @@
 let
   mkClangTools = pkgsStatic.callPackage ../../clang-tools { };
   mkPython = pkgsStatic.callPackage ../../python { };
-  nodejs-slim26 = pkgsStatic.callPackage ../../nodejs/26/linux.nix {
+  nodejs-slim26 = pkgsStatic.callPackage ../../nodejs/26 {
     inherit (pkgs) python3;
   };
-  nodeTools = import ../node-tools.nix {
+  nodeTools = import ./node-tools.nix {
     inherit pkgs pkgsStatic nodejs-slim26;
   };
 in
@@ -75,7 +75,7 @@ rec {
     version = "22.0.0";
   };
 
-  # Python. python311 is x86_64-only; see ./x86_64.nix.
+  # Python.
   python312 = mkPython {
     python = pkgsStatic.python312;
     setupLocal = ../../python/312/Setup.local;
@@ -97,8 +97,7 @@ rec {
   };
   dool = pkgs.callPackage ../../dool { };
 
-  # s6 stack. Built against s6PkgsStatic (a pinned static set) instead of
-  # unstable; see flake.nix (nixpkgs-s6) for why.
+  # s6 stack.
   execline = s6PkgsStatic.callPackage ../../execline { };
   s6 = s6PkgsStatic.callPackage ../../s6 {
     inherit execline;
@@ -137,8 +136,7 @@ rec {
   podman5-rootless = pkgsStatic.callPackage ../../podman-rootless { podman = podman5; };
   podman6-rootless = pkgsStatic.callPackage ../../podman-rootless { podman = podman6; };
 
-  # Node.js runtime and sibling-runtime tools; see
-  # docs/package-strategies/nodejs.md.
+  # Node.js runtime and sibling-runtime tools.
   nodejs-slim24 = pkgsStatic.callPackage ../../nodejs/24 {
     inherit (pkgs) python3;
   };

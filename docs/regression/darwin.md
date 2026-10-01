@@ -1,9 +1,10 @@
 # macOS 回归表
 
+<!-- markdownlint-disable MD013 -->
+
 适用于 aarch64-darwin，记录该平台的包级定制和公共 workaround。表格约定、状态/定制图例与批量回归命令见
 [`AGENTS.md`](AGENTS.md)。
 
-`原因与保留边界`、`回归判据` 两列只给摘要，完整说明见「来源」列指向的 nix 文件（或公共实现）注释。
 Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md#darwin-cgo-resolver)
 维护严格门禁，移除步骤见下方 [Darwin CGO Resolver 回归](#darwin-cgo-resolver-回归)。
 
@@ -11,58 +12,51 @@ Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md
 | --- | --- | --- | --- | --- | --- | --- |
 | `7zz` | 📌 `gcc15-pin` | ✅ | 与 Linux 共用经全平台验证的 GCC 15 nixpkgs revision；当前 pin 的直接原因是 Linux 静态链接失败 | Darwin 用 unstable 构建且只动态链接系统库 | — | `manifests/default.nix`, `flake.nix` |
 | `artifact-darwin-cgo-resolv` | 🩹 公共 artifact patch | ✅ | libresolv.9 dependency 由 artifact 改指系统库；临时 portability workaround；详见 cmd/artifact/AGENTS.md | 按下方 [Darwin CGO Resolver 回归](#darwin-cgo-resolver-回归) 绕过后全部宿主 Mach-O 无需替换、smoke 通过再删 | — | `cmd/artifact/binary.go`, `cmd/artifact/binary_test.go`, `lib/make-artifacts.nix` |
-| `aria2` | 📌 `24.11` | ❌ | unstable 静态 darwin 缺 iconv 符号链接失败；详见 manifest 注释 | 已确认必要，两平台都无可回归空间 | 624af665418d | `manifests/default.nix` |
-| `atuin` | 📦 本地 | 🟡 | 预生成相对定位 init.zsh；darwin 未验证；详见 nix 注释 | 预生成 init 保留 | — | `packages/atuin/` |
+| `aria2` | 📌 `24.11` | ❌ | unstable 静态 darwin 缺 iconv 符号链接失败 | 已确认必要，两平台都无可回归空间 | 624af665418d | `manifests/default.nix` |
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
 | `cloc` | 📦 本地 | 🟡 | sibling Perl wrapper/模块 bundling；install check 禁用；darwin 未验证 | 只恢复可运行的 install check | — | `packages/cloc/` |
 | `colima` | 📦 native selection | ✅ | darwin-only native；artifact 还原 wrapper/resolver；仍有 Go 资源 store 引用（见下方记录） | 产物不再保留资源 store 引用后恢复默认；resolver 特例独立回归 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/normalize.go`, `cmd/artifact/binary.go` |
 | `curl` | 📦 本地 | ❌ | 内置 CA bundle 与相对路径 wrapper | 自包含证书定位是 packaging | — | `packages/curl/` |
-| `docker-buildx` | 📦 native selection | ✅ | native 绕过 static Go 缺 libresolv；resolver 由 artifact 修正；详见 manifest 注释 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
-| `docker-compose` | 📦 native selection | ✅ | darwin native（pkgsStatic Go 缺 libresolv）；详见 manifest 注释 | `pkgsStatic` 可构建并满足 portability 后恢复默认 | 624af665418d | `manifests/default.nix` |
+| `docker-buildx` | 📦 native selection | ✅ | native 绕过 static Go 缺 libresolv；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
+| `docker-compose` | 📦 native selection | ✅ | darwin native（pkgsStatic Go 缺 libresolv） | `pkgsStatic` 可构建并满足 portability 后恢复默认 | 624af665418d | `manifests/default.nix` |
 | `exiftool` | 📦 本地 | 🟡 | sibling Perl/压缩模块 bundling；install checks 禁用；darwin 未验证 | 仅上游可运行 install check 时恢复 | — | `packages/exiftool/` |
 | `eza-ls` | 📦 本地 | ❌ | 自定义 `ls` 兼容层与 bundled eza | 独立产品行为，不是上游 bug | — | `packages/eza-ls/` |
 | `ffmpeg` | 🩹 本地 | 🟡 | 关无法静态化的 codec/network + 修 x265；`doCheck=false`（FATE flaky）；详见 nix 注释 | 逐 feature 恢复只依赖系统 dylib；上游修 flaky 后恢复检查 | — | `packages/ffmpeg/` |
 | `file` | 🩹 + 📦 本地 | 🟡 | version check 直指真实二进制；wrapper 相对定位 `magic.mgc` | 上游检查可兼容 wrapper 后删除检查修正；资源定位必须保留 | b4fd65b198c5 | `packages/file/` |
-| `gdb` | 📌 `25.11` | ❌ | unstable dejagnu→expect 静态 darwin 缺 tclStubsPtr；详见 manifest 注释 | 已确认两平台都必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
 | `git-filter-repo` | 📦 本地 | ❌ | Python sibling runtime；macOS 暂用宿主 Python | runtime packaging 不会因上游构建修复消失 | — | `packages/git-filter-repo/` |
 | `gnupg` | 📦 override | ❌ | 明确启用 minimal 并关闭 GUI | feature selection 是产品决策 | — | `packages/local/common.nix` |
-| `golangci-lint` | 📦 native selection | ✅ | native；resolver 由 artifact 修正；详见 manifest 注释 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
-| `gost` | 📦 native selection | ✅ | native；resolver 由 artifact 修正；详见 manifest 注释 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
+| `golangci-lint` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
+| `gost` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
 | `krb5` | 🩹 本地 | ❌ | 禁 CCAPI + 移 DES const（静态 darwin 两处 undefined symbol）；详见 nix 注释 | 上游修复 CCAPI/DES 静态可见性后删 patch | 624af665418d | `packages/krb5/` |
-| `lark-cli` | 📦 native selection | ❌ | macOS 选 unstable native（关 CGO 反而 disallowed reference）；详见 manifest 注释 | 当前没有 pin 或 patch 可回归 | — | `manifests/default.nix` |
+| `lark-cli` | 📦 native selection | ❌ | macOS 选 unstable native（关 CGO 反而 disallowed reference） | 当前没有 pin 或 patch 可回归 | — | `manifests/default.nix` |
 | `libtool` | 📦 本地 | ❌ | 改写 `libtoolize` 的 baked data paths | 相对资源定位必须保留 | — | `packages/libtool/` |
 | `lima` | 📦 native selection | ✅ | darwin-only native；artifact 去 qemu wrapper/resolver、保留 entitlement；仍有 Go 资源 store 引用（见下方记录） | 产物不再保留资源 store 引用后恢复默认；resolver 特例独立回归 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/normalize.go`, `cmd/artifact/binary.go` |
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |
-| `markdownlint-cli2` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/markdownlint-cli2/` |
 | `netron` | 📦 本地 | ❌ | wheel 重打包并绑定 sibling/宿主 Python | runtime packaging 必须保留 | — | `packages/netron/` |
-| `nixfmt` | ⏸️ 停用 darwin | 🟡 | stock pkgsStatic macOS 编译失败，暂仅接入 Linux；详见 manifest 注释 | macOS 构建修复后恢复 `aarch64-darwin` | — | `manifests/default.nix` |
-| `nodejs-slim26` | 🩹 本地 | 🟡 | 修 static deps/LIEF/Temporal/system libs/checks；darwin 未验证；详见 nix 注释 | 逐 patch 删除，满足各平台动态依赖规则 | — | `packages/nodejs/26/` |
-| `opencommit` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/opencommit/` |
+| `nixfmt` | ⏸️ 停用 darwin | 🟡 | stock pkgsStatic macOS 编译失败，暂仅接入 Linux | macOS 构建修复后恢复 `aarch64-darwin` | — | `manifests/default.nix` |
 | `pkgconf` | 🩹 本地 | ✅ | 改系统路径，避免二进制残留 store 路径；详见 nix 注释 | stock 二进制不再嵌 store 路径且只依赖系统 dylib | — | `packages/pkgconf/` |
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/parallel/` |
 | `perl` | 🩹 + 📦 本地 | 🟡 | macOS 静态替换 + install-name relocation + wrapper；darwin 未验证；详见 nix 注释 | 只删除 stock 已覆盖的依赖/link patch | — | `packages/perl/` |
 | `postgresql` | 🩹 + 📦 本地 | 🟡 | 基于 `pkgsStatic.libpq` 追加 psql，改系统 OpenSSL 目录；详见 nix 注释 | `pkgsStatic.libpq` 上游提供 psql 且不嵌依赖路径 | dc5d91f84032 | `packages/postgresql/` |
-| `prettier` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/prettier/` |
-| `protobuf_3_8_0` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.8.0 | 版本化产品，不回到最新 upstream | — | `packages/protobuf/3_8_0/` |
-| `protobuf_3_9_2` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.9.2 | 版本化产品，不回到最新 upstream | — | `packages/protobuf/3_9_2/` |
+| `protobuf_3_8_0` | 📌 `22.11` | ❌ | 明确发布 legacy protobuf 3.8.0；使用仍提供该版本的最新 channel | 仅在更新 channel 仍提供 3.8.0 且构建 portable 时前移 | — | `manifests/default.nix` |
+| `protobuf_3_9_2` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.9.2；共享本地 derivation 保持跨平台一致 | 新 channel 提供 3.9.2 且各平台构建 portable 时切回 manifest | — | `packages/protobuf/3_9_2/` |
 | `radare2` | ⏸️ 停用 darwin | ❌ | 产品不要求 macOS 支持；仅在 Linux 包集合接入 | 产品边界，不作为上游回归目标 | — | `packages/local/linux/common.nix` |
 | `rclone` | 📦 native selection | ✅ | 用户确认改 native，删资源 hash 清理；仍保留 tzdata/mailcap/iana-etc 引用（见下方记录） | 工具链层恢复资源路径且无 store 依赖后关闭；resolver 特例独立回归 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go`, `docs/package-strategies/go.md` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
 | `rizin` | ⏸️ 停用 darwin | ❌ | 产品不要求 macOS 支持；仅在 Linux 包集合接入 | 产品边界，不作为上游回归目标 | — | `packages/local/linux/common.nix` |
 | `rsync` | 🩹 本地 | ✅ | 注入 native Python/check compiler + libiconv 指系统库；详见 nix 注释 | stock 不再求值静态 Python、测试完整、不嵌 libiconv store 路径 | dc5d91f84032 | `packages/rsync/`, `packages/local/darwin.nix`, `manifests/default.nix` |
-| `shellcheck` | 📌 `25.11` | ❌ | unstable 静态 darwin GHC External interpreter terminated；详见 manifest 注释 | 已确认必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
+| `shellcheck` | 📌 `25.11` | ❌ | unstable 静态 darwin GHC External interpreter terminated | 已确认必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
 | `smartmontools` | 🩹 本地 | 🟡 | 关外部 drive DB + native autoreconfHook/hostname（避 static Perl）；详见 nix 注释 | static Perl 修复后删 build-tool override；CLI 配置保留 | dc5d91f84032 | `packages/smartmontools/darwin.nix`, `packages/local/darwin.nix` |
-| `starship` | 📦 本地 | ❌ | 预生成相对定位 init.zsh；darwin 未验证；详见 nix 注释 | 预生成 init 与相对定位属产品行为，无回归空间 | — | `packages/starship/` |
-| `supercronic` | 📦 native selection | ✅ | native；resolver 由 artifact 修正；详见 manifest 注释 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
+| `supercronic` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
-| `uv` | 📌 `25.11` | ❌ | unstable 静态 darwin aws-lc-sys cc-wrapper `posix_spawn failed`；详见 manifest 注释 | 已确认必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
+| `uv` | 📌 `25.11` | ❌ | unstable 静态 darwin aws-lc-sys cc-wrapper `posix_spawn failed` | 已确认必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |
 | `watchexec` | 🩹 本地 | ✅ | `--package=watchexec-cli` 排除 test crate；darwin 仅 eval；详见 nix 注释 | stock 输出不含 `test-socketfd` 且只依赖系统库 | — | `packages/watchexec/` |
 | `wget` | 🩹 + 📦 本地 | 🟡 | macOS 绕过 static Perl + CA wrapper；darwin 未验证；详见 nix 注释 | 恢复 checks/build tool 后保留 CA packaging | — | `packages/wget/` |
 | `zsh` | 🩹 + 📦 本地 | 🟡 | 静态 module patches + FPATH wrapper/zshenv packaging；详见 nix 注释 | 逐项删编译 patch，保留 relocation packaging | — | `packages/zsh/` |
-| `zsh-plugins` | 📦 本地 | ❌ | 聚合 oh-my-zsh 与 plugins | plugin bundle 是产品 | — | `packages/zsh-plugins/` |
+| `zsh-plugins` | 📦 本地 | ❌ | 聚合 oh-my-zsh、plugins，并预生成 atuin/starship plugin | plugin bundle 与预生成 shell integration 是产品 | — | `packages/zsh-plugins/` |
 
 ## Colima Override 回归
 

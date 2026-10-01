@@ -2,7 +2,7 @@
 #
 # prettier running on our fully-static (musl) `nodejs-slim26` package, instead
 # of being `nix bundle`'d into a self-extracting executable. The interpreter is
-# overridden upstream-style in packages/local/node-tools.nix
+# overridden upstream-style in packages/local/linux/node-tools.nix
 # (`pkgs.prettier.override { nodejs = nodejs-slim26; }`), so the `prettier`
 # argument here is already built against our static node. This derivation reuses
 # that prettier's JS distribution and ships a relative-path wrapper that invokes
@@ -69,7 +69,6 @@ stdenvNoCC.mkDerivation {
     platforms = [
       "x86_64-linux"
       "aarch64-linux"
-      "aarch64-darwin"
     ];
     mainProgram = "prettier";
   };

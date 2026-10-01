@@ -19,7 +19,7 @@
       "runner": "macos-26",
       "artifact_suffix": "darwin-arm64",
       "exclude_pkgs": "inetutils gnupg music-decrypto",
-      "push_exclude_pkgs": "nodejs-slim26 markdownlint-cli2 opencommit pnpm prettier shellcheck gdb"
+      "push_exclude_pkgs": "pnpm shellcheck"
     }
   ],
   "independent_packages": [

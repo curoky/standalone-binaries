@@ -6,6 +6,8 @@
 # lib) and `BUILD_TESTING`. The `minimal` build drops poppler's own transitive
 # linkage, so the CLIs no longer resolve fontconfig/freetype/expat/bzip2/brotli
 # symbols; the CMakeLists patch appends those static archives explicitly.
+# Restoring checks currently stops in python-fonttools first because static
+# Python cannot use ctypes dynamic loading, before poppler's tests can run.
 {
   lib,
   poppler,

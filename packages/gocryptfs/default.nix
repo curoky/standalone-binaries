@@ -19,6 +19,7 @@ gocryptfs.overrideAttrs (_: {
   propagatedBuildInputs = [ ];
   # cgo resolves the openssl crypto backend via `#cgo pkg-config: libcrypto`.
   # Point PKG_CONFIG_PATH at the static openssl dev output so the target
-  # pkg-config wrapper can locate libcrypto.pc during the cross build.
+  # pkg-config wrapper can locate libcrypto.pc during the cross build; without
+  # it configure fails with "No package 'libcrypto' found".
   PKG_CONFIG_PATH = "${lib.getDev openssl}/lib/pkgconfig";
 })

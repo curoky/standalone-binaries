@@ -5,7 +5,10 @@
 # private target compiler, musl loader and Nix data paths into the SDK. The
 # static linker does not recognize the bundled race object as requiring an
 # external linker, so that one mode is made explicit without affecting pure-Go
-# cross compilation.
+# cross compilation: without it a minimal `go test -race` fails with
+# "hole in findfunctab". debug/dwarf and debug/elf testdata are removed because
+# issue57046-clang.elf5 is a deliberately dynamic ELF fixture rejected by the
+# artifact portability gate.
 go.overrideAttrs (oldAttrs: {
   patches = [ ];
 

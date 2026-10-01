@@ -7,11 +7,11 @@
   rime-plugins = pkgsStatic.callPackage ../rime-plugins { };
   tmux-plugins = pkgsStatic.callPackage ../tmux-plugins { };
   vim-plugins = pkgs.callPackage ../vim-plugins { };
-  zsh-plugins = pkgsStatic.callPackage ../zsh-plugins { };
-
-  # Rust tools with relocatable shell integration.
-  atuin = pkgsStatic.callPackage ../atuin { nativeAtuin = pkgs.atuin; };
-  starship = pkgsStatic.callPackage ../starship { nativeStarship = pkgs.starship; };
+  zsh-plugins = pkgsStatic.callPackage ../zsh-plugins {
+    nativeAtuin = pkgs.atuin;
+    nativeStarship = pkgs.starship;
+    nativeZsh = pkgs.zsh;
+  };
 
   # C / autotools.
   autoconf = pkgsStatic.callPackage ../autoconf { };
@@ -26,7 +26,6 @@
   libtool = pkgsStatic.callPackage ../libtool { };
   makeself = pkgsStatic.callPackage ../makeself { };
   pkgconf = pkgsStatic.callPackage ../pkgconf { };
-  protobuf_3_8_0 = pkgsStatic.callPackage ../protobuf/3_8_0 { };
   protobuf_3_9_2 = pkgsStatic.callPackage ../protobuf/3_9_2 { };
   vim = pkgsStatic.callPackage ../vim { };
   watchexec = pkgsStatic.callPackage ../watchexec { };

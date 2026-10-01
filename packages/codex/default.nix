@@ -12,7 +12,9 @@
 # `code-mode-runtime` -> `v8` crate chain); the `codex-cli` dependency graph
 # never references `code-mode-*`, so the CLI itself does not link V8.
 #
-# V8 is the sole blocker for our musl-static build: nixpkgs injects a
+# Stock musl-static currently fails even earlier because openssl-sys enables
+# vendored OpenSSL without adding perl to nativeBuildInputs. After supplying
+# perl, V8 remains the blocker for the full stock output: nixpkgs injects a
 # *pre-built* `librusty_v8` archive whose download URL is keyed on
 # `rustcTarget`. denoland only publishes `*-linux-gnu` archives, so under our
 # `*-linux-musl` static target the fetch has no matching hash, and even a

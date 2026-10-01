@@ -1,9 +1,10 @@
 # Linux 回归表（aarch64 特有差异）
 
+<!-- markdownlint-disable MD013 -->
+
 仅列 aarch64-linux 与共享 [`linux.md`](linux.md) 的差异。当前都是「临时停用」（⏸️）：这些包的
 musl-static cross 构建目前在 aarch64-linux 失败，已在 manifest 或本地包集里去掉该架构，等上游/工具链
 修复后恢复。x86_64-linux 与 darwin 的状态见各自表格。表格约定与图例见 [`AGENTS.md`](AGENTS.md)。
-`原因与保留边界`、`回归判据` 两列共用同一结论，完整背景见「来源」列指向的 manifest / 本地包注释。
 
 | 包 | 定制 | 回归 | 原因与保留边界 | 回归判据 | commit | 来源 |
 | --- | --- | --- | --- | --- | --- | --- |

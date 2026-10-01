@@ -26,9 +26,6 @@
     alias = "7zz";
     version = "gcc15-pin";
   };
-  # bash/coreutils temporarily skip aarch64-linux: the musl-static cross build
-  # currently fails there (see docs regression table). x86_64-linux and darwin
-  # stay on the zero-customization manifest build.
   bash = {
     platforms = [
       "x86_64-linux"
@@ -53,9 +50,6 @@
       "aarch64-darwin"
     ];
   };
-  # diffutils on Linux keeps a local override (packages/diffutils): unstable
-  # 3.12's gnulib checkPhase fails 9 multithread/setlocale tests under
-  # musl-static. Darwin uses the stock manifest build.
   diffutils = {
     platforms = [ "aarch64-darwin" ];
   };
@@ -65,10 +59,11 @@
   };
   flex = { };
   gawk = { };
-  # gdb pins 25.11 on both platforms: unstable gdb 17.2's build dependency
-  # dejagnu -> expect fails to link under musl-static (undefined reference to
-  # tclStubsPtr), which also breaks gdb itself. No regression room.
   gdb = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
     version = "25.11";
   };
   gettext = { };
@@ -77,10 +72,6 @@
   gnumake = { };
   gnupatch = { };
   gnused = { };
-  # Linux gnutar is a local package (packages/gnutar): the fully-static musl
-  # build hits a duplicate-symbol link error against static libacl and needs a
-  # linker workaround. Darwin has no static libacl collision, so it stays on the
-  # stock manifest build.
   gnutar = {
     platforms = [ "aarch64-darwin" ];
   };
@@ -99,9 +90,6 @@
   openssl = {
     output = [ "bin" ];
   };
-  # patchelf skips aarch64-linux (musl-static cross build currently fails). The
-  # x86_64-linux pin to 25.05 predates that: unstable's make check hits an
-  # R_X86_64_32 relocation error under musl-static.
   patchelf = {
     platforms = [
       "x86_64-linux"
@@ -155,10 +143,8 @@
   };
 
   # rust pkgs
-  # atuin and starship are local packages (packages/atuin, packages/starship):
-  # they ship a pre-generated zsh init script alongside the binary.
+  atuin = { };
   bat = { };
-  # biome = { };
   dprint = { };
   eza = { };
   fd = { };
@@ -168,6 +154,7 @@
   procs = { };
   ripgrep = { };
   ruff = { };
+  starship = { };
   tokei = { };
   yazi-unwrapped = {
     alias = "yazi";
@@ -194,10 +181,6 @@
       "aarch64-linux"
     ];
   };
-  # fuse (libfuse 2.x) is a local package (packages/fuse): stock pkgsStatic.fuse
-  # substitutes mount.fuse's `su` with `${shadow.su}/bin/su`, baking a
-  # /nix/store path and pulling in shadow -> libbsd (musl-static checkPhase
-  # aborts on explicit_bzero). fuse3 has no such substitution and stays here.
   fuse3 = {
     platforms = [
       "x86_64-linux"
@@ -271,9 +254,6 @@
       "aarch64-linux"
     ];
   };
-  # nixfmt temporarily skips aarch64-darwin: the static build currently fails
-  # on macOS (see docs regression table). Linux stays on the stock manifest
-  # pkgsStatic build.
   nixfmt = {
     platforms = [
       "x86_64-linux"
@@ -292,13 +272,11 @@
       "aarch64-linux"
     ];
   };
-  # qemu-user skips aarch64-linux (musl-static cross build currently fails).
   qemu-user = {
     platforms = [
       "x86_64-linux"
     ];
   };
-  # Darwin uses a local override for build/check tools and system libiconv.
   rsync = {
     platforms = [
       "x86_64-linux"
@@ -318,11 +296,11 @@
     ];
   };
 
-  # protobuf legacy version pins. These are not un-pinnable: unstable has either
-  # removed the attribute (dropping the pin silently yields an empty package via
-  # `base.<name> or null`) or turned it into a throwing alias (eval error). Any
-  # change would have to retarget an existing unstable alias, altering the
-  # version semantics, so this is not a de-pin regression.
+  # protobuf legacy versions
+  protobuf3_8 = {
+    version = "22.11";
+    alias = "protobuf_3_8_0";
+  };
   protobuf_23 = {
     version = "24.05";
   };
@@ -350,10 +328,6 @@
   };
 
   # s6 stack
-  #
-  # Pinned to the nixpkgs-s6 env (a fixed unstable revision) because a later
-  # unstable bump broke these builds. The local s6 packages (execline / s6 /
-  # s6-linux-init / s6-rc) are pinned to the same revision via flake.nix.
   s6-dns = {
     platforms = [
       "x86_64-linux"
@@ -395,15 +369,6 @@
   };
 
   # go pkgs
-  #
-  # Cross-platform Go tools below carry an `aarch64-darwin` override with
-  # `isStatic = false` (native pkgs, CGO on). Their upstream CGO build already
-  # links only /usr/lib + system frameworks (no /nix dylib), so no
-  # CGO_ENABLED=0 override is needed on macOS; forcing it off would only make
-  # the pure-Go binary retain a go-compiler store path and trip
-  # buildGoModule's disallowedReferences check. Linux keeps the default
-  # (unstable, pkgsStatic musl static). runc stays Linux-only because it is a
-  # Linux container runtime (namespaces/cgroups) with no macOS build.
   age = {
     "aarch64-darwin" = {
       isStatic = false;
@@ -424,8 +389,6 @@
       isStatic = false;
     };
   };
-  # Artifact removes the upstream PATH wrapper and relocates the CGO resolver;
-  # runtime tools are installed separately and resolved through the user's PATH.
   colima = {
     platforms = [ "aarch64-darwin" ];
     isStatic = false;
@@ -435,17 +398,11 @@
       isStatic = false;
     };
   };
-  # docker-compose is a CLI plugin under libexec/docker/cli-plugins. Linux keeps
-  # the default (unstable, pkgsStatic musl static); darwin uses native pkgs
-  # because pkgsStatic fails to build the Go toolchain (missing static
-  # libresolv) and the native binary already links only /usr/lib + frameworks.
   docker-compose = {
     "aarch64-darwin" = {
       isStatic = false;
     };
   };
-  # Darwin Go/CGO resolver relocation is guarded in cmd/artifact/binary.go.
-  # Native selection avoids the pkgsStatic Go toolchain build failure.
   docker-buildx = {
     "aarch64-darwin" = {
       isStatic = false;
@@ -463,10 +420,6 @@
       isStatic = false;
     };
   };
-  # dive skips aarch64-linux (musl-static cross build currently fails). The
-  # x86_64-linux pin to 25.11 predates that: unstable's static dependency chain
-  # (gpgme->gnupg->openldap) fails to locate Cyrus SASL. darwin uses native
-  # pkgs.
   dive = {
     platforms = [
       "x86_64-linux"
@@ -559,8 +512,6 @@
       isStatic = false;
     };
   };
-  # Artifact unwraps limactl and relocates its CGO resolver, preserving
-  # entitlements, helpers and guest resources without a package override.
   lima = {
     platforms = [ "aarch64-darwin" ];
     isStatic = false;
@@ -570,8 +521,6 @@
       isStatic = false;
     };
   };
-  # Darwin uses native upstream without resource hash rewriting.
-  # Artifact handles the resolver; Go resource paths remain a tracked gap.
   rclone = {
     "aarch64-darwin" = {
       isStatic = false;
@@ -604,11 +553,6 @@
     };
   };
   lark-cli = {
-    # Linux: default isStatic = true -> pkgsStatic musl static.
-    # darwin: native pkgs (CGO on). The upstream CGO build already links only
-    # /usr/lib + system frameworks (no /nix dylib); forcing CGO_ENABLED=0 would
-    # make the pure-Go binary retain a reference to the go compiler's store path
-    # and trip buildGoModule's disallowedReferences check.
     "aarch64-darwin" = {
       isStatic = false;
     };
@@ -682,27 +626,18 @@
   };
 
   ## ---- cross-platform with per-platform overrides -----------------------
-  # linux uses default version; darwin pins a specific version.
-  # aria2 pins darwin to 24.11: unstable aria2 1.37.0's static darwin build
-  # fails to link libxml2.a (missing iconv/iconv_open/libiconv symbols).
   aria2 = {
     "aarch64-darwin" = {
       version = "24.11";
     };
   };
-  # shellcheck splits outputs (bin/man/doc/out); the executable lives in `bin`,
-  # so the default `out` would export an empty tree. darwin pins 25.11: unstable
-  # ShellCheck 0.11.0's static darwin build fails with GHC "External interpreter
-  # terminated (1)".
+  # shellcheck's executable is in the bin output.
   shellcheck = {
     output = [ "bin" ];
     "aarch64-darwin" = {
       version = "25.11";
     };
   };
-  # uv pins darwin to 25.11: unstable uv 0.11.32's static darwin build triggers
-  # a cc-wrapper multi-target defect in aws-lc-sys (--target arm64-apple-macosx
-  # -> "posix_spawn failed").
   uv = {
     "aarch64-darwin" = {
       version = "25.11";

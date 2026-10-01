@@ -97,12 +97,13 @@ segment，这只减少跨 matrix leg 的临时复用，不影响构建与发布�
 平台继续；如果所有所选平台都不可用，入口 job 失败，避免错误包名静默成功。新增触发方式
 或改变选择语义时，必须同步两个 build workflow 和本表。
 
-Node.js 运行时和同级 runtime 工具（`nodejs-slim*`、`markdownlint-cli2`、`opencommit`、
-`pnpm`、`prettier`）以及 `nil`、`nixfmt`、`shellcheck`、`gdb`、`clang-tools-{18..22}`
-编译慢，仅在 `push` 触发时通过平台配置的 `push_exclude_pkgs` 从候选中排除，避免拖慢普通
-代码 push。其中 `nil`、`nixfmt`、`clang-tools-*` 只在 Linux 暴露，Darwin 的排除列表相应
-更短。`schedule` 和 `workflow_dispatch` 不受此排除影响，仍会构建并发布它们。改动
-`push_exclude_pkgs` 时须同步 `.github/release-platforms.json` 和本说明。
+Linux-only Node.js runtime 和同级 runtime 工具（`nodejs-slim*`、`markdownlint-cli2`、
+`opencommit`、`prettier`）以及 `pnpm`、`nil`、`nixfmt`、`shellcheck`、`gdb`、
+`clang-tools-{18..22}` 编译慢，仅在 `push` 触发时通过平台配置的 `push_exclude_pkgs`
+从候选中排除，避免拖慢普通代码 push。其中 Node.js runtime 与同级工具、`nil`、`nixfmt`、
+`gdb`、`clang-tools-*` 只在 Linux 暴露，Darwin 的排除列表相应更短。`schedule` 和
+`workflow_dispatch` 不受此排除影响，仍会构建并发布它们。改动 `push_exclude_pkgs`
+时须同步 `.github/release-platforms.json` 和本说明。
 
 `clang-tools-{18..22}`（原 `build-llvm-tools.yaml`）已并入 Linux workflow 的普通
 `discover` / build matrix，与其他包共用 cache 命中过滤和 artifact 发布契约。它们是

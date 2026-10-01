@@ -1,4 +1,4 @@
-# nodejs-slim26 (static)
+# nodejs-slim26 (Linux, static)
 #
 # A standalone, fully-static (musl) Node.js 26 runtime, exposed as its own
 # package (deploy dir name: `nodejs-slim26`) so other packages can reference it
@@ -29,8 +29,7 @@
   # ctypes cannot `dlopen` (`OSError: Dynamic loading not supported`); node's
   # gyp ninja generator imports ctypes, so running configure.py under the static
   # python aborts before generating any build files. python is only a
-  # nativeBuildInput (never linked into node), so inject the native one (same
-  # pattern node 24, the darwin build and wget's build-time perl use).
+  # nativeBuildInput (never linked into node), so inject the native one.
   python3,
 }:
 
