@@ -1,0 +1,124 @@
+name: debug ARM
+
+run-name: debug ARM ${{ inputs.session }} on ${{ inputs.runner }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: ARM runner
+        required: true
+        type: choice
+        options:
+          - ubuntu-24.04-arm
+          - macos-26
+      session:
+        description: Unique session identifier
+        required: true
+        type: string
+      public_key:
+        description: Ephemeral SSH public key
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  debug:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          summarize: false
+
+      - name: Show environment
+        run: |
+          uname -a
+          uname -m
+          nix --version
+
+      - name: Install tmate
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            sudo apt-get update
+            sudo apt-get install --yes tmate
+          else
+            brew install tmate
+          fi
+
+      - name: Start SSH session
+        env:
+          SSH_PUBLIC_KEY: ${{ inputs.public_key }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          if [[ "$SSH_PUBLIC_KEY" == *$'\n'* ]]; then
+            echo "SSH public key must contain exactly one line" >&2
+            exit 1
+          fi
+
+          read -r key_type key_body _ <<<"$SSH_PUBLIC_KEY"
+          case "$key_type" in
+            ssh-ed25519|sk-ssh-ed25519@openssh.com|ecdsa-sha2-nistp256|ssh-rsa) ;;
+            *)
+              echo "unsupported SSH public key type" >&2
+              exit 1
+              ;;
+          esac
+          if [[ -z "$key_body" ]]; then
+            echo "SSH public key body is missing" >&2
+            exit 1
+          fi
+
+          printf '%s %s\n' "$key_type" "$key_body" >"$RUNNER_TEMP/authorized_keys"
+          ssh-keygen -l -f "$RUNNER_TEMP/authorized_keys"
+
+          socket="$RUNNER_TEMP/tmate.sock"
+          echo "TMATE_SOCKET=$socket" >>"$GITHUB_ENV"
+          tmate -S "$socket" -a "$RUNNER_TEMP/authorized_keys" new-session -d
+          tmate -S "$socket" wait tmate-ready
+          tmate -S "$socket" display -p '#{tmate_ssh}' >"$RUNNER_TEMP/ssh-command"
+
+      - name: Publish SSH connection
+        uses: actions/upload-artifact@v7
+        with:
+          name: tmate-${{ inputs.session }}
+          path: ${{ runner.temp }}/ssh-command
+          retention-days: 1
+
+      - name: Wait for SSH session
+        timeout-minutes: 110
+        run: |
+          set -euo pipefail
+
+          connected=false
+          remaining=600
+          while tmate -S "$TMATE_SOCKET" has-session 2>/dev/null; do
+            if [[ -e /continue || -e "$GITHUB_WORKSPACE/continue" ]]; then
+              break
+            fi
+
+            clients=$(tmate -S "$TMATE_SOCKET" display -p '#{tmate_num_clients}')
+            if ((clients > 0)); then
+              connected=true
+            elif [[ "$connected" == false ]]; then
+              remaining=$((remaining - 5))
+              if ((remaining <= 0)); then
+                echo "no SSH client connected within 10 minutes" >&2
+                exit 1
+              fi
+            fi
+            sleep 5
+          done
+
+      - name: Stop SSH session
+        if: ${{ always() }}
+        run: tmate -S "$TMATE_SOCKET" kill-session || true
+

@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Actions ARM Debug"
+  short_description: "在临时 ARM runner 上复现并回归测试问题"
+  default_prompt: "Use $github-actions-arm-debug to reproduce this issue on a temporary GitHub Actions ARM runner."
