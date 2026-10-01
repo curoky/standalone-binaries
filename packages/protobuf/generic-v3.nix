@@ -35,10 +35,6 @@ let
         chmod -R a+w gmock
         chmod -R a+w googletest
         ln -s ../googletest gmock/gtest
-      ''
-      + lib.optionalString stdenv.hostPlatform.isDarwin ''
-        substituteInPlace src/google/protobuf/testing/googletest.cc \
-          --replace 'tmpnam(b)' '"'$TMPDIR'/foo"'
       '';
 
       nativeBuildInputs = [
@@ -67,7 +63,7 @@ let
         homepage = "https://developers.google.com/protocol-buffers/";
         license = lib.licenses.bsd3;
         mainProgram = "protoc";
-        platforms = lib.platforms.unix;
+        platforms = lib.platforms.linux;
       };
     };
 in

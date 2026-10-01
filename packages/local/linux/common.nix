@@ -23,7 +23,6 @@ rec {
   cmake_4_1_2 = pkgsStatic.callPackage ../../cmake/4_1_2 { };
   diffutils = pkgsStatic.callPackage ../../diffutils { };
   fuse = pkgsStatic.callPackage ../../fuse { };
-  git = pkgsStatic.callPackage ../../git { };
   graphviz = pkgsStatic.callPackage ../../graphviz {
     inherit (pkgs) python3;
   };
@@ -32,8 +31,8 @@ rec {
   gocryptfs = pkgsStatic.callPackage ../../gocryptfs { };
   lua5_5 = pkgsStatic.callPackage ../../lua { };
   openssh_gssapi = pkgsStatic.callPackage ../../openssh_gssapi { };
-  poppler = pkgsStatic.callPackage ../../poppler { };
   postgresql = pkgsStatic.callPackage ../../postgresql { };
+  protobuf_3_9_2 = pkgsStatic.callPackage ../../protobuf/3_9_2 { };
   radare2 = pkgsStatic.callPackage ../../radare2 { };
   rizin = pkgsStatic.callPackage ../../rizin { };
   shadow = pkgsStatic.callPackage ../../shadow {

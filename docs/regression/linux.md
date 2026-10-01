@@ -62,7 +62,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `nsight-systems` | ⚠️ 预编译 glibc | ⏳ | NVIDIA 只提供 glibc 动态发行物 | 上游提供可用的 musl-static 发行物 | — | `packages/nsight-systems/` |
 | `opencommit` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/opencommit/` |
 | `openssh_gssapi` | 🩹 + 📦 本地 | ❌ | 相对定位 helpers + 关预认证 sandbox（QEMU 拒 seccomp）；详见 nix 注释 | 可搬运 helper 定位与跨架构 SSH 必须保留 | — | `packages/openssh_gssapi/` |
-| `poppler` | 🩹 本地 | 🟡 | minimal+utils、关 openjpeg、补静态传递链接；详见 nix 注释 | unstable 直接 musl-static 或仅保留命名差异 | b4fd65b198c5 | `packages/poppler/` |
+| `poppler` | 🩹 本地 | 🟡 | minimal+utils、关 openjpeg、补静态传递链接；graphite2 使用 native Python build tool，避免 static Python ctypes 失败；详见 nix 注释 | unstable 直接 musl-static，且 graphite2 构建不再使用 static Python；或仅保留命名差异 | b4fd65b198c5 | `packages/poppler/` |
 | `pkgconf` | 🩹 本地 | ✅ | 改系统路径，避免二进制残留 store 路径；详见 nix 注释 | stock 二进制不再编译进 store 路径 | b4fd65b198c5 | `packages/pkgconf/` |
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/parallel/` |
 | `patchelf` | 📌 `25.05` | ✅ | 历史 pin；unstable check `__TMC_END__` relocation 失败 | Linux 用 unstable 并满足 musl-static portability | b4fd65b198c5 | `manifests/default.nix` |

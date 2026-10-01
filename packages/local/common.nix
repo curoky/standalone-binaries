@@ -26,7 +26,6 @@
   libtool = pkgsStatic.callPackage ../libtool { };
   makeself = pkgsStatic.callPackage ../makeself { };
   pkgconf = pkgsStatic.callPackage ../pkgconf { };
-  protobuf_3_9_2 = pkgsStatic.callPackage ../protobuf/3_9_2 { };
   vim = pkgsStatic.callPackage ../vim { };
   watchexec = pkgsStatic.callPackage ../watchexec { };
   zsh = pkgsStatic.callPackage ../zsh { };

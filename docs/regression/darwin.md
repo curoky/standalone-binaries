@@ -39,8 +39,6 @@ Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/parallel/` |
 | `perl` | 🩹 + 📦 本地 | 🟡 | macOS 静态替换 + install-name relocation + wrapper；darwin 未验证；详见 nix 注释 | 只删除 stock 已覆盖的依赖/link patch | — | `packages/perl/` |
 | `postgresql` | 🩹 + 📦 本地 | 🟡 | 基于 `pkgsStatic.libpq` 追加 psql，改系统 OpenSSL 目录；详见 nix 注释 | `pkgsStatic.libpq` 上游提供 psql 且不嵌依赖路径 | dc5d91f84032 | `packages/postgresql/` |
-| `protobuf_3_8_0` | 📌 `22.11` | ❌ | 明确发布 legacy protobuf 3.8.0；使用仍提供该版本的最新 channel | 仅在更新 channel 仍提供 3.8.0 且构建 portable 时前移 | — | `manifests/default.nix` |
-| `protobuf_3_9_2` | 📌 源码版本 | ❌ | 明确发布 legacy protobuf 3.9.2；共享本地 derivation 保持跨平台一致 | 新 channel 提供 3.9.2 且各平台构建 portable 时切回 manifest | — | `packages/protobuf/3_9_2/` |
 | `radare2` | ⏸️ 停用 darwin | ❌ | 产品不要求 macOS 支持；仅在 Linux 包集合接入 | 产品边界，不作为上游回归目标 | — | `packages/local/linux/common.nix` |
 | `rclone` | 📦 native selection | ✅ | 用户确认改 native，删资源 hash 清理；仍保留 tzdata/mailcap/iana-etc 引用（见下方记录） | 工具链层恢复资源路径且无 store 依赖后关闭；resolver 特例独立回归 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go`, `docs/package-strategies/go.md` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |

@@ -275,6 +275,7 @@
   qemu-user = {
     platforms = [
       "x86_64-linux"
+      "aarch64-linux"
     ];
   };
   rsync = {
@@ -298,24 +299,59 @@
 
   # protobuf legacy versions
   protobuf3_8 = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
     version = "22.11";
     alias = "protobuf_3_8_0";
   };
   protobuf_23 = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
     version = "24.05";
   };
   protobuf_24 = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
     version = "25.05";
   };
-  protobuf_25 = { };
+  protobuf_25 = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
+  };
   protobuf_26 = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
     version = "25.05";
   };
-  protobuf_27 = { };
+  protobuf_27 = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
+  };
   protobuf_28 = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
     version = "25.05";
   };
-  protobuf_29 = { };
+  protobuf_29 = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
+  };
   protobuf3_20 = {
     platforms = [
       "x86_64-linux"
@@ -324,6 +360,10 @@
     version = "24.05";
   };
   protobuf3_21 = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
     version = "24.05";
   };
 

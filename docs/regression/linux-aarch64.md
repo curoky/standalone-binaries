@@ -8,9 +8,10 @@ musl-static cross 构建目前在 aarch64-linux 失败，已在 manifest 或本�
 
 | 包 | 定制 | 回归 | 原因与保留边界 | 回归判据 | commit | 来源 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `bash` | ⏸️ 停用 aarch64 | 🟡 | aarch64-linux musl-static cross 构建失败，临时去掉该架构 | 该架构构建修复后恢复 | 624af665418d | `manifests/default.nix` |
-| `coreutils` | ⏸️ 停用 aarch64 | 🟡 | aarch64-linux musl-static cross 构建失败，临时去掉该架构 | 该架构构建修复后恢复 | 624af665418d | `manifests/default.nix` |
-| `dive` | 📌 `25.11` + ⏸️ 停用 aarch64 | 🟡 | aarch64-linux 构建失败去掉该架构；x86_64 仍走 `25.11` pin（详见 `linux.md`） | 该架构构建修复后恢复 | 624af665418d | `manifests/default.nix` |
-| `patchelf` | 📌 `25.05` + ⏸️ 停用 aarch64 | 🟡 | aarch64-linux 构建失败去掉该架构；x86_64 仍走 `25.05` pin（详见 `linux.md`） | 该架构构建修复后恢复 | 624af665418d | `manifests/default.nix` |
-| `python311` | 📦 本地 + ⏸️ 停用 aarch64 | 🟡 | aarch64-linux 构建失败，在 `aarch64.nix` 去掉该架构（x86_64 保留） | 该架构构建修复后恢复 | 624af665418d | `packages/local/linux/aarch64.nix`, `packages/local/linux/x86_64.nix` |
-| `qemu-user` | ⏸️ 停用 aarch64 | 🟡 | aarch64-linux musl-static cross 构建失败，临时去掉该架构 | 该架构构建修复后恢复 | 624af665418d | `manifests/default.nix` |
+| `bash` | ⏸️ 停用 aarch64 | 🟡 | stock unstable 带动态 ELF `lib/bash/accept`，不满足 Linux 纯静态产物约束 | stock artifact 不再包含动态 ELF 后恢复 | b4fd65b198c5 | `manifests/default.nix` |
+| `coreutils` | ⏸️ 停用 aarch64 | 🟡 | stock unstable 带动态 ELF `libexec/coreutils/libstdbuf.so`，不满足 Linux 纯静态产物约束 | stock artifact 不再包含动态 ELF 后恢复 | b4fd65b198c5 | `manifests/default.nix` |
+| `dive` | 📌 `25.11` + ⏸️ 停用 aarch64 | 🟡 | unstable 的 `openldap` static 依赖找不到 Cyrus SASL；x86_64 仍走 `25.11` pin（详见 `linux.md`） | unstable 完整构建及 artifact 校验通过后恢复 | b4fd65b198c5 | `manifests/default.nix` |
+| `git` | 🩹 x86_64 本地 + ⏸️ 停用 aarch64 | 🟡 | unstable 的 Rust `libgitcore.a` 引用 musl 不提供的 `*64` 符号；`26.05`、`25.11`、`25.05` stock 均失败于 `t2082` | 任一受支持 channel 无 patch 完整构建及 artifact 校验通过后恢复 | b4fd65b198c5 | `packages/local/linux/x86_64.nix`, `packages/git/` |
+| `patchelf` | 📌 `25.05` + ⏸️ 停用 aarch64 | 🟡 | unstable checks 构建测试共享库时找不到 `-lbar` 与 `-lbar-scoped`；x86_64 仍走 `25.05` pin（详见 `linux.md`） | unstable 完整构建及 artifact 校验通过后恢复 | b4fd65b198c5 | `manifests/default.nix` |
+| `poppler` | 🩹 x86_64 本地 + ⏸️ 停用 aarch64 | 🟡 | stock `26.05` 与 `25.11` 均声明 static platform unsupported；当前本地构建又失败于 static Python 无法动态加载 fonttools 依赖 | 任一受支持 channel 的 stock artifact 通过，或不增加 aarch64 patch 即可完整构建后恢复 | b4fd65b198c5 | `packages/local/linux/x86_64.nix`, `packages/poppler/` |
+| `python311` | 📦 x86_64 本地 + ⏸️ 停用 aarch64 | 🟡 | stock unstable 带动态 ELF `lib-dynload/*.so`，不满足 Linux 纯静态产物约束 | stock artifact 不再包含动态 ELF 后恢复 | b4fd65b198c5 | `packages/local/linux/x86_64.nix`, `packages/python/` |
