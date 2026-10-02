@@ -16,7 +16,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
 | `aardvark-dns` | 🩹 本地 | ✅ | musl 无 `close_range` wrapper，patch 改用 raw syscall | 上游改用 musl-safe close_range 后删 patch | b4fd65b198c5 | `packages/regression/aardvark-dns/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
-| `build-tool-splicing` | 🩹 公共 package-set patch | ✅ | Graphite2、Node 和 Rizin 的 build-only Python，以及 Rizin/Radare2 的 build-only Perl 强制使用 native package set，并门禁错误平台的 native inputs | 各 upstream producer 正确选择 native interpreter 后逐项删除 override；门禁保留 | — | `packages/static-build-tools.nix`, `lib/validate-native-build-inputs.nix` |
+| `build-tool-splicing` | 🩹 公共 package-set patch | ✅ | Graphite2、Node 和 Rizin 的 build-only Python、Rizin/Radare2 的 build-only Perl，以及 Mise 的 Git check tool 强制使用 native package set，并门禁错误平台的 native inputs | 各 upstream producer 正确选择 native build tool 后逐项删除 override；门禁保留 | — | `packages/static-build-tools.nix`, `lib/validate-native-build-inputs.nix` |
 | `busybox` | 🩹 + 📦 本地 | 🟡 | udhcpc 与配套脚本改为 sibling 相对定位 | 上游支持可搬运资源定位后删 patch；保留脚本 packaging | b4fd65b198c5 | `packages/busybox/` |
 | `catatonit` | 🩹 本地 | ✅ | 补 build-for-build binutils 让 installCheck 的 readelf 可用 | 上游把 binutils 加进 nativeBuildInputs 后恢复 | b4fd65b198c5 | `packages/regression/catatonit/` |
 | `clang-tools-18` | 📦 本地 | ❌ | 固定 LLVM 18，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
@@ -55,7 +55,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `lua5_5` | 🩹 本地 | ✅ | 恢复 `/usr/local` module paths，避免嵌 store 路径 | stock 默认 module paths 无 store 路径 | b4fd65b198c5 | `packages/lua/` |
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |
 | `markdownlint-cli2` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/nodejsPackages/markdownlint-cli2.nix` |
-| `mise` | 🩹 本地 | 🟡 | native Git 检查工具 + 跳过代理相关 DNS 测试 + PATH helper | static Git 与 DNS 测试修复后删 build workaround；保留 PATH portability patch | b4fd65b198c5 | `packages/mise/` |
+| `mise` | 🩹 本地 | 🟡 | 跳过代理相关 DNS 测试 + PATH helper | DNS 测试不再受构建代理影响后删 test workaround；保留 PATH portability patch | b4fd65b198c5 | `packages/mise/` |
 | `netron` | 📦 本地 | ❌ | wheel 重打包并绑定 sibling/宿主 Python | runtime packaging 必须保留 | — | `packages/pythonPackages/netron.nix` |
 | `nodejs-slim24` | 🩹 本地 | 🟡 | 保留 `ada` doCheck 与 node configureFlags | 逐 patch 验证删除，保留 Node 24 runtime | b4fd65b198c5 | `packages/nodejsPackages/nodejs/24.nix` |
 | `nodejs-slim26` | 🩹 本地 | 🟡 | 保留 `ada`/`lief`/`temporal_capi` 与 configureFlags | 逐 patch 删除，满足各平台动态依赖规则 | b4fd65b198c5 | `packages/nodejsPackages/nodejs/26.nix` |

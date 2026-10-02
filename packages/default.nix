@@ -75,9 +75,7 @@ let
 
     # Rust.
     codex = pkgsStatic.callPackage ./codex { };
-    mise = pkgsStatic.callPackage ./mise {
-      nativeGit = pkgs.gitMinimal;
-    };
+    mise = pkgsStatic.callPackage ./mise { };
 
     # Perl.
     perl = pkgsStatic.callPackage ./perlPackages/perl/linux.nix { };

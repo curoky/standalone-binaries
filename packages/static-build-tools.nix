@@ -13,10 +13,10 @@
 #    Python during the build. None of these interpreters is linked into or
 #    shipped with the corresponding product.
 # 4. Override the producer once so every consumer inherits the native tool.
-#    The current failures happen to involve Python and Perl, but the platform
-#    rule also applies to compilers, linkers, code generators, build systems,
-#    and test tools. Add them here only when a patched producer actually picks
-#    a target tool for build-only execution.
+#    The current failures happen to involve Python, Perl, and Git, but the
+#    platform rule also applies to compilers, linkers, code generators, build
+#    systems, and test tools. Add them here only when a patched producer
+#    actually picks a target tool for build-only execution.
 # 5. Do not replace `pkgsStatic.python3`, `pkgsStatic.perl`, or their package
 #    sets: runtimes and packages embedding an interpreter still require the
 #    target-static interpreter and libraries.
@@ -38,6 +38,9 @@ in
 lib.optionalAttrs prev.stdenv.hostPlatform.isStatic (
   lib.optionalAttrs (prev ? graphite2) (
     useNativeBuildTools "graphite2" { python3 = nativePkgs.python3; }
+  )
+  // lib.optionalAttrs (prev.stdenv.hostPlatform.isLinux && prev ? mise) (
+    useNativeBuildTools "mise" { git = nativePkgs.gitMinimal; }
   )
   // lib.optionalAttrs (prev.stdenv.hostPlatform.isLinux && prev ? nodejs-slim_24) (
     useNativeBuildTools "nodejs-slim_24" { python3 = nativePkgs.python3; }

@@ -24,7 +24,7 @@ assembler、code generator、build system 和测试工具：只要工具会在�
 build platform 上运行；为 target 生成代码或作为产品运行期 helper 的工具仍属于 target。
 正式包集合通过
 [`packages/static-build-tools.nix`](../../packages/static-build-tools.nix)
-在 producer 边界统一注入当前 channel 的 native 解释器。不得把整个
+在 producer 边界统一注入当前 channel 的 native build tool。不得把整个
 `pkgsStatic.python3`、`pkgsStatic.perl` 或对应 package set 改成 native，否则会破坏静态
 runtime 和需要链接 target interpreter library 的包。
 
@@ -42,14 +42,14 @@ build tool，不得为了减少构建闭包而替换成 native interpreter。
 ## Patched package toolchain 边界
 
 只对回归清单中已有 patch/override 的 package root 做 build-tool 归属审计，不为 stock
-upstream 包预先增加 override。当前非解释器工具链不需要新的共享 override：
+upstream 包预先增加 override。Mise 的 Git check tool 通过公共 producer override 使用
+native package set；其余非解释器工具链不需要新的共享 override：
 
 - CMake bootstrap 和 Rizin 的 Meson native compiler 已通过 `depsBuildBuild` 选择 build
   platform compiler；
 - Catatonit 的 install check 使用 build-for-build binutils，Codex 使用 native
   Clang/libclang，rsync 使用 native check compiler；
-- Mise 的 Git check tool、smartmontools 的 autoreconf/hostname 均已来自 native package
-  set；
+- smartmontools 的 autoreconf/hostname 已来自 native package set；
 - PostgreSQL 的 `gccAsClang` 是有意生成 target code 的 compiler，不能替换成普通 native
   compiler；
 - Rizin 的 binutils 被编入 x86/PPC assembler backend，属于运行期 target assembler，不是
