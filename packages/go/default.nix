@@ -1,14 +1,22 @@
+# Go — portable musl-static SDK.
+#
+# Why local:
+# 1. Nixpkgs' cross bootstrap records its private target compiler, musl loader,
+#    CGO setting and data paths as the installed SDK defaults. Regenerate those
+#    values to match upstream binary releases while leaving bootstrap variables
+#    in effect during the build.
+# 2. Go's internal linker does not recognize the bundled race runtime as needing
+#    external linkage; `go test -race` then fails with `hole in findfunctab`.
+#    Force external linking only for race builds.
+# 3. `debug/dwarf` and `debug/elf` ship a deliberately dynamic ELF fixture.
+#    It is test data, not SDK runtime content, but the strict artifact gate must
+#    reject every dynamic ELF, so remove those testdata directories.
+#
+# The SDK layout is product packaging. Regress generated defaults and race-mode
+# linking independently when stock static Go matches upstream behavior; retain
+# the strict artifact boundary.
 { go }:
 
-# Build the compiler itself as static musl, but keep the public toolchain
-# defaults aligned with upstream Go. nixpkgs' cross build otherwise bakes its
-# private target compiler, musl loader and Nix data paths into the SDK. The
-# static linker does not recognize the bundled race object as requiring an
-# external linker, so that one mode is made explicit without affecting pure-Go
-# cross compilation: without it a minimal `go test -race` fails with
-# "hole in findfunctab". debug/dwarf and debug/elf testdata are removed because
-# issue57046-clang.elf5 is a deliberately dynamic ELF fixture rejected by the
-# artifact portability gate.
 go.overrideAttrs (oldAttrs: {
   patches = [ ];
 

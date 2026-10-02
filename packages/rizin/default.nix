@@ -1,14 +1,6 @@
-{
-  lib,
-  stdenv,
-  callPackage,
-  buildPackages,
-  python3,
-  rizin,
-}:
-
-# Stock rizin fails to build under our musl-static cross set for several reasons:
+# Rizin — musl-static cross-build fixes.
 #
+# Why local:
 #   1. libewf's configure aborts on OpenSSL AC_RUN_IFELSE probes it cannot run
 #      when cross compiling.
 #   2. tree-sitter's `make install` tries to install a shared object the static
@@ -44,6 +36,18 @@
 #      and aarch64 musl runtimes, so the exact-string assertion trips only on
 #      aarch64. pyyaml is only a build-time code generator here, so drop its
 #      installCheck to unblock the cross build.
+#
+# Remove each fix when the corresponding stock dependency or cross-build path
+# succeeds under the repository's static toolchain.
+{
+  lib,
+  stdenv,
+  callPackage,
+  buildPackages,
+  python3,
+  rizin,
+}:
+
 (rizin.override {
   libewf = callPackage ../libewf { };
   tree-sitter = callPackage ../tree-sitter { };

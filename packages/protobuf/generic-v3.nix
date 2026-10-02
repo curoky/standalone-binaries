@@ -1,5 +1,13 @@
-# https://github.com/NixOS/nixpkgs/blob/release-24.05/pkgs/development/libraries/protobuf/generic-v3.nix
-
+# Legacy Protobuf v3 build helper.
+#
+# 1. Cross compilation cannot execute the target protoc needed while generating
+#    target sources, so instantiate the same source once for the build platform
+#    and pass that native compiler through `--with-protoc`.
+# 2. Replace the old bundled gmock/gtest trees with the selected nixpkgs test
+#    source so this legacy release can compile and run checks with the current
+#    toolchain.
+# 3. Keep static-library generation enabled and link the target zlib; this helper
+#    is Linux-only and is not itself a published package entry point.
 {
   lib,
   stdenv,
@@ -20,7 +28,6 @@ let
       pname = "protobuf";
       inherit version;
 
-      # make sure you test also -A pythonPackages.protobuf
       src = fetchFromGitHub {
         owner = "protocolbuffers";
         repo = "protobuf";

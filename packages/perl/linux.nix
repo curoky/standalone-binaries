@@ -1,3 +1,16 @@
+# Perl for Linux — static interpreter with bundled compression XS modules.
+#
+# Why local:
+# 1. Static Perl is built with `-Uusedl`, so it cannot load XS `.so` modules at
+#    runtime. ExifTool needs LZMA and Brotli modules absent from stock static
+#    Perl; inject their CPAN sources and build them into the interpreter.
+# 2. Link those extensions directly to static xz/Brotli archives and verify they
+#    can be required by the installed interpreter.
+# 3. Replace the entry point with a relative wrapper so local modules resolve
+#    without an installed Nix profile.
+#
+# The runtime shape is intentional; individual XS injections may be removed if
+# stock static Perl includes equivalent modules.
 {
   lib,
   perl,

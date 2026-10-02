@@ -1,16 +1,15 @@
-# catatonit — musl-static build with binutils added for the installCheck.
+# catatonit — install-check tool fix.
 #
-# Upstream's installCheck runs `readelf -d` to assert the binary is statically
-# linked, but never adds binutils to `nativeBuildInputs`. Under the musl64
-# cross `strictDeps` build the native PATH is isolated, so `readelf` is missing
-# and the check fails with "readelf: command not found". Add binutils so the
-# check runs instead of clearing it.
+# Why local:
+# 1. Upstream's install check runs `readelf -d` to assert static linkage but does
+#    not declare binutils in `nativeBuildInputs`.
+# 2. `strictDeps` therefore hides readelf in the musl cross build and the check
+#    fails with `readelf: command not found`.
+# 3. The check needs an unprefixed build-machine command; direct
+#    `buildPackages.binutils` still installs a target-prefixed tool, so the
+#    override uses build-for-build binutils.
 #
-# The check invokes the unprefixed `readelf`, which only the build-for-build
-# binutils provides: the direct `buildPackages.binutils` still targets the musl
-# host and installs `x86_64-unknown-linux-musl-readelf`, so we reach one level
-# deeper (`buildPackages.buildPackages`, targetPrefix = "") for a plain
-# `readelf`.
+# Remove this override once upstream declares the correct check dependency.
 {
   lib,
   stdenv,

@@ -1,62 +1,33 @@
-# nodejs-slim26 (Linux, static)
+# Node.js 26 — versioned musl-static runtime.
 #
-# A standalone, fully-static (musl) Node.js 26 runtime, exposed as its own
-# package (deploy dir name: `nodejs-slim26`) so other packages can reference it
-# as a sibling directory at deploy time (the same convention dool/netron use for
-# the `python311` package: $store/<pkg-name>/bin/<interpreter>).
+# Why local:
+# 1. Gyp imports ctypes, which the static target Python cannot load. Configure
+#    with build-platform Python instead.
+# 2. Ada's tests expect fuzzer executables that its static build does not
+#    produce, so disable only that dependency's checks.
+# 3. LIEF forces Python bindings, reaching a pydantic-core cdylib that the
+#    static Rust target cannot build. Node needs only LIEF's C/C++ library, so
+#    remove the Python output and propagated Python closure.
+# 4. Temporal's install check invokes unprefixed pkg-config and runs target test
+#    programs in the cross sandbox. Disable that dependency check only.
+# 5. Static stdenv appends autotools flags that Node's Python configure script
+#    rejects; remove `--enable-static` and `--disable-shared` from that input.
+# 6. System Brotli, simdutf and merve archives have link-order or version
+#    mismatches. Use Node's mutually matched bundled copies.
+# 7. Node's checks build `.node` shared addons with a non-PIC static CRT and fail
+#    on `__TMC_END__` relocations, so checks remain disabled.
+# 8. Dependency overrides are guarded by `hostPlatform.isStatic`; applying them
+#    to build-platform copies would invalidate cached CMake/LLVM/Rust toolchains.
 #
-# This package owns the static-build patches. The ada / lief / temporal_capi tweaks
-# must be applied to the *dependencies* node is compiled against, which are not
-# exposed as overridable args of nodejs-slim (they are args of the inner
-# nodejs.nix, pulled in via callPackage). So `.override` can't reach them and we
-# extend the static package set with an overlay, then take its patched
-# nodejs-slim. node's own derivation (configureFlags / buildInputs / doCheck) is
-# then adjusted with `.overrideAttrs`. Keeping the overlay local to this package
-# avoids mutating shared static packages used by other consumers (e.g. ngtcp2).
-#
-# The Node SEA single-file approach was abandoned: flipping the SEA fuse on
-# nixpkgs' node 24 segfaults in V8 init before any JS runs, on both dynamic and
-# static builds — unrelated to the static deps patched here.
-#
-# Verification:
-#   file $out/bin/node   # => "ELF ... statically linked"
-#   $out/bin/node --version
+# The Node 26 output is a product version. Regress each build workaround
+# independently when stock `pkgsStatic.nodejs_26` supports it.
 {
   lib,
   pkgsStatic,
-  # Native (non-static) python used only as node's build-time configure tool.
-  # Under pkgsStatic, `python3` is the fully static (musl) interpreter, whose
-  # ctypes cannot `dlopen` (`OSError: Dynamic loading not supported`); node's
-  # gyp ninja generator imports ctypes, so running configure.py under the static
-  # python aborts before generating any build files. python is only a
-  # nativeBuildInput (never linked into node), so inject the native one.
   python3,
 }:
 
 let
-  # pkgsStatic with the static-build patches needed to compile a fully static
-  # (musl) nodejs-slim:
-  #   - ada: tests disabled. Under pkgsStatic its test suite expects
-  #     `basic_fuzzer` and `max_length_fuzzer`, but neither executable is built
-  #     by the static toolchain.
-  #
-  # hdrhistogram_c no longer needs a local override: unstable nixpkgs already
-  # disables the shared target (HDR_HISTOGRAM_BUILD_SHARED / BUILD_PROGRAMS) and
-  # installs the `libhdr_histogram.a` -> `libhdr_histogram_static.a` symlink node
-  # links against. Re-adding those here produced a duplicate `ln -s` that failed
-  # with "File exists".
-  # These overrides fix problems that only occur when a dependency is built for
-  # the fully-static musl *target* (test suites that don't run in the sandbox,
-  # SHARED-only CMake targets the static toolchain can't link, etc.). But a
-  # plain `pkgsStatic.extend` also rewrites the *build-platform* (glibc) copies
-  # of these packages, which nixpkgs' own toolchain pulls in — e.g. libuv is a
-  # nativeBuildInput of cmake, which is a nativeBuildInput of llvm. Rewriting
-  # the glibc libuv therefore changes cmake's and llvm's hashes, so rustc's
-  # llvm can no longer be substituted from cache.nixos.org and gets rebuilt
-  # from source. Guard every override with `hostPlatform.isStatic` so it only
-  # applies to the musl-static target copy; the glibc build-platform copies are
-  # left untouched and keep hitting the upstream cache.
-  # Full write-up: ../../../docs/package-strategies/pkgsstatic-extend.md
   onlyStatic =
     pkg: overrides: if pkg.stdenv.hostPlatform.isStatic then pkg.overrideAttrs overrides else pkg;
   pkgsStaticNode = pkgsStatic.extend (
@@ -103,15 +74,9 @@ let
     }
   );
 
-  # Pin to the major-26 attribute so this package's version doesn't drift with
-  # nixpkgs' default `nodejs-slim` alias.
   patchedNode = (pkgsStaticNode.nodejs-slim_26.override { python3 = python3; }).overrideAttrs (old: {
     configureFlags = builtins.filter (
       f:
-      # Under pkgsStatic the static stdenv adapter appends the autotools flags
-      # `--enable-static --disable-shared`, but node uses a Python
-      # `configure.py` that rejects `--disable-shared` ("gyp: --disable-shared
-      # not found / Error running GYP"). Strip those autotools flags.
       f != "--enable-static"
       && f != "--disable-shared"
       # Make node use its own bundled copies of brotli, simdutf and merve
@@ -150,13 +115,7 @@ let
     doCheck = false;
   });
 in
-# The overridden nodejs-slim is already a complete node derivation, so use it
-# directly as this package's result (no need to wrap it in another mkDerivation
-# just to copy the binary). $out is a full node install (bin/node + lib/ etc.);
-# consumers reference $store/nodejs-slim26/bin/node. pname is fixed to
-# `nodejs-slim26` (the source dir already encodes the major version).
 patchedNode.overrideAttrs (_: {
   pname = "nodejs-slim26";
-  # pname change recomputes name; we're not changing the actual version.
   __intentionallyOverridingVersion = true;
 })

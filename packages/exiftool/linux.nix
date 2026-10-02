@@ -1,3 +1,15 @@
+# ExifTool for Linux — pure-Perl payload with a sibling static runtime.
+#
+# Why local:
+# 1. Static Perl cannot load XS shared objects. Compression XS modules are
+#    therefore compiled into the sibling Perl package, while this package ships
+#    only ExifTool and its pure-Perl dependencies.
+# 2. The upstream launcher carries a Nix interpreter environment. Replace it
+#    with a relative wrapper and bundle the required module tree.
+# 3. `installCheck` cannot execute that wrapper before the sibling Perl package
+#    is assembled, so disable it without adding a store fallback.
+#
+# These are structural runtime-packaging boundaries.
 {
   perlPackages,
   rsync,

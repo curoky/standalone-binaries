@@ -38,3 +38,5 @@ wrapper 从自身路径求出共同 `store/` 目录，再显式执行同级 runt
 
 pin、patch、禁用检查、linker workaround、结构性 packaging 和动态例外只在
 [回归清单](../regression/AGENTS.md)维护状态。专题文档不复制回归队列或测试历史。
+包级 root cause、对应修正和保留边界写在最终 derivation 的 Nix 文件头部；回归表只留
+一句候选摘要与删除判据，选择/接线文件只保留分组标题。

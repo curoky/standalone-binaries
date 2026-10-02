@@ -1,30 +1,14 @@
-# markdownlint-cli2 (on static node)
+# markdownlint-cli2 — JavaScript payload with a sibling Node runtime.
 #
-# markdownlint-cli2 running on our fully-static (musl) `nodejs-slim26` package,
-# instead of being `nix bundle`'d into a self-extracting executable. Reuse the
-# upstream nixpkgs JS distribution and ship a relative-path wrapper that invokes
-# the sibling static node explicitly. The static node then travels with the
-# deployed tool instead of depending on a node on the host PATH after artifact
-# assembly rewrites the upstream shebang.
+# Why local:
+# 1. The nixpkgs package builds correctly, but its generated launcher retains
+#    the Node interpreter selected inside the Nix store.
+# 2. Copy the JavaScript distribution without that launcher and install a
+#    wrapper that finds the separately deployed `nodejs-slim26` sibling.
+# 3. Run the install check directly through that Node runtime so it validates
+#    the shipped JavaScript entry point without introducing a store fallback.
 #
-# Unlike prettier, the interpreter is NOT overridden at build time: this is
-# an npm-based buildNpmPackage tool whose build needs `npm`, which nodejs-slim
-# lacks. So it is built with the regular node and only switches to the sibling
-# static node at runtime via the wrapper below.
-#
-# Upstream nixpkgs ships markdownlint-cli2 as:
-#   $out/bin/markdownlint-cli2                          (wrapper invoking node)
-#   $out/lib/node_modules/markdownlint-cli2/...         (the JS + node_modules)
-#
-# Deploy layout:
-#   $store/
-#     nodejs-slim26/bin/node            (separate package; static musl ELF)
-#     markdownlint-cli2/
-#       bin/markdownlint-cli2           (wrapper -> sibling node + entry .mjs)
-#       libexec/markdownlint-cli2/...   (JS, from the nixpkgs markdownlint-cli2)
-#
-# Verification:
-#   $out/bin/markdownlint-cli2 --help   # (with sibling node present)
+# This is intentional runtime packaging, not an upstream build workaround.
 {
   lib,
   stdenvNoCC,
@@ -51,12 +35,9 @@ stdenvNoCC.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    # Reuse the upstream nixpkgs markdownlint-cli2's JS distribution.
     mkdir -p $out/libexec
     cp -R ${markdownlint-cli2}/lib/node_modules/markdownlint-cli2 $out/libexec/markdownlint-cli2
 
-    # Replace the upstream bin wrapper with a relative-path wrapper that invokes
-    # the sibling static node explicitly.
     mkdir -p $out/bin
     cp ${wrapper} $out/bin/markdownlint-cli2
     chmod +x $out/bin/markdownlint-cli2
@@ -64,11 +45,6 @@ stdenvNoCC.mkDerivation {
     runHook postInstall
   '';
 
-  # Even though markdownlint-cli2 is *built* with the regular node (it needs
-  # npm), make sure the shipped JS actually runs on the static `nodejs-slim26`
-  # we deploy alongside it — i.e. the exact command the runtime wrapper issues.
-  # markdownlint-cli2 has no --version/--help that exits 0, so lint a trivial
-  # clean markdown file and assert success.
   doInstallCheck = true;
   installCheckPhase = ''
     runHook preInstallCheck

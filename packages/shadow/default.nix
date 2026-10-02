@@ -1,8 +1,13 @@
-# Stock pkgsStatic.shadow enables optional libbsd support. On musl-static,
-# libbsd's explicit_bzero check aborts with SIGABRT before shadow can build.
-# Disable that optional feature instead of skipping dependency tests, while
-# retaining shadow's own checks. Upstream splits `su` into a separate output,
-# so merge it back into the standalone command suite.
+# shadow — musl build workaround plus complete command packaging.
+#
+# Why local:
+# 1. Stock enables optional libbsd support, but libbsd's `explicit_bzero` check
+#    aborts under musl-static before shadow can build. Disable that feature while
+#    retaining shadow's own checks.
+# 2. Nixpkgs splits `su` into a separate output. The standalone command suite is
+#    intentionally assembled with both outputs via `symlinkJoin`.
+#
+# Re-enable libbsd when its checks pass; keep the joined command layout.
 {
   shadow,
   symlinkJoin,
@@ -17,7 +22,5 @@ symlinkJoin {
     portableShadow
     portableShadow.su
   ];
-  # The joined derivation only has `out`; inheriting Shadow's multi-output
-  # install selection would make Nix request a nonexistent `man` output.
   meta = removeAttrs portableShadow.meta [ "outputsToInstall" ];
 }

@@ -1,51 +1,35 @@
 # 上游回归清单
 
-本目录是 agent 维护的 pin、包级及公共组件 patch 与本地 packaging 总账，也是批量回归的唯一输入。
+本目录只维护回归队列，不解释 patch 实现。包级原因和保留边界以最终 derivation 的 Nix
+注释为准；公共 workaround 以其组件实现和 `AGENTS.md` 为准。
 
-按平台/架构拆成三张表：
+- [`linux.md`](linux.md)：x86_64-linux 与 aarch64-linux 共用的定制。
+- [`linux-aarch64.md`](linux-aarch64.md)：仅 aarch64-linux 的差异。
+- [`darwin.md`](darwin.md)：aarch64-darwin 的定制。
 
-- [`linux.md`](linux.md)：跨架构共享的 Linux 表（x86_64-linux 与 aarch64-linux 通用），每行只列该平台有定制的包。
-- [`linux-aarch64.md`](linux-aarch64.md)：仅 aarch64-linux 特有的差异（当前是临时停用的包）。共享行不在此重复。
-- [`darwin.md`](darwin.md)：macOS 表。
+跨平台包分别登记。公共 workaround 使用稳定候选 ID，并在「来源」中指向实现；候选 ID
+不一定是 package attr。
 
-跨平台包在对应的多张表里各出现一次。
+## 列约定
 
-公共 workaround 也必须在对应平台表中单独登记，用稳定的组件候选 ID 标识，并在「来源」
-指向共享实现；候选 ID 不一定是 package attr，不能直接拼成 `nix build .#<ID>`。
-从包级集中到 artifact 或其他公共层不代表上游回归成功，不得因此移出批量候选。
-当前 Darwin resolver 的移除操作见
-[`darwin.md`](darwin.md#darwin-cgo-resolver-回归)。
+- `回归`：✅ 整项回到 upstream；🟡 只回归 workaround；❌ 结构性 packaging；⏳ 长期例外。
+- `定制`：📌 pin；🩹 build/portability patch；📦 packaging；⚠️ 动态例外；⏸️ 临时停用。
+- `原因与保留边界`：只写足以识别待回归部分的一句话，不复制 Nix 注释。
+- `回归判据`：只写删除定制前必须成立的结果，不记录操作过程或历史验证。
+- `commit`：最后一次在该平台实际回归测试所用的 `nixpkgs-unstable` 短 rev；未测填 `—`。
+- `来源`：只列选择或实现路径，不附原因说明。
 
-## 状态含义（`回归` 列）
-
-- ✅ **整项候选**：优先尝试直接回到 unstable 上游；标记只表示值得验证，不表示已经构建成功。
-- 🟡 **部分候选**：只回归临时 workaround，必须保留表中写明的 packaging 或产品行为。
-- ❌ **结构性保留**：当前不是上游回归目标；用于说明本地包为何存在，避免误删。
-- ⏳ **长期审计**：动态或预编译例外；只有出现满足仓库产物不变量的替代方案时才处理。
-
-## 定制含义（`定制` 列）
-
-📌 表示旧 nixpkgs pin，🩹 表示编译或 portability patch，📦 表示结构性 packaging，
-⚠️ 表示动态例外，⏸️ 表示临时停用。
-
-## commit 语义
-
-`commit` 记录最后一次在该平台做回归测试时 `flake.lock` 里 `nixpkgs-unstable` 的 rev（短 hash），
-未测过填 `—`。审计时若该 commit 与当前 `flake.lock` 的 unstable rev 相同，说明该平台在当前 channel
-已测过、可跳过；rev 变化后需重新验证。`原因与保留边界` 和 `回归判据` 记录回归所需的结论，
-「来源」只定位实际选择或实现。最终包的 Nix 文件或公共实现已有更详细注释时以那里为准；
-`manifests/default.nix`、`packages/local*.nix` 和 `flake.nix` 不重复这些说明。
-公共 patch 只有在绕过自身后完成其回归判据，或得到仍需保留的明确失败证据，才更新 commit；
-经过 patch 后的成功构建及部分成功样本不算公共 patch 的移除回归。
+索引文件可以保留平台或生态分组标题，但不得承载包级原因。实际构建过且得到明确成功或
+失败证据后才刷新 `commit`；普通 patched build 或部分公共 workaround 样本不算回归验证。
 
 ## 批量回归
 
-批量回归按表格顺序遍历 `✅` 和 `🟡` 行：
+按表格顺序处理 `✅` 和 `🟡`：
 
 ```bash
 rg '^\| .+ \| (✅|🟡)' docs/regression/*.md
 ```
 
-回归成功后，整项回归删除该行；部分回归更新原因与判据，只保留尚未解决的部分，并刷新 commit。
-跨平台包在某个平台回归成功后只删该平台表中的行，其他平台/架构的行保留。新增或改变非 unstable pin、
-本地 derivation、override、公共 workaround、禁用检查或动态例外时，必须同步维护本目录。
+整项成功后删行；部分成功只删除已失效的 workaround；失败则保留并把一句话判据修正得更
+准确。新增或改变 pin、本地 derivation、override、公共 workaround、禁用检查或例外时，
+同步更新对应平台表。

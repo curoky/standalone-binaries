@@ -1,25 +1,20 @@
-# sudo — fully-static musl build (Linux only).
+# sudo — PAM-free musl-static build.
 #
-# The stock `pkgsStatic.sudo` is fail-closed: its `buildInputs = [ pam ]` and
-# pam carries `meta.badPlatforms = [ isStatic ]`, so the static build is
-# rejected before it starts. PAM cannot be statically linked here (and a
-# portable, unprivileged tarball has no PAM stack to talk to anyway), so drop
-# the pam dependency and configure `--disable-pam`. The result is a standalone
-# musl-static `sudo`.
+# Why local:
+# 1. Stock `pkgsStatic.sudo` depends on PAM, whose metadata rejects static hosts,
+#    so evaluation fails before compilation.
+# 2. A relocatable tarball has no packaged PAM stack, so the override removes
+#    PAM and configures sudo without it instead of bypassing the platform guard.
+# 3. The artifact intentionally does not preserve setuid-root; deployments that
+#    need privilege escalation must apply that permission out of band.
 #
-# Note: this ships a relocatable binary only. Privilege escalation still
-# requires the setuid-root bit to be applied out of band (the tarball install
-# path is unprivileged and cannot preserve setuid); `--version` and `--help`
-# work without it.
+# Remove the build override if PAM becomes static-safe, but retain the explicit
+# deployment boundary for setuid.
 {
   lib,
   sudo,
 }:
 
-# pam is the sole `isStatic` badPlatform source and cannot be statically
-# linked. Replace it with null via `.override` so the derivation no longer
-# references it (which is what pins the badPlatform / fail-closed evaluation),
-# then disable PAM at configure time.
 (sudo.override { pam = null; }).overrideAttrs (old: {
   buildInputs = lib.remove null (old.buildInputs or [ ]);
 

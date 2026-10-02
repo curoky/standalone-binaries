@@ -1,6 +1,3 @@
-# Linux local packages: shared set (common.nix) merged with the current
-# architecture's set (x86_64.nix / aarch64.nix). Architecture is selected from
-# the static (target) platform so cross builds resolve correctly.
 {
   pkgs,
   pkgsStatic,

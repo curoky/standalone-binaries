@@ -1,12 +1,13 @@
-# cloc — sibling-perl wrapper with its Perl modules bundled.
+# cloc — Perl application with a sibling runtime.
 #
-# `cloc` is a Perl script; the wrapper resolves the sibling static `perl`
-# (../../perl/bin/perl relative to the install) and sets PERL5LIB to the bundled
-# modules so the relocatable tarball has no PATH or store dependency.
+# Why local:
+# 1. The upstream script carries a Nix interpreter/module environment. Bundle
+#    its Perl modules and wrap it with paths relative to the deployed package.
+# 2. The runtime Perl is a separate sibling package, so the build sandbox cannot
+#    execute the final wrapper during `installCheck`; disable that check rather
+#    than introducing a store-path fallback.
 #
-# `doInstallCheck = false` is not recoverable: the stock installCheck runs
-# `$out/bin/cloc` (the sibling wrapper), and the sandbox has no sibling perl, so
-# it fails with "perl: No such file or directory".
+# Both choices are structural runtime packaging, not upstream build regressions.
 {
   lib,
   cloc,

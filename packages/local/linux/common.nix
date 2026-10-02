@@ -148,7 +148,5 @@ rec {
     ;
 
   # Native glibc data.
-  glibcLocales = pkgs.glibcLocales.override {
-    allLocales = false;
-  };
+  glibcLocales = pkgs.callPackage ../../glibc-locales { };
 }

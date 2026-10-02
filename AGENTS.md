@@ -61,6 +61,10 @@ macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`
 - Manifest 不填写默认字段；包清单和 schema 以实现为准。
 - Manifest schema 在 eval 时 fail-closed：未知字段、平台、nixpkgs version、空或重复
   output 和错误字段类型必须直接报错。
+- `manifests/default.nix` 与 `packages/local/**` 只负责选择和接线；可以保留生态、平台等
+  分组标题，不记录包级定制原因。每个本地包必须在最终 derivation 的 Nix 文件头部按项
+  说明 stock 行为、具体失败和对应修正，并写清可删除边界；混合包另列必须保留的结构性
+  packaging。不要省略 root cause，也不要保留验证流水、旧实现或 Git 历史。
 - 本地包只修 root cause，不复制 upstream derivation。
 - 优先最小 override，避免 target overlay 污染 `buildPackages`。只针对静态 target
   的 override 必须检查 `stdenv.hostPlatform.isStatic`。

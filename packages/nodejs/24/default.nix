@@ -1,65 +1,37 @@
-# nodejs-slim24 (Linux, static)
+# Node.js 24 — versioned musl-static runtime.
 #
-# A standalone, fully-static (musl) Node.js 24 runtime, exposed as its own
-# package (deploy dir name: `nodejs-slim24`) so other packages can reference it
-# as a sibling directory at deploy time (the same convention dool/netron use for
-# the `python311` package: $store/<pkg-name>/bin/<interpreter>).
+# Why local:
+# 1. Gyp imports ctypes, which the static target Python cannot load. Configure
+#    with build-platform Python instead.
+# 2. Ada's tests expect fuzzer executables that its static build does not
+#    produce, so disable only that dependency's checks.
+# 3. Static stdenv appends autotools flags that Node's Python configure script
+#    rejects; remove `--enable-static` and `--disable-shared` from that input.
+# 4. System Brotli is split into archives whose one-pass link order leaves
+#    common symbols unresolved. Use Node's matched bundled copy.
+# 5. The nixpkgs simdutf selected for Node 24 lacks API used by this source. Use
+#    Node's bundled copy rather than linking mismatched headers/libraries.
+# 6. Node's checks build `.node` shared addons with a non-PIC static CRT and fail
+#    on `__TMC_END__` relocations, so checks remain disabled.
 #
-# This package owns the static-build patches. The ada tweak
-# must be applied to the *dependencies* node is compiled against, which are not
-# exposed as overridable args of nodejs-slim (they are args of the inner
-# nodejs.nix, pulled in via callPackage). So `.override` can't reach them and we
-# extend the static package set with an overlay, then take its patched
-# nodejs-slim. node's own derivation (configureFlags / buildInputs / doCheck) is
-# then adjusted with `.overrideAttrs`. Keeping the overlay local to this package
-# avoids mutating shared static packages used by other consumers (e.g. ngtcp2).
-#
-# The Node SEA single-file approach was abandoned: flipping the SEA fuse on
-# nixpkgs' node 24 segfaults in V8 init before any JS runs, on both dynamic and
-# static builds — unrelated to the static deps patched here.
-#
-# Verification:
-#   file $out/bin/node   # => "ELF ... statically linked"
-#   $out/bin/node --version
+# The Node 24 output is a product version. Regress each build workaround
+# independently when stock `pkgsStatic.nodejs_24` supports it.
 {
   lib,
   pkgsStatic,
-  # Native (non-static) python used only as node's build-time configure tool.
-  # Under pkgsStatic, `python3` is the fully static (musl) interpreter, whose
-  # ctypes cannot `dlopen` (`OSError: Dynamic loading not supported`); node's
-  # gyp ninja generator imports ctypes, so running configure.py under the static
-  # python aborts before generating any build files. python is only a
-  # nativeBuildInput (never linked into node), so inject the native one.
   python3,
 }:
 
 let
-  # pkgsStatic with the static-build patches needed to compile a fully static
-  # (musl) nodejs-slim:
-  #   - ada: tests disabled. Under pkgsStatic its test suite expects
-  #     `basic_fuzzer` and `max_length_fuzzer`, but neither executable is built
-  #     by the static toolchain.
-  #
-  # hdrhistogram_c no longer needs a local override: unstable nixpkgs already
-  # disables the shared target (HDR_HISTOGRAM_BUILD_SHARED / BUILD_PROGRAMS) and
-  # installs the `libhdr_histogram.a` -> `libhdr_histogram_static.a` symlink node
-  # links against. Re-adding those here produced a duplicate `ln -s` that failed
-  # with "File exists".
   pkgsStaticNode = pkgsStatic.extend (
     _: prev: {
       ada = prev.ada.overrideAttrs { doCheck = false; };
     }
   );
 
-  # Pin to the major-24 attribute so this package's version doesn't drift with
-  # nixpkgs' default `nodejs-slim` alias.
   patchedNode = (pkgsStaticNode.nodejs-slim_24.override { python3 = python3; }).overrideAttrs (old: {
     configureFlags = builtins.filter (
       f:
-      # Under pkgsStatic the static stdenv adapter appends the autotools flags
-      # `--enable-static --disable-shared`, but node uses a Python
-      # `configure.py` that rejects `--disable-shared` ("gyp: --disable-shared
-      # not found / Error running GYP"). Strip those autotools flags.
       f != "--enable-static"
       && f != "--disable-shared"
       # Make node use its own bundled copies of brotli and simdutf instead of
@@ -89,13 +61,7 @@ let
     doCheck = false;
   });
 in
-# The overridden nodejs-slim is already a complete node derivation, so use it
-# directly as this package's result (no need to wrap it in another mkDerivation
-# just to copy the binary). $out is a full node install (bin/node + lib/ etc.);
-# consumers reference $store/nodejs-slim24/bin/node. pname is fixed to
-# `nodejs-slim24` (the source dir already encodes the major version).
 patchedNode.overrideAttrs (_: {
   pname = "nodejs-slim24";
-  # pname change recomputes name; we're not changing the actual version.
   __intentionallyOverridingVersion = true;
 })

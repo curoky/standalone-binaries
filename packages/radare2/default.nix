@@ -1,12 +1,6 @@
-{
-  lib,
-  stdenv,
-  callPackage,
-  radare2,
-}:
-
-# Stock radare2 fails to build under our musl-static cross set for two reasons:
+# radare2 — musl-static dependency and Meson fixes.
 #
+# Why local:
 #   1. It pulls in libewf, whose configure aborts on OpenSSL AC_RUN_IFELSE
 #      probes it cannot run when cross compiling. Swap in the local libewf that
 #      caches the failing probes.
@@ -20,6 +14,16 @@
 #      `get_shared_lib()` reference at the static lib so no .so is produced.
 #      radare2's meson also grabs the shared half via `get_shared_lib()`; redirect
 #      that to the static archive it already link_wholes.
+#
+# Remove each fix when the corresponding stock dependency or cross-build path
+# succeeds under the repository's static toolchain.
+{
+  lib,
+  stdenv,
+  callPackage,
+  radare2,
+}:
+
 (radare2.override {
   libewf = callPackage ../libewf { };
 }).overrideAttrs

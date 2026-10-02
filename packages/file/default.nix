@@ -1,3 +1,15 @@
+# file — relocatable magic database.
+#
+# Why local:
+# 1. The executable's default magic database path points into its Nix output,
+#    which is invalid after artifact relocation.
+# 2. Rename the real executable and wrap it with an explicit path to the
+#    co-located `magic.mgc`.
+# 3. Nixpkgs' version hook would execute the wrapper before the standalone
+#    layout exists, so direct that build-time check at the real executable.
+#
+# The wrapper is permanent packaging; remove the version-hook override when the
+# upstream check supports wrapped entry points.
 {
   lib,
   stdenv,
@@ -18,8 +30,6 @@ let
 in
 
 file.overrideAttrs (oldAttrs: {
-  # nixpkgs 5.48 enables versionCheckHook. Check the real executable because
-  # postInstall replaces the public entry point with the relocatable wrapper.
   versionCheckProgram = "${builtins.placeholder "out"}/bin/_file";
 
   postInstall = (oldAttrs.postInstall or "") + ''

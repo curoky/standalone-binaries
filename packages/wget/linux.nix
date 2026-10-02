@@ -1,10 +1,14 @@
-# wget (Linux) — static wget with a bundled CA bundle.
+# wget for Linux — static binary with relocatable certificates.
 #
-# The wrapper resolves a co-located CA bundle (etc/wget/ca-bundle.crt) relative
-# to the install so TLS works in the relocatable tarball.
+# Why local:
+# 1. The static test suite runs `wget_options_fuzzer`, which segfaults under the
+#    musl build, and its expected corpus is absent. Disable checks until the
+#    upstream static suite is runnable.
+# 2. A standalone wget cannot rely on a Nix CA path. Bundle cacert and use a
+#    wrapper that resolves it relative to the executable.
 #
-# `doCheck = false` on the static build is required: restoring the checks
-# segfaults `wget_options_fuzzer` (exit 139) and the fuzzer corpus is missing.
+# The disabled checks are a regression candidate; the certificate packaging is
+# permanent.
 {
   lib,
   stdenv,

@@ -1,9 +1,13 @@
-# conmon — musl-static build for podman's container monitor.
+# conmon — static dependency closure.
 #
-# Stock unstable's `propagatedBuildInputs` pulls in `systemd-minimal`, whose
-# `meta.badPlatforms` includes `isStatic`, so the musl-static set is rejected
-# at eval time. Narrow `buildInputs` to what conmon actually links and clear
-# `propagatedBuildInputs`.
+# Why local:
+# 1. Stock conmon propagates `systemd-minimal`.
+# 2. systemd is marked unsupported on static hosts, so evaluation fails before
+#    conmon can build even though this configuration links only glib/seccomp.
+# 3. The override keeps those direct libraries and clears propagated inputs.
+#
+# Remove this override when stock `pkgsStatic.conmon` no longer propagates
+# systemd.
 {
   lib,
   stdenv,

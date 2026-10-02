@@ -1,22 +1,23 @@
+# mise — portable helper lookup and cross-test inputs.
+#
+# Why local:
+# 1. Nixpkgs patches helper commands to absolute store paths. Artifact hash
+#    normalization would leave dead paths, so installed helpers must resolve
+#    from the user's PATH.
+# 2. `pkgsStatic` selects target Git for checks; that Git fails its own musl test
+#    before mise builds. Mise only needs a build-machine Git, so use native Git.
+# 3. The DNS regression test expects immediate failure, but the build proxy turns
+#    the invalid host into a timeout and poisons other HTTP tests through a
+#    shared lock. Skip only that environment-dependent case.
+#
+# The check-input and DNS changes can regress independently; PATH-based helper
+# lookup is permanent portability behavior.
 {
   lib,
   mise,
   nativeGit,
 }:
 
-# nixpkgs patches helper commands to absolute Nix store paths. The artifact
-# normalizer can erase those references, but the resulting paths then point at
-# nonexistent store entries. Keep mise portable by resolving external helpers
-# through the user's PATH instead.
-#
-# The static target set also resolves nativeCheckInputs.git to pkgsStatic.git.
-# Its checkPhase fails t3434-rebase-i18n under musl before mise can build, while
-# mise's tests only need a build-platform Git executable. Replace that one
-# check input with native Git; the shipped mise and its linked libraries remain
-# from pkgsStatic. The DNS regression test expects an invalid hostname to fail
-# immediately, but the build environment's proxy turns it into a timeout; skip
-# only that environment-dependent test (its shared lock otherwise poisons seven
-# unrelated HTTP tests).
 mise.overrideAttrs (oldAttrs: {
   postPatch = ''
     patchShebangs --build \

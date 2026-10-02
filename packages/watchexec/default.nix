@@ -1,8 +1,13 @@
-# watchexec — build only the product CLI.
+# watchexec — workspace target selection.
 #
-# Stock runs a bare `cargo build` at the workspace root, and the install hook
-# would then publish the `test-socketfd` test crate alongside the CLI. Restrict
-# the build to `watchexec-cli` so only the product binary is produced.
+# Why local:
+# 1. Stock runs `cargo build` for the whole workspace.
+# 2. That produces the `test-socketfd` test crate, and the generic install hook
+#    publishes it beside the actual CLI.
+# 3. Restrict the Cargo target to `watchexec-cli` so the output contains only
+#    the product binary.
+#
+# Remove this override when stock selects only the CLI crate.
 {
   watchexec,
 }:

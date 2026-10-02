@@ -1,3 +1,14 @@
+# Zsh plugins — curated bundle with pre-generated integrations.
+#
+# Why local:
+# 1. Consumers expect one fixed Oh My Zsh tree containing the selected plugins,
+#    rather than a collection of independent nixpkgs outputs.
+# 2. Atuin and Starship normally generate shell integration at startup and may
+#    embed the generator's Nix store path.
+# 3. Generate both scripts once with native tools, rewrite their command lookup
+#    to sibling-package paths, and verify the result contains no store path.
+#
+# This is a product data bundle, not an upstream build workaround.
 {
   lib,
   stdenv,

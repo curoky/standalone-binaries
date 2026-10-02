@@ -1,16 +1,20 @@
+# tree-sitter — static install-target fix.
+#
+# Why local:
+# 1. The static Makefile correctly omits the shared-library build target.
+# 2. Nixpkgs tries to remove shared install commands with a sed range beginning
+#    at `install:`, but that range terminates on the same non-indented line and
+#    removes nothing.
+# 3. `make install` then fails because `libtree-sitter.so` was never produced.
+#    Delete the three shared install/symlink commands explicitly on static hosts.
+#
+# Remove this override when stock static tree-sitter no longer installs `.so`.
 {
   lib,
   stdenv,
   tree-sitter,
 }:
 
-# On static hosts, tree-sitter's Makefile still builds only the static archive
-# (the `.so` target is dropped), but the stock postPatch fails to strip the
-# shared-object lines from the `install:` target: its sed range
-# `/^install:/,/^[^[:space:]]/` terminates on the `install:` line itself (which
-# starts with a non-whitespace char), so nothing is deleted and `make install`
-# aborts with "cannot stat 'libtree-sitter.so'". Remove those three shared-lib
-# install/symlink lines directly. Consumed by rizin via .override.
 tree-sitter.overrideAttrs (old: {
   postPatch =
     (old.postPatch or "")

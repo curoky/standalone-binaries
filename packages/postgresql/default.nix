@@ -1,22 +1,22 @@
-# psql — the PostgreSQL interactive client, built as a fully-static musl binary.
+# psql for Linux — client-only musl-static PostgreSQL build.
 #
-# Only the `psql` client is shipped (the user only needs psql). The stock
-# `pkgsStatic.postgresql` build fails here for two reasons, both fixed below:
+# Why local:
+# 1. Nixpkgs switches PostgreSQL to clang for LTO. This musl cross clang cannot
+#    find its unwind/runtime libraries, while GCC works; preserve the GCC stdenv
+#    and remove `-flto`, which also breaks PostgreSQL's `ld -r` partial link.
+# 2. The static toolchain cannot build the server's loadable charset and
+#    procedural-language modules. Disable JIT and PL/Perl/Python/Tcl, and build
+#    only libpq's static archive plus psql.
+# 3. PostgreSQL 18 enables curl OAuth support, but its static configure probe
+#    cannot resolve curl's private closure. Disable that optional client path.
+# 4. GSSAPI's static configure probe cannot resolve `gss_store_cred_into` from
+#    the Kerberos archives. Disable that optional authentication path.
+# 5. Stock metadata marks all static PostgreSQL broken and splits outputs around
+#    the server. Clear that guard for this client-only build and publish one
+#    self-contained output.
 #
-#   1. postgresql's generic.nix switches the compiler from gcc to clang (to
-#      enable `-flto`). In this repo's musl64-cross static set clang is broken:
-#      it can't find `-lgcc_eh`, is missing `libunwind.a`, and has no usable
-#      `lld` (`configure: error: C compiler cannot create executables`). gcc in
-#      the same set works fine. generic.nix only keeps the incoming stdenv when
-#      `cc.isClang` is already true, so we fake `isClang = true` to keep gcc.
-#
-#   2. gcc's `-flto` breaks postgres's partial-link (`ld -r`) step, so we drop
-#      `-flto` from CFLAGS (keeping the section-GC flags).
-#
-# A fully-static gcc toolchain also cannot link shared objects, so we skip the
-# server backend (charset-conversion `.so` modules) entirely and build only
-# libpq's static archive plus psql. libpq's `all`/`all-lib` targets are patched
-# to not require the `.so`.
+# Regress compiler and optional-feature workarounds independently; the psql-only
+# product boundary remains.
 {
   stdenv,
   postgresql,
@@ -54,61 +54,62 @@ in
   # doesn't resolve). It is an optional psql auth method, so disable it to keep
   # the fully-static build linking.
   gssSupport = false;
-}).overrideAttrs (old: {
-  # Upstream marks the whole derivation broken for static hosts because the
-  # server cannot load shared modules. This package builds only libpq's static
-  # archive and psql, so that server limitation does not apply.
-  meta = (old.meta or { }) // {
-    broken = false;
-  };
+}).overrideAttrs
+  (old: {
+    # Upstream marks the whole derivation broken for static hosts because the
+    # server cannot load shared modules. This package builds only libpq's static
+    # archive and psql, so that server limitation does not apply.
+    meta = (old.meta or { }) // {
+      broken = false;
+    };
 
-  # Ship one self-contained output. The stock split creates a cycle here
-  # because the server and pg_config are intentionally not built.
-  outputs = [ "out" ];
-  outputChecks = { };
+    # Ship one self-contained output. The stock split creates a cycle here
+    # because the server and pg_config are intentionally not built.
+    outputs = [ "out" ];
+    outputChecks = { };
 
-  env = (old.env or { }) // {
-    CFLAGS = "-fdata-sections -ffunction-sections";
-  };
+    env = (old.env or { }) // {
+      CFLAGS = "-fdata-sections -ffunction-sections";
+    };
 
-  # The inherited postPatch substitutes split-output variables. Point them all
-  # at the sole output, then make libpq build only its static archive.
-  postPatch = ''
-    export dev="$out" doc="$out" man="$out"
-  ''
-  + (old.postPatch or "")
-  + ''
-    substituteInPlace src/Makefile.shlib \
-      --replace-fail "all-lib: all-shared-lib" "all-lib: all-static-lib" \
-      --replace-fail "install-lib: install-lib-shared" "install-lib: install-lib-static"
-    substituteInPlace src/interfaces/libpq/Makefile \
-      --replace-fail "all: all-lib libpq-refs-stamp" "all: all-lib"
-  '';
+    # The inherited postPatch substitutes split-output variables. Point them all
+    # at the sole output, then make libpq build only its static archive.
+    postPatch = ''
+      export dev="$out" doc="$out" man="$out"
+    ''
+    + (old.postPatch or "")
+    + ''
+      substituteInPlace src/Makefile.shlib \
+        --replace-fail "all-lib: all-shared-lib" "all-lib: all-static-lib" \
+        --replace-fail "install-lib: install-lib-shared" "install-lib: install-lib-static"
+      substituteInPlace src/interfaces/libpq/Makefile \
+        --replace-fail "all: all-lib libpq-refs-stamp" "all: all-lib"
+    '';
 
-  preConfigure = (old.preConfigure or "") + ''
-    configureFlagsArray+=(
-      "--includedir=$out/include"
-      "--mandir=$out/share/man"
-      "--docdir=$out/share/doc/postgresql"
-      "--libdir=$out/lib"
-      "--libexecdir=$out/lib/libexec"
-      "--localedir=$out/lib/share/locale"
-    )
-  '';
+    preConfigure = (old.preConfigure or "") + ''
+      configureFlagsArray+=(
+        "--includedir=$out/include"
+        "--mandir=$out/share/man"
+        "--docdir=$out/share/doc/postgresql"
+        "--libdir=$out/lib"
+        "--libexecdir=$out/lib/libexec"
+        "--localedir=$out/lib/share/locale"
+      )
+    '';
 
-  buildPhase = ''
-    runHook preBuild
-    make -C src/interfaces/libpq all-lib -j$NIX_BUILD_CORES
-    make -C src/bin/psql -j$NIX_BUILD_CORES
-    runHook postBuild
-  '';
+    buildPhase = ''
+      runHook preBuild
+      make -C src/interfaces/libpq all-lib -j$NIX_BUILD_CORES
+      make -C src/bin/psql -j$NIX_BUILD_CORES
+      runHook postBuild
+    '';
 
-  installPhase = ''
-    runHook preInstall
-    make -C src/interfaces/libpq install
-    make -C src/bin/psql bindir="$out/bin" install
-    runHook postInstall
-  '';
+    installPhase = ''
+      runHook preInstall
+      make -C src/interfaces/libpq install
+      make -C src/bin/psql bindir="$out/bin" install
+      runHook postInstall
+    '';
 
-  postInstall = "";
-})
+    postInstall = "";
+  })

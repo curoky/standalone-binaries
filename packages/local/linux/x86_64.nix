@@ -1,4 +1,3 @@
-# x86_64-linux-only local packages.
 {
   pkgs,
   pkgsStatic,

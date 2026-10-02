@@ -1,8 +1,12 @@
-# diffutils — musl-static build with checks disabled.
+# diffutils — musl test-suite workaround.
 #
-# unstable diffutils 3.12's gnulib checkPhase fails 9 multithread/setlocale
-# tests under musl-static (`test-setlocale_null-mt`, `test-thread_create`, ...
-# with SIGABRT), so `doCheck = false`. This is the only customization.
+# Why local:
+# 1. The binaries compile and link statically without source changes.
+# 2. Nine gnulib multithread/setlocale tests, including
+#    `test-setlocale_null-mt` and `test-thread_create`, abort under musl.
+# 3. Checks are disabled without changing the shipped binaries.
+#
+# Remove this override when the full stock test suite passes under musl-static.
 {
   lib,
   stdenv,

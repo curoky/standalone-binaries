@@ -1,3 +1,14 @@
+# GNU Parallel — Perl entry points with a sibling runtime.
+#
+# Why local:
+# 1. Nixpkgs wraps the Perl commands with an interpreter and module environment
+#    from the Nix store, which cannot be used after relocation.
+# 2. Preserve every real script under a private name and install one uniform
+#    wrapper for `parallel`, `sem`, `niceload`, `parcat`, `parsort` and `sql`.
+# 3. Resolve sibling commands through the package bin directory and execute the
+#    separately installed standalone Perl from the shared package store.
+#
+# This is intentional runtime packaging, not an upstream build workaround.
 {
   lib,
   parallel,
@@ -6,11 +17,6 @@
 }:
 
 let
-  # Wrapper for the bundled perl scripts. At deploy time it runs the real
-  # script (renamed `_<name>`) under the sibling `perl` package, falling back
-  # to a system perl. The script's own directory is prepended to PATH so the
-  # scripts that shell out to a bare `parallel` (e.g. parsort) find the wrapped
-  # one next to them.
   wrapperScript = writeText "wrapper.sh" ''
     #!/usr/bin/env bash
 
@@ -27,18 +33,12 @@ in
 parallel.overrideAttrs (oldAttrs: {
   nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [ perl ];
   postInstall = (oldAttrs.postInstall or "") + ''
-    # The main program ships as `.parallel-wrapped` (the real perl script) plus a
-    # nixpkgs bash PATH-wrapper named `parallel`. Drop that wrapper and treat the
-    # real script like the others.
     mv $out/bin/.parallel-wrapped $out/bin/parallel
     rm -f $out/bin/sem
     chmod +w $out/bin
 
-    # `sem` is the same script as `parallel`, selected via $0. Give it its own
-    # `_sem` (a symlink to `_parallel`) so the wrapper needs no special-casing.
     ln -s _parallel $out/bin/_sem
 
-    # Re-wrap every bundled perl command to run under a sibling/system perl.
     for name in parallel sem niceload parcat parsort sql; do
       [ -e $out/bin/_$name ] || mv $out/bin/$name $out/bin/_$name
       cp ${wrapperScript} $out/bin/$name

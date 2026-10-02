@@ -1,9 +1,13 @@
-# pkgconf — no Nix store paths baked into the binary.
+# pkgconf — portable default search paths.
 #
-# Stock `pkgconf-unwrapped` compiles its own Nix output's `.pc`, system
-# lib/include and personality paths into the binary. Point them at the standard
-# `/usr` and `/usr/local` locations so the standalone product has no
-# `/nix/store` residue.
+# Why local:
+# 1. Stock `pkgconf-unwrapped` compiles its output's pkg-config, library, include
+#    and personality directories into the executable.
+# 2. Those `/nix/store` defaults survive artifact assembly and are invalid after
+#    relocation.
+# 3. Configure pkgconf with the standard `/usr` and `/usr/local` search roots.
+#
+# Remove this override when stock pkgconf no longer embeds its output path.
 { pkgconf-unwrapped }:
 
 pkgconf-unwrapped.overrideAttrs (oldAttrs: {

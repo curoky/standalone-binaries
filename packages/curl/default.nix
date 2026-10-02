@@ -1,3 +1,13 @@
+# curl — bundled, relocatable CA certificates.
+#
+# Why local:
+# 1. Stock curl builds successfully, but its TLS verification depends on a host
+#    CA location or on the Nix store path of the certificate package.
+# 2. A moved artifact can assume neither path exists.
+# 3. Copy the CA bundle into the package and wrap curl with a `--cacert` path
+#    derived from the executable's installed location.
+#
+# This is permanent standalone packaging, not an upstream build workaround.
 {
   lib,
   stdenv,

@@ -1,3 +1,14 @@
+# Vim plugins — curated runtime bundle.
+#
+# Why local:
+# 1. Consumers expect one fixed `vim-plugin` tree rather than independently
+#    installed nixpkgs plugin outputs.
+# 2. Install vim-plug in `autoload` and copy the selected plugins beneath the
+#    matching `plugged` layout.
+# 3. The bundle contains only data and Vim scripts; it has no static-linking
+#    requirement beyond remaining free of Nix store references.
+#
+# This is a product data bundle, not an upstream workaround.
 {
   lib,
   stdenv,
@@ -6,13 +17,10 @@
 
 let
   inherit (vimPlugins) vim-plug;
-  # inherit (vimPlugins) delimitMate;
   inherit (vimPlugins) vim-airline;
   inherit (vimPlugins) vim-airline-themes;
   inherit (vimPlugins) vim-colors-solarized;
   inherit (vimPlugins) indentLine;
-  # inherit (vimPlugins) vim-commentary;
-  # inherit (vimPlugins) vim-fugitive;
   inherit (vimPlugins) vim-gitgutter;
   inherit (vimPlugins) nerdtree;
   inherit (vimPlugins) nerdtree-git-plugin;
@@ -30,8 +38,6 @@ stdenv.mkDerivation rec {
 
   installPhase = ''
     mkdir -p $out/share/
-    # cp -r ${vim-plug.src}/ $out/share/
-    # chmod +w $out/share/
     mkdir -p $out/share/vim-plugin/autoload
     cp ${vim-plug.src}/plug.vim $out/share/vim-plugin/autoload/
     mkdir -p $out/share/vim-plugin/plugged

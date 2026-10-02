@@ -1,3 +1,15 @@
+# Perl for macOS — native interpreter with portable Mach-O dependencies.
+#
+# Why local:
+# 1. Darwin `pkgsStatic.perl` requires a separate failing static toolchain. Use
+#    cached native Perl but replace libxcrypt with its static archive.
+# 2. Native Perl records the absolute install name of `libperl.dylib`. Rewrite
+#    its ID and every consumer to `@loader_path`-relative locations.
+# 3. `Compress::Raw::Zlib` links a Nix zlib dylib and carries its rpath. Point it
+#    at macOS system zlib and remove the stale Nix rpath.
+# 4. Wrap the interpreter so bundled modules resolve relative to the package.
+#
+# Keep these changes until stock Perl has the same portable dependency graph.
 {
   stdenv,
   perl,

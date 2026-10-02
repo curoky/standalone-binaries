@@ -1,3 +1,16 @@
+# Podman rootless — per-user service bundle derived from rootful Podman.
+#
+# Why local:
+# 1. The rootful package carries systemd units, root-owned runtime paths and a
+#    fixed bridge definition; those are the wrong lifecycle for one user.
+# 2. Reuse the matching static Podman/helper payload, but remove rootful units,
+#    Quadlet and the preseeded network before installing rootless wrappers.
+# 3. The replacement launcher binds Podman to the user's ID-map and state, while
+#    the installer publishes an s6 service definition instead of systemd state.
+# 4. Package checks compare the derived payload with its rootful source so this
+#    overlay cannot silently drop or diverge from shared backend tools.
+#
+# This is an independent product boundary, not an upstream build workaround.
 {
   lib,
   stdenvNoCC,
@@ -23,9 +36,6 @@ stdenvNoCC.mkDerivation {
     cp -a ${podman}/. "$out/"
     chmod -R u+w "$out"
 
-    # This package is an overlay on the matching rootful bundle. Keep its
-    # compiled payload and common policy/configuration, replacing only files
-    # whose rootless behavior differs.
     rm "$out/conf/podmanxd.service" "$out/conf/podmanxd.socket"
     rm "$out/libexec/podman/quadlet"
     rm -rf "$out/conf/networks"

@@ -53,7 +53,7 @@ shellcheck = {
 
 回归必须在不应用该 workaround 的条件下验证全部当前受影响 consumer。普通构建或
 `probe` 若仍经过共享修正，成功不代表上游已经修好。Darwin Go/CGO resolver 的具体
-操作和保留边界见仓库 `docs/regression/darwin.md` 的「Darwin CGO Resolver 回归」。
+操作和保留边界见仓库 `cmd/artifact/AGENTS.md` 的「Darwin CGO Resolver」。
 只有临时 resolver 替换可删除，不能连带删除通用 rpath 清理、签名或结构性 packaging。
 
 ## Principle
@@ -95,10 +95,10 @@ shellcheck = {
 
 - 不在批量执行时重新扫描 `packages/` 或 `manifests/default.nix` 猜测候选。仓库扫描只用于维护
   `docs/regression/`、核对队列完整性，或用户明确要求全量审计时。
-- 每次只消费一行。先读包名、Linux、macOS、回归、`Linux 原因与保留边界`、`macOS 原因与保留边界`、
-  回归判据、`Linux commit`、`macOS commit`、来源，再读取实现。表内判据是最低验收条件，不替代根
-  `AGENTS.md` 的通用 portability 检查。原因与保留边界按平台拆成两列，只读目标平台那一列。
-- `Linux commit` / `macOS commit` 记录该平台最后一次回归测试时 `flake.lock` 里 `nixpkgs-unstable`
+- 每次只消费一行。先读包、定制、回归、原因与保留边界、回归判据、commit 和来源，再读取最终
+  derivation 的 Nix 注释或公共组件说明。表格只提供简短索引，详细原因与当前修正以实现旁注释为准；
+  表内判据也不替代根 `AGENTS.md` 的通用 portability 检查。
+- `commit` 记录该平台最后一次回归测试时 `flake.lock` 里 `nixpkgs-unstable`
   的 rev（短 hash），未测过填 `—`。消费前先对比该列与当前 `flake.lock` 的 unstable rev：若相同，说明
   该平台在当前 channel 已验证过、本轮可跳过；rev 不同（含 `—`）才需要重新构建验证。
 - `✅` 可以尝试整项回到 unstable；`🟡` 只回归对应平台原因栏所述 workaround，保留 wrapper、资源打包、
@@ -116,7 +116,8 @@ shellcheck = {
 1. **从队列选择一个条目。**
    - 批量模式取 `docs/regression/` 中下一条 `✅` 或 `🟡` 行；用户指定包时，从对应表格定位该行。
    - 若指定的 pin、patch 或本地 packaging 不在表格，先补齐该行和正确状态再继续。
-   - 按「来源」读取实现，确认当前代码仍与「原因与保留边界」一致。表格陈旧时先修正表格。
+   - 按「来源」读取实现，以最终 derivation 的 Nix 注释或公共组件说明确认当前原因和保留边界。
+     表格陈旧时先修正表格；索引文件只保留分组标题和接线，不补写包级原因。
 
 2. **搞清 patch/pin 为何存在。**
    - A 类：读本地 `packages/<pkg>/*.nix` 及其注释。先用上面「regression 候选？」分类——
@@ -179,7 +180,7 @@ shellcheck = {
      `❌`，原因和判据改为结构性保留说明。
    - 只回归部分 workaround：保留 `✅` 或 `🟡`，原因和判据只留下仍未解决的部分。
    - 验证失败：保留状态；若本次得到比原记录更具体的错误，更新对应平台的原因和判据。
-   - 无论成功或失败，只要在某平台实际构建验证过，就把该平台的 `Linux commit` / `macOS commit`
+   - 无论成功或失败，只要在某平台实际构建验证过，就把该平台表的 `commit`
      刷新为本次 `flake.lock` 的 `nixpkgs-unstable` 短 rev，标记该 channel 已测过。只有整项回归删行时
      无需再填 commit。
    - 若回归改变稳定 package selection、例外或协议，更新根

@@ -13,8 +13,7 @@
 `zellij` 直接构建 unstable `zellij-unwrapped`。上游 `zellij` 仅在注入额外 PATH 内容时提供
 价值，本仓库不需要该 wrapper 层。
 
-当前构建关闭 checks；具体原因和回归条件只在[回归清单](../regression/AGENTS.md)维护。最终可执行文件仍必须通过 Linux
-musl 全静态校验。
+最终可执行文件仍必须通过 Linux musl 全静态校验。
 
 ## 构建工具链
 

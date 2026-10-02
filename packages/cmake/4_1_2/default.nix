@@ -1,3 +1,15 @@
+# CMake 4.1.2 — versioned musl-static build.
+#
+# Why local:
+# 1. This exact version is a product output built independently of the moving
+#    nixpkgs CMake attribute.
+# 2. The test suite links a shared module with the static CRT and fails on a
+#    non-PIC relocation, so `BUILD_TESTING` remains disabled.
+# 3. OpenSSL, curses and system libraries are excluded deliberately to keep the
+#    bootstrap self-contained; those are product choices, not regressions.
+#
+# Restore tests when they support the static CRT; retain the versioned output
+# and reduced dependency policy.
 {
   lib,
   stdenv,
@@ -6,14 +18,6 @@
   pkg-config,
 }:
 
-# cmake 4.1.2 — versioned musl-static build.
-#
-# Workarounds still required (see also cmake/3_27_9):
-#   - `--no-system-libs`, `CMAKE_USE_OPENSSL = false`, `BUILD_CursesDialog =
-#     false`: build self-contained, dropping openssl and curses.
-#   - `BUILD_TESTING = false`: same shared-module test link failure under
-#     musl-static as 3.27.9.
-#
 # https://github.com/NixOS/nixpkgs/blob/59011787de6d841fcc5e3c0fd7f5d3247ff37a18/pkgs/by-name/cm/cmake/package.nix
 
 stdenv.mkDerivation (finalAttrs: {
@@ -25,28 +29,14 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-ZD8EGCt7oyOrMfUm94UTT7ecujGIqFIgbvBHP+4oKhU=";
   };
 
-  patches = [
-    # Add NIXPKGS_CMAKE_PREFIX_PATH to cmake which is like CMAKE_PREFIX_PATH
-    # except it is not searched for programs
-    # ./nixpkgs-cmake-prefix-path.patch
-
-    # Add the libc paths from the compiler wrapper.
-    # ./add-nixpkgs-libc-paths.patch
-  ]
-  ++ [
-    # Remove references to non‐Nix search paths.
-    # ./remove-impure-search-paths.patch
-  ];
+  patches = [ ];
 
   outputs = [ "out" ];
 
   separateDebugInfo = true;
   setOutputFlags = false;
 
-  setupHooks = [
-    # ./setup-hook.sh
-    # ./check-pc-files-hook.sh
-  ];
+  setupHooks = [ ];
 
   depsBuildBuild = [ buildPackages.stdenv.cc ];
 
@@ -105,7 +95,7 @@ stdenv.mkDerivation (finalAttrs: {
   dontUseCmakeConfigure = true;
   enableParallelBuilding = true;
 
-  doCheck = false; # fails
+  doCheck = false;
 
   meta = { };
 })

@@ -1,17 +1,22 @@
+# libewf — OpenSSL configure probes for same-architecture cross builds.
+#
+# Why local:
+# 1. Configure uses `AC_RUN_IFELSE` for two OpenSSL behavior probes and aborts
+#    when it detects cross compilation.
+# 2. Nixpkgs supplies cached answers only when the build platform cannot execute
+#    the host platform. This repository crosses from glibc to musl on the same
+#    architecture, so that predicate is true even though Autoconf still reports
+#    `cross_compiling=yes`.
+# 3. Key the cached answers on differing build/host triples instead. Radare2 and
+#    Rizin receive this derivation explicitly.
+#
+# Remove this override when upstream handles same-architecture libc crosses.
 {
   lib,
   stdenv,
   libewf,
 }:
 
-# libewf's configure runs two AC_RUN_IFELSE OpenSSL probes
-# (`ac_cv_openssl_xts_duplicate_keys` and `ac_cv_openssl_evp_zlib_compatible`)
-# that abort with "cannot run test program while cross compiling". nixpkgs only
-# provides the cache answer when `!buildPlatform.canExecute hostPlatform`, but
-# our musl-static set is a same-arch cross (build gnu, host musl) where
-# canExecute stays true, so the guard never fires while autoconf still sees
-# cross_compiling=yes. Key off the build/host triple mismatch instead and cache
-# both probes. radare2/rizin consume this fixed libewf via .override.
 libewf.overrideAttrs (old: {
   configureFlags =
     (old.configureFlags or [ ])

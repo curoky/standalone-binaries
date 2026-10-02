@@ -1,3 +1,17 @@
+# ExifTool for macOS — bundled Perl modules with portable XS linkage.
+#
+# Why local:
+# 1. Compression XS bundles from native nixpkgs link zlib, bzip2, xz and Brotli
+#    through Nix dylibs. Rebuild each XS module against `pkgsStatic` archives so
+#    only Apple system libraries remain dynamic.
+# 2. Rebuild IO::Compress and ExifTool on those replacements so their propagated
+#    closures do not restore the dynamic variants.
+# 3. Replace the upstream launcher with a relative sibling-Perl wrapper and
+#    bundle every required module.
+# 4. `installCheck` cannot execute the final wrapper before the sibling runtime
+#    is assembled, so disable it without adding a store fallback.
+#
+# These are structural runtime-packaging and Darwin linkage boundaries.
 {
   lib,
   perlPackages,

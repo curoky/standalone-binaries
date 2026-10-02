@@ -1,3 +1,23 @@
+# Podman 5 — self-contained rootful container-engine bundle.
+#
+# Why local:
+# 1. Stock static Podman propagates systemd and installs its unit/tmpfiles
+#    payload. Systemd is unavailable in the static set and the final service is
+#    installed from this bundle, so remove that dependency and generated state.
+# 2. Nixpkgs exposes runc through a generated wrapper. Copying that launcher
+#    would retain store paths, so restore the wrapped file as the actual static
+#    runc executable before Podman packages its helpers.
+# 3. Stock fixup wraps Podman and helper lookup with Nix paths. Disable it, copy
+#    the complete helper set into `libexec/podman`, and supply static nftables
+#    plus BusyBox applets from the same bundle.
+# 4. Podman 5 otherwise searches host paths for catatonit, seccomp policy,
+#    registries and signature policy. The four source patches make the bundled
+#    paths authoritative where configuration or environment variables cannot.
+# 5. Certificates, configuration and the remote/server launchers are installed
+#    beside the binary; focused checks exercise those exact packaged paths.
+#
+# Regress the systemd and runc build workarounds independently. The helper,
+# configuration and resource layout is the rootful product boundary.
 {
   lib,
   gpgme,
@@ -13,7 +33,6 @@
   podman,
 }:
 let
-  # Upstream wraps static runc in a dynamic PATH launcher. Ship the real ELF.
   runcStatic = runc.overrideAttrs (old: {
     postInstall = (old.postInstall or "") + ''
       mv -f "$out/bin/.runc-wrapped" "$out/bin/runc"
@@ -31,7 +50,6 @@ in
   runc = runcStatic;
 }).overrideAttrs
   (oldAttrs: {
-    # pkgsStatic propagates upstream build inputs. cgroupfs/file logging need no libsystemd.
     propagatedBuildInputs = [ ];
     buildInputs = builtins.filter (dep: lib.getName dep != "systemd") oldAttrs.propagatedBuildInputs;
 
@@ -43,11 +61,8 @@ in
       ./packaged-init.patch
       ./builtin-seccomp.patch
 
-      # Keep registry drop-ins inside the package instead of scanning host paths.
       ./registries-conf-dir.patch
 
-      # podman 5.x ignores CONTAINERS_POLICY_JSON; backport the podman 6.x env
-      # override so the wrapper can resolve policy.json relative to the binary.
       ./policy-json-env.patch
     ];
 
@@ -57,7 +72,6 @@ in
       mv "$out/bin/.podman-wrapped" "$out/bin/_podman"
       rm -f "$out/bin/podmansh"
       rm -rf "$out/lib/systemd" "$out/lib/tmpfiles.d" "$out/share/systemd"
-      # Complete tools for the fixed backend; no inherited host PATH.
       install -m755 ${lib.getBin nftables}/bin/nft "$out/libexec/podman/nft"
       install -m755 ${busybox}/bin/busybox "$out/libexec/podman/busybox"
       for tool in sh readlink mkdir sed cp; do

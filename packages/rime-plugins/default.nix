@@ -1,3 +1,14 @@
+# Rime plugins — curated, preprocessed data bundle.
+#
+# Why local:
+# 1. The product consumes several independent dictionaries and schemas as one
+#    resource tree; no single upstream package provides that layout.
+# 2. Fetch the selected revisions explicitly and unpack each source into its
+#    stable subdirectory.
+# 3. Generate simplified-Chinese variants with OpenCC at build time so runtime
+#    consumers need neither the source repositories nor conversion tools.
+#
+# This is a product data bundle, not an upstream workaround.
 {
   lib,
   stdenv,
@@ -72,10 +83,6 @@ stdenv.mkDerivation rec {
 
     # rime-symbols
     tar -xzf ${rime_symbols} --strip-components=1 -C $out/share/rime-bundle/rime-symbols
-    #python3 $out/share/rime-bundle/opencc/rime-symbols/rime-symbols-gen
-    #for file in $out/share/rime-bundle/opencc/rime-symbols/*.txt; do
-    #  opencc -i $file -o "$out/share/rime-bundle/opencc/rime-symbols/simple.$(basename $file)" -c t2s.json
-    #done
 
     # rime-emoji
     tar -xzf ${rime_emoji} --strip-components=1 -C $out/share/rime-bundle/rime-emoji/

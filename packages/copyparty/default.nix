@@ -1,3 +1,16 @@
+# Copyparty — pure-Python payload with a sibling static runtime.
+#
+# Why local:
+# 1. The regular Python package carries a Nix interpreter environment and may
+#    include native extensions, neither of which survives standalone relocation.
+# 2. Copy Copyparty plus a curated pure-Python dependency set, remove bytecode
+#    and shared objects, and explicitly disable optional native integrations.
+# 3. The wrapper locates the separately installed Python 3.14 sibling and sets a
+#    closed module path relative to the two deployed packages.
+# 4. Install checks exercise HTTP, FTP and multiprocess startup with exactly
+#    that reduced dependency surface.
+#
+# These are structural runtime and feature boundaries, not build regressions.
 {
   lib,
   stdenv,

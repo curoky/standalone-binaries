@@ -1,24 +1,14 @@
-# eza-ls
+# eza-ls — ls-compatible product front end.
 #
-# An `ls`-compatible front-end backed by `eza`. The public command stays `ls`,
-# but it runs the bundled `eza` binary with enhanced defaults (icons, git,
-# grouped dirs, human sizes) so the output is eza's richer rendering.
+# Why local:
+# 1. Upstream eza is a separate command and does not provide this repository's
+#    `ls` compatibility behavior or selected defaults.
+# 2. Bundle the real eza binary beside a wrapper that translates supported `ls`
+#    calls and selects the richer presentation.
+# 3. Unsupported or non-interactive cases use `/bin/ls`; that host command is
+#    an explicit Linux/macOS product boundary.
 #
-# It ships as its own package (deploy dir `eza-ls`) exposing a single `ls`
-# binary; the upstream `eza` manifest package is left untouched.
-#
-#   $store/eza-ls/
-#     bin/
-#       ls    (bash wrapper: translates ls-style flags, then exec's eza)
-#       eza   (the real static eza binary, from pkgsStatic.eza)
-#
-# The wrapper (./ls-wrapper.sh) adapts the eggbean eza gist (same as
-# /opt/devspace/tools/eza-wrapper.sh) and extends it to map most common GNU `ls`
-# options to eza — short and long forms (e.g. -la, --sort=size, --color=auto,
-# --time-style=..., --group-directories-first) — invoking the co-located ./eza.
-# Options eza cannot faithfully represent (e.g. -Q/-C/-m/-w, --sort=version)
-# transparently fall back to the system /bin/ls instead of erroring out; it also
-# falls back when the bundled eza is unusable or stdout is piped.
+# This is an independent product package, not an upstream workaround.
 {
   lib,
   stdenvNoCC,
@@ -36,8 +26,6 @@ stdenvNoCC.mkDerivation {
 
     mkdir -p $out/bin
 
-    # Ship the real eza binary alongside the wrapper so `ls` is self-contained
-    # and does not depend on an `eza` on the host PATH.
     cp ${lib.getExe eza} $out/bin/eza
 
     cp ${./ls-wrapper.sh} $out/bin/ls

@@ -1,3 +1,15 @@
+# wget for macOS — partial-static binary with relocatable certificates.
+#
+# Why local:
+# 1. Darwin `pkgsStatic.perl` crashes while its `mktables` step generates Unicode
+#    tables, so stock static wget cannot finish building its build-time Perl.
+#    Wget uses Perl only during the build; inject native Perl while keeping all
+#    wget target libraries static.
+# 2. A standalone wget cannot rely on a Nix CA path. Bundle cacert and use a
+#    wrapper that resolves it relative to the executable.
+#
+# Regress the native build-tool override when static Perl works; retain the
+# certificate packaging.
 {
   stdenv,
   wget,
@@ -7,20 +19,6 @@
 }:
 
 let
-  # macOS, `pkgsStatic` route. Unlike ./darwin.nix (which builds native pkgs.wget
-  # and swaps each non-system dep for its pkgsStatic archive), this variant takes
-  # the fully-static `pkgsStatic.wget` directly — same set used on Linux — and
-  # only overrides its *build-time* perl. The darwin `pkgsStatic.perl`
-  # (perl-static) fails to build: its final `mktables` step runs the freshly
-  # built static miniperl to generate the Unicode tables and that static miniperl
-  # crashes on darwin (the static build disables most locale support:
-  # -DNO_THREAD_SAFE_QUERYLOCALE / -DNO_POSIX_2008_LOCALE / -DNO_LOCALE_COLLATE),
-  # exiting with code 2 right after "Updating 'mktables.lst'". wget only needs
-  # perl as a build tool, so pointing `perlPackages` at the native (cache-prebuilt)
-  # set sidesteps the broken static perl while the wget binary itself still links
-  # every nix dep statically — leaving only /usr/lib system libs dynamic. On Linux
-  # wget builds straight from pkgsStatic (see ./linux.nix); this is the macOS
-  # equivalent with that single build-tool tweak.
   wget_static = wget.override {
     inherit perlPackages;
   };

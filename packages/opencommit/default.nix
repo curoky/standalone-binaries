@@ -1,30 +1,14 @@
-# opencommit (on static node)
+# OpenCommit — JavaScript payload with a sibling Node runtime.
 #
-# opencommit running on our fully-static (musl) `nodejs-slim26` package, instead
-# of being `nix bundle`'d into a self-extracting executable. Reuse the upstream
-# nixpkgs JS distribution and ship a relative-path wrapper that invokes the
-# sibling static node explicitly. The static node then travels with the deployed
-# tool instead of depending on a node on the host PATH after artifact assembly
-# rewrites the upstream shebang.
+# Why local:
+# 1. The nixpkgs package builds correctly, but its generated launchers retain the
+#    Node interpreter selected inside the Nix store.
+# 2. Copy the JavaScript distribution without those launchers and install the
+#    same package-relative wrapper for both `opencommit` and `oco`.
+# 3. The wrapper finds the separately deployed `nodejs-slim26`; the install
+#    check invokes the shipped CLI module through that exact runtime.
 #
-# Unlike prettier, the interpreter is NOT overridden at build time: this is
-# an npm-based buildNpmPackage tool whose build needs `npm`, which nodejs-slim
-# lacks. So it is built with the regular node and only switches to the sibling
-# static node at runtime via the wrapper below.
-#
-# Upstream nixpkgs ships opencommit as:
-#   $out/bin/{opencommit,oco}                  (wrappers invoking node)
-#   $out/lib/node_modules/opencommit/...        (the JS + node_modules)
-#
-# Deploy layout:
-#   $store/
-#     nodejs-slim26/bin/node      (separate package; static musl ELF)
-#     opencommit/
-#       bin/{opencommit,oco}      (wrappers -> sibling node + out/cli.cjs)
-#       libexec/opencommit/...    (JS, from the nixpkgs opencommit)
-#
-# Verification:
-#   $out/bin/opencommit --version   # (with sibling node present)
+# This is intentional runtime packaging, not an upstream build workaround.
 {
   lib,
   stdenvNoCC,
@@ -51,12 +35,9 @@ stdenvNoCC.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    # Reuse the upstream nixpkgs opencommit's JS distribution.
     mkdir -p $out/libexec
     cp -R ${opencommit}/lib/node_modules/opencommit $out/libexec/opencommit
 
-    # Replace the upstream bin wrappers with relative-path wrappers that invoke
-    # the sibling static node explicitly.
     mkdir -p $out/bin
     cp ${wrapper} $out/bin/opencommit
     cp ${wrapper} $out/bin/oco
@@ -65,9 +46,6 @@ stdenvNoCC.mkDerivation {
     runHook postInstall
   '';
 
-  # Even though opencommit is *built* with the regular node (it needs npm), make
-  # sure the shipped JS actually runs on the static `nodejs-slim26` we deploy
-  # alongside it — i.e. the exact command the runtime wrapper issues.
   doInstallCheck = true;
   installCheckPhase = ''
     runHook preInstallCheck

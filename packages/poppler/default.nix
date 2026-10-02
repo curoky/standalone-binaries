@@ -1,16 +1,24 @@
-# poppler-utils — musl-static build of the CLI utilities only.
+# poppler-utils — static CLI subset with relocatable data.
 #
-# Stock `poppler-utils` is rejected under musl-static because default features
-# pull in `nss -> p11-kit` (badPlatforms = isStatic). Build `minimal + utils`,
-# then also disable openjpeg (otherwise `libtiff -> giflib` forces a shared
-# lib) and `BUILD_TESTING`. The `minimal` build drops poppler's own transitive
-# linkage, so the CLIs no longer resolve fontconfig/freetype/expat/bzip2/brotli
-# symbols. HarfBuzz's CMake target also omits its private graphite2 archive.
-# The CMakeLists patches append those static archives in dependency order.
-# graphite2 and HarfBuzz use Python only as a build-time tool. pkgsStatic gives
-# them the target static Python, whose ctypes cannot load FreeType while
-# collecting fonttools tests. Inject native Python while keeping graphite2,
-# HarfBuzz and Poppler themselves static.
+# Why local:
+# 1. Stock features pull in `nss -> p11-kit`, which is rejected on static hosts.
+#    Build Poppler's minimal CLI utility set instead.
+# 2. OpenJPEG reaches a libtiff/giflib path that still requires a shared library;
+#    disable it together with upstream tests that exercise unavailable targets.
+# 3. The minimal build omits private static archives needed by the CLI link:
+#    fontconfig, freetype, expat, bzip2, brotli and graphite2. Patch CMakeLists in
+#    dependency order so every symbol resolves.
+# 4. Graphite2 and HarfBuzz need Python only as a build tool. Target static
+#    Python cannot load ctypes/FreeType during fonttools collection, so inject
+#    native Python without changing target linkage.
+# 5. Darwin fontconfig misses xlocale declarations and has `/tmp` path tests
+#    incompatible with `/private/tmp`; HarfBuzz's unused GLib/docs/CoreText paths
+#    also fail or introduce unwanted frameworks. Apply those Darwin-only fixes.
+# 6. Poppler CLIs require fontconfig, DejaVu fonts and poppler-data at runtime.
+#    Bundle them and use wrappers that resolve all data relative to the package.
+#
+# Build fixes are regression candidates; the CLI-only output and relative data
+# packaging are product decisions.
 {
   lib,
   stdenv,

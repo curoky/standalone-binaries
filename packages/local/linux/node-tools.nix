@@ -5,7 +5,8 @@
 }:
 {
   prettier = pkgsStatic.callPackage ../../prettier {
-    prettier = pkgs.prettier.override { nodejs = nodejs-slim26; };
+    inherit nodejs-slim26;
+    inherit (pkgs) prettier;
   };
   markdownlint-cli2 = pkgsStatic.callPackage ../../markdownlint-cli2 {
     inherit nodejs-slim26;

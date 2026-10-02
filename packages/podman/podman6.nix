@@ -1,3 +1,23 @@
+# Podman 6 — pinned self-contained rootful container-engine bundle.
+#
+# Why local:
+# 1. Version 6.1.0 is an explicit product output, so replace the moving nixpkgs
+#    source while retaining its maintained derivation and dependency wiring.
+# 2. Stock static Podman propagates systemd and installs its unit/tmpfiles
+#    payload. Systemd is unavailable in the static set and service installation
+#    belongs to this bundle, so remove that dependency and generated state.
+# 3. Nixpkgs exposes runc through a generated wrapper. Copying that launcher
+#    would retain store paths, so restore the actual static runc executable
+#    before Podman packages its helpers.
+# 4. Stock fixup wraps Podman and helper lookup with Nix paths. Disable it, copy
+#    the helper set into `libexec/podman`, and supply static nftables plus
+#    BusyBox applets from the same bundle.
+# 5. Source patches force bundled catatonit and seccomp defaults and prevent the
+#    selected registry file from being merged with host drop-ins. Certificates,
+#    configuration and focused checks use the same package-relative layout.
+#
+# Regress the systemd and runc build workarounds independently. Keep the pinned
+# version and helper/configuration layout as product boundaries.
 {
   lib,
   fetchFromGitHub,
@@ -14,7 +34,6 @@
   podman,
 }:
 let
-  # Upstream wraps static runc in a dynamic PATH launcher. Ship the real ELF.
   runcStatic = runc.overrideAttrs (oldRuncAttrs: {
     postInstall = (oldRuncAttrs.postInstall or "") + ''
       mv -f "$out/bin/.runc-wrapped" "$out/bin/runc"
@@ -32,7 +51,6 @@ in
   runc = runcStatic;
 }).overrideAttrs
   (oldAttrs: rec {
-    # nixpkgs provides the 5.x derivation; select the 6.x release here.
     version = "6.1.0";
     src = fetchFromGitHub {
       owner = "podman-container-tools";
@@ -47,8 +65,6 @@ in
       ./registries-conf-dir-v6.patch
     ];
 
-    # pkgsStatic propagates upstream build inputs. cgroupfs/file logging need
-    # no libsystemd.
     buildInputs = builtins.filter (dep: lib.getName dep != "systemd") oldAttrs.propagatedBuildInputs;
     propagatedBuildInputs = [ ];
 
@@ -63,7 +79,6 @@ in
       rm -f "$out/bin/podmansh"
       rm -rf "$out/lib/systemd" "$out/lib/tmpfiles.d" "$out/share/systemd"
 
-      # Complete tools for the fixed backend; no inherited host PATH.
       install -m755 ${lib.getBin nftables}/bin/nft "$out/libexec/podman/nft"
       install -m755 ${busybox}/bin/busybox "$out/libexec/podman/busybox"
       for tool in sh readlink mkdir sed cp; do

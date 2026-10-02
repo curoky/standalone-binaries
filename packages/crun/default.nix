@@ -1,17 +1,17 @@
-# crun — fully-static musl build for podman's container runtime.
+# crun — reduced musl-static feature set.
 #
-# Stock features are not recoverable here: enabling them pulls in `elfutils`,
-# whose `meta.badPlatforms` includes `isStatic`, so the musl-static set is
-# rejected at eval time. Feature disabling (libkrun/systemd/python bindings)
-# must stay.
+# Why local:
+# 1. libkrun and systemd support pull in elfutils/systemd dependencies marked
+#    unsupported on static hosts, so stock evaluation cannot complete.
+# 2. Python bindings require a loadable extension and are incompatible with the
+#    fully static target.
+# 3. The rootless, namespace and cgroup tests require kernel facilities the
+#    cross-build sandbox cannot exercise; the suite currently fails in bulk.
+# 4. The remaining runtime uses libcap, libseccomp, json-c and argp and is linked
+#    with crun's all-static mode.
 #
-# `doCheck = false` is likewise required: restoring the checks runs 368 tests,
-# 106 of which fail (rootless/namespace/cgroup cases the musl-static sandbox
-# cannot exercise).
-#
-# crun 1.29 (upstream PR #2088) swapped YAJL for json-c, so `buildInputs` uses
-# `json_c` (not `yajl`) and the now-removed `--enable-embedded-yajl` flag is
-# gone.
+# Re-enable each feature and the checks independently when its static path is
+# supported.
 {
   stdenv,
   lib,
@@ -37,10 +37,8 @@
   (oldAttrs: rec {
     propagatedBuildInputs = [ ];
     buildInputs = [
-      # criu
       libcap
       libseccomp
-      # gperf
       json_c
       argp-standalone
     ];

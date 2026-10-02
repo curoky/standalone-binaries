@@ -1,10 +1,16 @@
-# zsh — musl-static build with three modules built in, plus an FPATH wrapper.
+# Zsh — static modules with relocatable runtime data.
 #
-# Without the `link=either` patch the static build fails to `zmodload
-# zsh/system`, `zsh/regex` and `zsh/mathfunc`, so those three modules must be
-# built in. The wrapper resolves the co-located functions dir relative to the
-# install (FPATH) and `--enable-zshenv=/etc/zsh/zshenv` keeps the global zshenv
-# out of the read-only store (packaging policy).
+# Why local:
+# 1. Stock static Zsh leaves system, regex and mathfunc as loadable modules.
+#    A static executable cannot load them, so `zmodload` fails; mark all three
+#    `link=either` so they are built into the executable.
+# 2. Nixpkgs configures the global zshenv under the immutable output. Point it
+#    at `/etc/zsh/zshenv`, the host-controlled system configuration path.
+# 3. Shell functions live inside the moved package. The wrapper derives FPATH
+#    from its own location instead of retaining an output path.
+#
+# Regress only the module change when stock static Zsh embeds them; retain the
+# zshenv and FPATH packaging policy.
 {
   lib,
   stdenv,
@@ -26,15 +32,10 @@ let
 in
 
 zsh.overrideAttrs (oldAttrs: rec {
-  # nixpkgs sets `--enable-zshenv=$out/etc/zshenv`, pinning the global zshenv
-  # into the read-only Nix store. Drop that flag and point it at /etc/zsh/zshenv
-  # so a system-wide /etc/zsh/zshenv is honored.
   configureFlags =
     (lib.filter (f: !(lib.hasPrefix "--enable-zshenv=" f)) (oldAttrs.configureFlags or [ ]))
     ++ [ "--enable-zshenv=/etc/zsh/zshenv" ];
 
-  # Force the system/regex/mathfunc modules to be buildable either statically
-  # or dynamically; the static build otherwise fails to `zmodload` all three.
   postPatch = (oldAttrs.postPatch or "") + ''
     echo "link=either" >> Src/Modules/system.mdd
     echo "link=either" >> Src/Modules/regex.mdd
@@ -46,9 +47,6 @@ zsh.overrideAttrs (oldAttrs: rec {
     "man"
   ];
 
-  # nativeBuildInputs = builtins.filter (dep: dep.pname or "" != "yodl") oldAttrs.nativeBuildInputs;
-
-  # postInstall = (oldAttrs.postInstall or "") + ''
   postInstall = ''
     mv $out/bin/zsh $out/bin/_zsh
     cp ${wrapperScript} $out/bin/zsh

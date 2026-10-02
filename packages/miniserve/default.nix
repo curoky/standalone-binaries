@@ -1,3 +1,14 @@
+# miniserve — repository-specific default behavior.
+#
+# Why local:
+# 1. Upstream miniserve builds and runs unchanged, but its defaults do not expose
+#    the archive formats, directory ordering and UI behavior selected here.
+# 2. Keep the real binary private and set those choices through supported
+#    environment variables in a wrapper.
+# 3. Set a variable only when the caller did not provide it, so explicit user
+#    policy continues to take precedence.
+#
+# This is intentional product packaging, not an upstream workaround.
 {
   lib,
   stdenv,

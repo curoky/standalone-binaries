@@ -1,3 +1,13 @@
+# Makeself — relocatable archive header lookup.
+#
+# Why local:
+# 1. Stock Makeself builds successfully, but its entry point refers to
+#    `makeself-header.sh` through the Nix output path.
+# 2. That compiled installation relationship is lost when the package moves.
+# 3. Keep the real command private and wrap it with an explicit `--header` path
+#    resolved from the installed executable.
+#
+# This is permanent runtime packaging, not an upstream build workaround.
 {
   lib,
   stdenv,

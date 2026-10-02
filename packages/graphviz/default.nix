@@ -1,3 +1,16 @@
+# graphviz — static CLI subset with relocatable fonts.
+#
+# Why local:
+# 1. Stock Graphviz enables LTDL, GUI/image plugins and their transitive dynamic
+#    dependencies; several cannot build or link in the musl-static set.
+# 2. The remaining CLI engines still need GD/font data. Build a minimal GD,
+#    bundle DejaVu Sans with common aliases, and point `GDFONTPATH` at it through
+#    a relative wrapper.
+# 3. Publish only the static `dot` implementation and select each engine through
+#    argv[0], removing libraries and development outputs from the product.
+#
+# Feature reductions are regression candidates; the CLI-only layout, aliases
+# and bundled font are intentional packaging.
 {
   lib,
   graphviz,

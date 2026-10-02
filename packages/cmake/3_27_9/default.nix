@@ -1,14 +1,17 @@
-# cmake 3.27.9 — versioned musl-static build.
+# CMake 3.27.9 — versioned musl-static build.
 #
-# Kept as a pinned source version alongside the newer cmake. Workarounds still
-# required on top of a from-scratch mkDerivation:
-#   - `postPatch` inserts `#include <cstdint>` into cmcppdap's network.h; this
-#     old source is missing the header and fails to compile with modern
-#     toolchains.
-#   - `BUILD_TESTING = false`: the shared-module test fails to link under
-#     musl-static with "R_X86_64_32 against __TMC_END__".
-#   - `CMAKE_USE_OPENSSL = false` / `BUILD_CursesDialog = false`: openssl and
-#     curses are deliberately dropped.
+# Why local:
+# 1. This exact legacy version is a product output and is built from source
+#    independently of the moving nixpkgs CMake attributes.
+# 2. Its bundled cmcppdap omits `<cstdint>` and fails with current compilers;
+#    inject the include before building.
+# 3. The test suite links a shared module with the static CRT and fails on a
+#    non-PIC `__TMC_END__` relocation, so `BUILD_TESTING` remains disabled.
+# 4. OpenSSL, curses and system libraries are excluded deliberately to keep the
+#    bootstrap self-contained; those are product choices, not regressions.
+#
+# Regress only the include and test workarounds; retain the versioned output and
+# reduced dependency policy.
 {
   lib,
   stdenv,
@@ -29,22 +32,12 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-YJqbmFcqal6kd/kSz/uXMQntTQpqaz+eI1PSzcBIcI4=";
   };
 
-  patches = [
-    # Don't search in non-Nix locations such as /usr, but do search in our libc.
-    # ./001-search-path.diff
-    # Don't depend on frameworks.
-    # ./002-application-services.diff
-    # Derived from https://github.com/libuv/libuv/commit/1a5d4f08238dd532c3718e210078de1186a5920d
-    # ./003-libuv-application-services.diff
-  ];
+  patches = [ ];
 
   outputs = [ "out" ];
   setOutputFlags = false;
 
-  setupHooks = [
-    # ./setup-hook.sh
-    # ./check-pc-files-hook.sh
-  ];
+  setupHooks = [ ];
 
   depsBuildBuild = [ buildPackages.stdenv.cc ];
 
@@ -59,7 +52,6 @@ stdenv.mkDerivation (finalAttrs: {
   '';
 
   preConfigure = ''
-    # fixCmakeFiles .
     substituteInPlace Modules/Platform/UnixPaths.cmake \
       --subst-var-by libc_bin ${lib.getBin stdenv.cc.libc} \
       --subst-var-by libc_dev ${lib.getDev stdenv.cc.libc} \
@@ -114,7 +106,7 @@ stdenv.mkDerivation (finalAttrs: {
   dontUseCmakeConfigure = true;
   enableParallelBuilding = true;
 
-  doCheck = false; # fails
+  doCheck = false;
 
   meta = { };
 })

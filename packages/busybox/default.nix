@@ -1,8 +1,15 @@
-# Stock BusyBox compiles its Nix output path into udhcpc as the default
-# dispatcher script, and that generated script calls BusyBox through the same
-# absolute path. Artifact hash normalization would make both paths nonexistent.
-# Keep the dispatcher as a sibling resource and resolve both directions from
-# /proc/self/exe and $0 so the complete DHCP behavior remains relocatable.
+# BusyBox — relocatable udhcpc resources.
+#
+# Why local:
+# 1. Stock udhcpc compiles the Nix output path of `default.script` into the
+#    executable. Hash normalization leaves that path nonexistent at runtime.
+# 2. The generated dispatcher also calls BusyBox applets through the same
+#    absolute output path.
+# 3. The patch makes udhcpc resolve its script from `/proc/self/exe`; packaging
+#    moves the script into the package and makes its applet calls `$0`-relative.
+#
+# Keep the resource packaging; remove the patch only when upstream supports a
+# relocatable default dispatcher path.
 { busybox }:
 
 (busybox.override {

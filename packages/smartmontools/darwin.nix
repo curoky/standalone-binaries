@@ -1,11 +1,15 @@
 # smartmontools (Darwin) — CLI with no Nix store paths, native build tools.
 #
-#   - `--with-drivedbdir=no`: `smartctl` otherwise embeds a Nix store path to
-#     the external drive DB; disable it and rely on the compiled-in DB.
-#   - `--sysconfdir=/etc` + installFlags to `$out/etc`: point the optional local
-#     DB / config at the system `/etc`.
-#   - `autoreconfHook`/`hostname` are overridden to native: as static build
-#     tools they would drag in a failing static Perl.
+# Why local:
+# 1. `smartctl` otherwise compiles the Nix path of the external drive database.
+#    Disable that lookup and use its built-in database.
+# 2. Point optional local database/config discovery at `/etc`, while installing
+#    package-owned samples under `$out/etc`.
+# 3. Static autoreconf/hostname pull in the failing Darwin static Perl even
+#    though they run only during the build. Inject native build tools instead.
+#
+# The build-tool override may regress when static Perl works; the CLI resource
+# policy remains.
 {
   autoreconfHook,
   hostname,
@@ -14,14 +18,15 @@
 
 (smartmontools.override {
   inherit autoreconfHook hostname;
-}).overrideAttrs (old: {
-  configureFlags = (old.configureFlags or [ ]) ++ [
-    "--sysconfdir=/etc"
-    "--with-drivedbdir=no"
-  ];
+}).overrideAttrs
+  (old: {
+    configureFlags = (old.configureFlags or [ ]) ++ [
+      "--sysconfdir=/etc"
+      "--with-drivedbdir=no"
+    ];
 
-  installFlags = (old.installFlags or [ ]) ++ [
-    "sysconfdir=$(out)/etc"
-    "smartdscriptdir=$(out)/etc"
-  ];
-})
+    installFlags = (old.installFlags or [ ]) ++ [
+      "sysconfdir=$(out)/etc"
+      "smartdscriptdir=$(out)/etc"
+    ];
+  })

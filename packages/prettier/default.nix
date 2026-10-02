@@ -1,37 +1,24 @@
-# prettier (on static node)
+# Prettier — JavaScript payload with a sibling Node runtime.
 #
-# prettier running on our fully-static (musl) `nodejs-slim26` package, instead
-# of being `nix bundle`'d into a self-extracting executable. The interpreter is
-# overridden upstream-style in packages/local/linux/node-tools.nix
-# (`pkgs.prettier.override { nodejs = nodejs-slim26; }`), so the `prettier`
-# argument here is already built against our static node. This derivation reuses
-# that prettier's JS distribution and ships a relative-path wrapper that invokes
-# the sibling static node explicitly, so the static node travels with the
-# deployed tool instead of depending on a node on the host PATH after artifact
-# assembly rewrites the upstream shebang.
+# Why local:
+# 1. The nixpkgs package builds correctly, but its generated launcher retains
+#    the Node interpreter selected inside the Nix store.
+# 2. Build the upstream distribution with `nodejs-slim26` so its generation and
+#    checks use the same runtime version that the standalone product publishes.
+# 3. Copy only the JavaScript distribution and replace the launcher with one
+#    that finds the separately deployed Node sibling by relative path.
 #
-# Upstream nixpkgs ships prettier as:
-#   $out/bin/prettier                                  (wrapper invoking node)
-#   $out/lib/node_modules/prettier/...                 (the JS, self-contained)
-#
-# Deploy layout:
-#   $store/
-#     nodejs-slim26/bin/node   (separate package; static musl ELF)
-#     prettier/
-#       bin/prettier           (wrapper: exec $store/nodejs-slim26/bin/node \
-#                                          $root/libexec/prettier/bin/prettier.cjs "$@")
-#       libexec/prettier/...   (prettier JS, from the nixpkgs prettier)
-#
-# Verification:
-#   $out/bin/prettier --version   # => prettier version (with sibling node present)
+# This is intentional runtime packaging, not an upstream build workaround.
 {
   lib,
   stdenvNoCC,
   writeText,
   prettier,
+  nodejs-slim26,
 }:
 
 let
+  prettierStatic = prettier.override { nodejs = nodejs-slim26; };
   wrapper = writeText "prettier-wrapper.sh" ''
     #!/usr/bin/env bash
     script_path="$(readlink -f "$0")"
@@ -42,19 +29,16 @@ let
 in
 stdenvNoCC.mkDerivation {
   pname = "prettier";
-  inherit (prettier) version;
+  inherit (prettierStatic) version;
 
   dontUnpack = true;
 
   installPhase = ''
     runHook preInstall
 
-    # Reuse the upstream nixpkgs prettier's JS distribution.
     mkdir -p $out/libexec
-    cp -R ${prettier}/lib/node_modules/prettier $out/libexec/prettier
+    cp -R ${prettierStatic}/lib/node_modules/prettier $out/libexec/prettier
 
-    # Replace the upstream bin wrapper with a relative-path wrapper that invokes
-    # the sibling static node explicitly.
     mkdir -p $out/bin
     cp ${wrapper} $out/bin/prettier
     chmod +x $out/bin/prettier

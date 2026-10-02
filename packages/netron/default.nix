@@ -1,3 +1,14 @@
+# Netron — pure-Python wheel with a relocatable launcher.
+#
+# Why local:
+# 1. A normal Python package entry point records its Nix interpreter and module
+#    environment, which does not survive standalone relocation.
+# 2. Unpack the pure-Python wheel directly and provide the small console-entry
+#    shim ourselves, without adding native extension dependencies.
+# 3. Launch with sibling Python 3.14 on Linux or the explicitly supported system
+#    `python3` boundary on macOS, using package-relative module paths.
+#
+# This is intentional runtime packaging, not an upstream build workaround.
 {
   lib,
   stdenv,

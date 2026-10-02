@@ -1,3 +1,14 @@
+# Dool — script payload with platform runtime selection.
+#
+# Why local:
+# 1. The upstream entry point is tied to the Python interpreter selected inside
+#    Nix and is therefore not relocatable as a standalone script package.
+# 2. Ship the Python source directly; use sibling Python 3.14 on Linux and the
+#    explicitly supported system `python3` boundary on macOS.
+# 3. The wrapper also supplies the product default `--bytes` while leaving later
+#    user arguments intact.
+#
+# This is intentional runtime and CLI packaging, not a build workaround.
 {
   stdenv,
   writeText,
@@ -12,8 +23,6 @@ let
     root=$(cd "$(dirname "$script_path")" && pwd)/..
     store=$root/..
 
-    # python_bin_path=/home/x/.nix-profile/bin/python3.14
-    # pathon_lib_root=/nix/var/nix/profiles/py314-static/lib/python3.14/
     if [[ "$(uname)" == "Darwin" ]]; then
       exec -a "$0" python3 "$root/bin/_dool_main.py" --bytes "$@"
     else
@@ -35,9 +44,6 @@ stdenv.mkDerivation {
 
   installPhase = ''
     mkdir -p $out/bin
-    # dool ships as a single self-contained, stdlib-only python script; reuse it
-    # directly as the entry point. The wrapper invokes a relative python
-    # interpreter explicitly, so the upstream nix-store shebang is inert.
     cp ${dool}/bin/dool $out/bin/_dool_main.py
     cp ${wrapperScript} $out/bin/dool
     chmod +x $out/bin/dool

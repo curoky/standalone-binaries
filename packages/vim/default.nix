@@ -1,3 +1,13 @@
+# Vim — relocatable runtime tree.
+#
+# Why local:
+# 1. Stock Vim builds successfully, but its runtime discovery follows the Nix
+#    installation prefix recorded by the packaged executable.
+# 2. That path is invalid after the standalone directory is moved.
+# 3. Keep the real binary private and set `VIMRUNTIME` from the wrapper's own
+#    installed location unless the user supplied an explicit value.
+#
+# This is permanent runtime packaging, not an upstream build workaround.
 {
   lib,
   stdenv,
@@ -9,8 +19,6 @@
 let
   wrapperScript = writeText "wrapper.sh" ''
     #!/usr/bin/env bash
-
-    # https://askubuntu.com/questions/445686/vim-cannot-find-syntax-vim
 
     script_path="$(readlink -f "$0")"
     root=$(cd "$(dirname "$script_path")" && pwd)/..

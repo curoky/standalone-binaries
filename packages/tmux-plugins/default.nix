@@ -1,3 +1,12 @@
+# tmux-plugins — pinned configuration resource.
+#
+# Why local:
+# 1. This product publishes a selected `.tmux.conf`, not an executable provided
+#    by nixpkgs.
+# 2. Pin the chosen upstream revision and install only the configuration file in
+#    the stable resource path expected by consumers.
+#
+# This is a product data bundle, not an upstream workaround.
 {
   lib,
   stdenv,

@@ -674,7 +674,6 @@
       version = "24.11";
     };
   };
-  # shellcheck's executable is in the bin output.
   shellcheck = {
     output = [ "bin" ];
     "aarch64-darwin" = {

@@ -1,3 +1,15 @@
+# OpenSSH with GSSAPI — relocatable cross-architecture service bundle.
+#
+# Why local:
+# 1. Scp and sshd need sibling ssh/session/auth helpers. Replace their compiled
+#    or PATH-based discovery with wrappers that resolve helpers from the moved
+#    package.
+# 2. QEMU user mode cannot execute OpenSSH's seccomp pre-auth sandbox, while the
+#    rlimit sandbox terminates the cross-architecture service before handshake.
+#    Configure no sandbox for the supported host-loopback deployment.
+#
+# Both choices are product boundaries for this package rather than a general
+# upstream regression candidate.
 {
   lib,
   stdenv,
@@ -31,10 +43,6 @@ in
 
 openssh_gssapi.overrideAttrs (oldAttrs: {
   configureFlags = (oldAttrs.configureFlags or [ ]) ++ [
-    # QEMU user-mode cannot run OpenSSH's seccomp or rlimit pre-authentication
-    # sandboxes (the rlimit sandbox also drops cross-arch containers before the
-    # SSH handshake completes). The service is restricted to the host loopback
-    # by devspace.
     "--with-sandbox=none"
   ];
 

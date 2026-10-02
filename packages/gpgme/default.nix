@@ -1,10 +1,14 @@
-# gpgme — musl-static build backed by a minimal GnuPG.
+# gpgme — reduced GnuPG closure for musl-static.
 #
-# The stock full GnuPG dependency tree drags in openldap, which aborts with
-# "Could not locate Cyrus SASL" under musl-static, so `minimalGnuPG`
-# (enableMinimal, no GUI) must stay. `--disable-gpg-test` is no longer needed,
-# but the checks still invoke bare `gpgconf` and `gpgsm`, which are unavailable
-# in the cross test sandbox, so `doCheck = false` must stay.
+# Why local:
+# 1. Stock GPGME pulls in full GnuPG, whose openldap dependency aborts because
+#    Cyrus SASL cannot be located in the static build.
+# 2. GPGME's checks invoke bare target `gpgconf` and `gpgsm`, which are not
+#    executable from the cross-test sandbox.
+# 3. The override supplies minimal, GUI-free GnuPG and disables those checks.
+#
+# Regress the dependency reduction and checks independently when stock supports
+# them under musl-static.
 {
   gnupg,
   gpgme,

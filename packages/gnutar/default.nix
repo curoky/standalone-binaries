@@ -1,26 +1,21 @@
-# gnutar — fully-static musl build.
+# gnutar — static xattr symbol collision.
 #
-# The stock `pkgsStatic.gnutar` (1.35) fails to link here with a duplicate-symbol
-# error:
+# Why local:
+# 1. Gnutar's bundled gnulib supplies fallback `getxattrat`, `setxattrat` and
+#    `listxattrat` symbols.
+# 2. Current static libacl supplies the same symbols, so the final tar link fails
+#    with multiple definitions under GCC's `-fno-common` behavior.
+# 3. Both implementations are equivalent fallbacks; pass
+#    `--allow-multiple-definition` only to the final automake link rather than
+#    disabling ACL/xattr support or contaminating configure probes.
 #
-#   libtar.a(xattr-at.o): multiple definition of `setxattrat' (also `getxattrat',
-#   `listxattrat'); acl-static/libacl.a(xattrat.o): first defined here
-#
-# gnutar bundles an old gnulib `xattr-at` module that provides its own
-# `*xattrat` wrappers (via gnulib's `at-func.c`). Newer libacl (2.4.0, pulled in
-# statically here) now ships real `*xattrat` symbols too, so linking `tar`
-# statically pulls both definitions in and GCC 15's default `-fno-common`
-# surfaces the collision. Both implementations are equivalent fallbacks, so tell
-# the linker to keep the first and drop the duplicate — this preserves ACL and
-# xattr support instead of disabling them.
+# Remove the flag when stock gnutar and libacl no longer export both copies.
 {
   gnutar,
 }:
 
 gnutar.overrideAttrs (old: {
-  # Pass the flag only to `make` (not to configure's compiler-works check, which
-  # breaks under the musl cross toolchain if NIX_LDFLAGS is overridden). LDFLAGS
-  # is an automake user variable, appended after AM_LDFLAGS, so it only augments
-  # the final link.
+  # Keep the flag out of configure's compiler probe; it applies only to the
+  # final automake link.
   makeFlags = (old.makeFlags or [ ]) ++ [ "LDFLAGS=-Wl,--allow-multiple-definition" ];
 })

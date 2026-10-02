@@ -1,3 +1,14 @@
+# git-filter-repo — Python payload with a relocatable launcher.
+#
+# Why local:
+# 1. The nixpkgs entry point is wrapped with its Nix Python environment, leaving
+#    interpreter and module paths that cannot be used after relocation.
+# 2. Copy the application modules and underlying script into the package rather
+#    than preserving that generated wrapper.
+# 3. Launch with sibling Python 3.14 on Linux or the explicitly supported system
+#    `python3` boundary on macOS, using package-relative module paths.
+#
+# This is intentional runtime packaging, not an upstream build workaround.
 {
   stdenv,
   writeText,

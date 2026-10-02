@@ -1,3 +1,14 @@
+# Nsight Systems — vendor glibc binary exception.
+#
+# Why local:
+# 1. NVIDIA publishes this release only as a self-extracting prebuilt Linux
+#    distribution; there is no source derivation that can be rebuilt for musl.
+# 2. Unpack the vendor installer non-interactively and install its payload
+#    without pretending the contained ELF files are static.
+# 3. This is the repository's sole approved Linux dynamic-ELF exception; it does
+#    not relax the portability gate for any other package.
+#
+# Replace this package only when NVIDIA provides a usable musl-static release.
 {
   lib,
   stdenv,

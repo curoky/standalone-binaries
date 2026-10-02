@@ -1,6 +1,16 @@
-# psql for macOS, built on nixpkgs' static libpq client package so every Nix
-# dependency is linked from a static archive and only Apple system libraries
-# remain dynamic.
+# psql for macOS — static libpq client with system resource paths.
+#
+# Why local:
+# 1. `pkgsStatic.libpq` provides the portable client libraries but does not
+#    install psql. Build and install that client explicitly without the server.
+# 2. Static OpenSSL compiles its configuration, engine, module and certificate
+#    paths under the Nix output. Patch those defaults to macOS/system paths
+#    before linking them into psql.
+# 3. Keep every Nix dependency static; only Apple system libraries may remain
+#    as Mach-O load commands.
+#
+# Remove this override when stock static libpq ships psql without embedded Nix
+# resource paths.
 {
   libpq,
   openssl,
@@ -19,14 +29,18 @@ let
 in
 (libpq.override {
   openssl = portableOpenSSL;
-}).overrideAttrs (old: {
-  configureFlags = (old.configureFlags or [ ]) ++ [ "--bindir=/usr/local/bin" ];
+}).overrideAttrs
+  (old: {
+    configureFlags = (old.configureFlags or [ ]) ++ [ "--bindir=/usr/local/bin" ];
 
-  postBuild = (old.postBuild or "") + ''
-    make -C src/bin/psql -j$NIX_BUILD_CORES
-  '';
+    postBuild = (old.postBuild or "") + ''
+      make -C src/bin/psql -j$NIX_BUILD_CORES
+    '';
 
-  postInstall = (old.postInstall or "") + "\n" + ''
-    make -C src/bin/psql bindir="$out/bin" install
-  '';
-})
+    postInstall =
+      (old.postInstall or "")
+      + "\n"
+      + ''
+        make -C src/bin/psql bindir="$out/bin" install
+      '';
+  })

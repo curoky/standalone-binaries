@@ -1,22 +1,21 @@
-# macOS krb5: build the fully-static `pkgsStatic.krb5` set, working around two
-# upstream defects that break static linking of libkrb5.a / libk5crypto.a on
-# darwin (any consumer, e.g. krb5kdc, otherwise fails to link):
+# krb5 for macOS — static archive linkage fixes.
 #
-#   1. USE_CCAPI_MACOS: on modern macOS, configure compiles cc_api_macos.c and
-#      makes API: the default ccache. That object calls CCAPI's cc_initialize,
-#      provided only by `-framework Kerberos`, which is not linked into consumers
-#      of the static libkrb5.a -> undefined `_cc_initialize`. We disable the
-#      macOS CCAPI backend (falling back to the FILE: ccache, like Linux).
+# Why local:
+# 1. Configure enables `USE_CCAPI_MACOS`, compiles `cc_api_macos.c` and selects
+#    `API:` as the default credential cache. That archive member calls
+#    `cc_initialize`, which is available only from the Kerberos framework and is
+#    not linked into static libkrb5 consumers; final links fail with undefined
+#    `_cc_initialize`. Disable CCAPI and retain the portable FILE cache backend.
+# 2. `mit_des_zeroblock` is defined in `f_aead.o`, but no other referenced symbol
+#    causes macOS ld to extract that member from `libk5crypto.a`. When
+#    `d3_aead.o` is selected, its reference remains undefined. Move the identical
+#    zero constant into the referencing translation unit so the archive link can
+#    resolve it.
+# 3. Both changes affect only static linkage. The resulting binaries may retain
+#    Apple system libraries, but no Nix dylib or framework path.
 #
-#   2. mit_des_zeroblock: defined in f_aead.o, but in a static link macOS `ld`
-#      never pulls f_aead.o (nothing references its other symbols), so
-#      d3_aead.o's reference to `_krb5int_c_mit_des_zeroblock` is undefined. The
-#      patch moves the definition into d3_aead.c so it is always pulled.
-#
-# With both fixes the static set links cleanly; the resulting binaries depend
-# only on /usr/lib system libraries (libSystem, libresolv): every Nix
-# dependency is statically linked, and only macOS system libraries stay
-# dynamic.
+# Remove each fix when stock static krb5 links its consumers without the
+# corresponding undefined symbol.
 { krb5 }:
 
 krb5.overrideAttrs (old: {

@@ -1,25 +1,23 @@
+# gocryptfs — static dependency and CGO discovery fixes.
+#
+# Why local:
+# 1. Nixpkgs propagates libfido2 so runtime `fido2-*` commands reach PATH, but
+#    its pcsclite documentation output fails to build under musl-static.
+#    Gocryptfs does not link libfido2; it invokes those optional tools through
+#    `os/exec`, so the standalone package may rely on the host PATH instead.
+# 2. The OpenSSL CGO backend uses `pkg-config: libcrypto`, but the target wrapper
+#    does not discover the static OpenSSL `.pc` file automatically in this cross
+#    setup. Point `PKG_CONFIG_PATH` at the target development output.
+#
+# Remove each workaround when stock dependency propagation and CGO discovery
+# work under musl-static.
 {
   lib,
   gocryptfs,
   openssl,
 }:
 
-# gocryptfs links openssl via CGO for its crypto backend; that builds fine under
-# musl-static. The only obstacle to the stock pkgsStatic build is the
-# `libfido2` propagatedBuildInput, whose transitive `pcsclite` dependency fails
-# to build its `doc` output under musl-static.
-#
-# libfido2 is NOT a link-time dependency: gocryptfs' FIDO2 support shells out to
-# the `fido2-assert` / `fido2-cred` CLI tools at runtime (see
-# internal/fido2/fido2.go using os/exec). nixpkgs propagates libfido2 only so
-# those CLI tools land on PATH. In a standalone, relocatable build we resolve
-# fusermount and the fido2 tools from the host $PATH anyway, so drop the
-# propagated input entirely.
 gocryptfs.overrideAttrs (_: {
   propagatedBuildInputs = [ ];
-  # cgo resolves the openssl crypto backend via `#cgo pkg-config: libcrypto`.
-  # Point PKG_CONFIG_PATH at the static openssl dev output so the target
-  # pkg-config wrapper can locate libcrypto.pc during the cross build; without
-  # it configure fails with "No package 'libcrypto' found".
   PKG_CONFIG_PATH = "${lib.getDev openssl}/lib/pkgconfig";
 })
