@@ -153,6 +153,12 @@
   fd = { };
   git-absorb = { };
   mcfly = { };
+  miniserve = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
+  };
   pnpm = { };
   procs = { };
   ripgrep = { };

@@ -47,7 +47,6 @@ rec {
   mise = pkgsStatic.callPackage ../../mise {
     nativeGit = pkgs.gitMinimal;
   };
-  miniserve = pkgsStatic.callPackage ../../miniserve { };
 
   # Perl.
   perl = pkgsStatic.callPackage ../../perl/linux.nix { };

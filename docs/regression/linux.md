@@ -56,7 +56,6 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |
 | `markdownlint-cli2` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/markdownlint-cli2/` |
 | `mise` | 🩹 本地 | 🟡 | native Git 检查工具 + 跳过代理相关 DNS 测试 + PATH helper | static Git 与 DNS 测试修复后删 build workaround；保留 PATH portability patch | b4fd65b198c5 | `packages/mise/` |
-| `miniserve` | 📦 本地 | ❌ | wrapper 设置仓库要求的默认功能开关 | 产品行为必须保留 | — | `packages/miniserve/` |
 | `netron` | 📦 本地 | ❌ | wheel 重打包并绑定 sibling/宿主 Python | runtime packaging 必须保留 | — | `packages/netron/` |
 | `nodejs-slim24` | 🩹 本地 | 🟡 | 保留 `ada` doCheck 与 node configureFlags | 逐 patch 验证删除，保留 Node 24 runtime | b4fd65b198c5 | `packages/nodejs/24/` |
 | `nodejs-slim26` | 🩹 本地 | 🟡 | 保留 `ada`/`lief`/`temporal_capi` 与 configureFlags | 逐 patch 删除，满足各平台动态依赖规则 | b4fd65b198c5 | `packages/nodejs/26/` |

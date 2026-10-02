@@ -1,12 +1,7 @@
 # Rust 包
 
-普通 Rust CLI 直接使用 unstable `pkgsStatic`。本地 derivation 只保留产品 wrapper 或当前
-静态构建所需的最小 override；状态见[回归清单](../regression/AGENTS.md)。
-
-## 产品 Wrapper
-
-`miniserve` 的 wrapper 设置仓库定义的默认功能开关，再执行包内真实二进制。这些默认值属于
-发布产品行为，不应在上游包可直接构建时一并删除。
+普通 Rust CLI 直接使用 unstable `pkgsStatic`。本地 derivation 只保留当前静态构建所需的
+最小 override；状态见[回归清单](../regression/AGENTS.md)。
 
 ## 直接使用 Unwrapped 输出
 
