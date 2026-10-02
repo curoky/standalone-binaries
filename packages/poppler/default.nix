@@ -22,7 +22,7 @@
 {
   lib,
   stdenv,
-  poppler,
+  poppler-utils,
   harfbuzz,
   graphite2,
   nativePython3,
@@ -128,9 +128,7 @@ let
     "set(poppler_LIBS \${poppler_LIBS} harfbuzz::harfbuzz harfbuzz::subset "
     + "${graphite2WithNativePython}/lib/libgraphite2.a)";
 in
-(poppler.override {
-  suffix = "utils";
-  utils = true;
+(poppler-utils.override {
   minimal = true;
   harfbuzz = harfbuzzWithNativeGraphite2;
   fontconfig = fontconfigForPoppler;

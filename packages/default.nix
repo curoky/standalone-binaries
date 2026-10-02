@@ -27,7 +27,6 @@ let
     eza-ls = pkgsStatic.callPackage ./eza-ls { };
     file = pkgsStatic.callPackage ./file { };
     ghostscript = pkgsStatic.callPackage ./ghostscript { };
-    gnupg = pkgsStatic.callPackage ./gnupg { };
     libtool = pkgsStatic.callPackage ./libtool { };
     makeself = pkgsStatic.callPackage ./makeself { };
     pkgconf = pkgsStatic.callPackage ./pkgconf { };
@@ -183,8 +182,6 @@ let
       inherit (pkgs) opencommit;
     };
 
-    # Native glibc data.
-    glibcLocales = pkgs.callPackage ./glibc-locales { };
   };
 
   darwin = {

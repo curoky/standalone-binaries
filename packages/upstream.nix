@@ -68,6 +68,9 @@
   };
   gettext = { };
   git-extras = { };
+  gnupgMinimal = {
+    alias = "gnupg";
+  };
   gnugrep = { };
   gnumake = { };
   gnupatch = { };
@@ -192,6 +195,14 @@
       "aarch64-linux"
     ];
     output = [ "bin" ];
+  };
+  glibcLocalesUtf8 = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+    ];
+    isStatic = false;
+    alias = "glibcLocales";
   };
   indent = {
     platforms = [

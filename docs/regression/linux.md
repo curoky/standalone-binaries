@@ -43,13 +43,11 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `git` | 🩹 本地 | 🟡 | test locale FAIL + 静态传递链接 + 相对资源 wrapper | 逐项删构建 workaround，保留 wrapper | b4fd65b198c5 | `packages/git/` |
 | `git-filter-repo` | 📦 本地 | ❌ | Python sibling runtime | runtime packaging 不会因上游构建修复消失 | — | `packages/pythonPackages/git-filter-repo.nix` |
 | `ghostscript` | 🩹 本地 | ✅ | 改用静态 `gs` target，跳过不存在的 `gsx` check | `pkgsStatic.ghostscript_headless` 直接生成可搬运静态 `gs` 后删除 override | b4fd65b198c5 | `packages/ghostscript/` |
-| `glibcLocales` | 📦 override | ❌ | 只发布裁剪后的 locale 数据 | 输出裁剪是产品决策 | — | `packages/glibc-locales/` |
-| `gnupg` | 📦 override | ❌ | 明确启用 minimal 并关闭 GUI | feature selection 是产品决策 | — | `packages/gnupg/` |
 | `graphviz` | 🩹 + 📦 本地 | 🟡 | 关闭 LTDL/GIF/TIFF/WebP 等 + 相对字体入口 | stock 直接 musl-static 后删编译 workaround；入口/字体/CLI packaging 保留 | b4fd65b198c5 | `packages/graphviz/` |
 | `gnutar` | 🩹 本地 | ✅ | `-Wl,--allow-multiple-definition`（xattrat 符号冲突） | stock 无 flag 也能静态链接并保留 ACL/xattr | b4fd65b198c5 | `packages/regression/gnutar/` |
 | `go` | 🩹 + 📦 本地 | 🟡 | musl-static compiler；在 bootstrap 生成官方默认配置，对 race 强制外链，移除测试专用 dynamic ELF fixtures | 上游 static Go 默认值与 race link mode 对齐后删 patch；SDK packaging 与严格 ELF 门禁保留 | b4fd65b198c5 | `packages/go/` |
 | `gocryptfs` | 🩹 本地 | 🟡 | 清空 propagatedBuildInputs + 设 PKG_CONFIG_PATH | 上游 pcsclite doc 可构建、cross cgo 自动定位 openssl 后删 | b4fd65b198c5 | `packages/gocryptfs/` |
-| `gpgme` | 🩹 本地 | 🟡 | minimalGnuPG + `doCheck=false`；`--disable-gpg-test` 已删除 | 恢复完整 GnuPG 或 checks，保持 musl-static | b4fd65b198c5 | `packages/gpgme/` |
+| `gpgme` | 🩹 本地 | 🟡 | `gnupgMinimal` + `doCheck=false`；`--disable-gpg-test` 已删除 | 恢复完整 GnuPG 或 checks，保持 musl-static | b4fd65b198c5 | `packages/gpgme/` |
 | `libewf` | 🩹 本地 | ✅ | radare2/rizin 依赖；补 cross OpenSSL 探针 cache | 上游同 arch cross 不依赖运行探针后删 override | b4fd65b198c5 | `packages/regression/libewf/` |
 | `libtool` | 📦 本地 | ❌ | 改写 `libtoolize` 的 baked data paths | 相对资源定位必须保留 | — | `packages/libtool/` |
 | `lua5_5` | 🩹 本地 | ✅ | 恢复 `/usr/local` module paths，避免嵌 store 路径 | stock 默认 module paths 无 store 路径 | b4fd65b198c5 | `packages/lua/` |

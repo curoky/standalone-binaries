@@ -13,7 +13,7 @@
 # and bundled font are intentional packaging.
 {
   lib,
-  graphviz,
+  graphviz-nox,
   gd,
   dejavu_fonts,
   python3,
@@ -68,8 +68,7 @@ let
   ];
 in
 
-(graphviz.override {
-  withXorg = false;
+(graphviz-nox.override {
   gd = gdMinimal;
   pango = null;
   fontconfig = null;
