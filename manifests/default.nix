@@ -99,6 +99,9 @@
       version = "25.05";
     };
   };
+  qpdf = {
+    output = [ "bin" ];
+  };
   snappy = {
     output = [ "bin" ];
   };

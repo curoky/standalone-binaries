@@ -42,6 +42,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `gdb` | 📌 `25.11` | ❌ | 历史 pin；unstable dejagnu→expect 链接失败（tclStubsPtr） | 已确认必要，无可回归空间 | 624af665418d | `manifests/default.nix` |
 | `git` | 🩹 本地 | 🟡 | test locale FAIL + 静态传递链接 + 相对资源 wrapper；详见 nix 注释 | 逐项删构建 workaround，保留 wrapper | b4fd65b198c5 | `packages/git/` |
 | `git-filter-repo` | 📦 本地 | ❌ | Python sibling runtime | runtime packaging 不会因上游构建修复消失 | — | `packages/git-filter-repo/` |
+| `ghostscript` | 🩹 本地 | ✅ | headless 构建仍强制链接 shared `libgs`，musl-static 因非 PIC 启动对象失败；改用上游静态 `gs` target，并从 install check 去掉 headless 不生成的 `gsx` | `pkgsStatic.ghostscript_headless` 直接生成可搬运静态 `gs` 后删除 override | b4fd65b198c5 | `packages/ghostscript/` |
 | `glibcLocales` | 📦 override | ❌ | 只发布裁剪后的 locale 数据 | 输出裁剪是产品决策 | — | `packages/local/linux/common.nix` |
 | `gnupg` | 📦 override | ❌ | 明确启用 minimal 并关闭 GUI | feature selection 是产品决策 | — | `packages/local/common.nix` |
 | `graphviz` | 🩹 + 📦 本地 | 🟡 | 关闭 LTDL/GIF/TIFF/WebP 等 + 相对字体入口；详见 nix 注释 | stock 直接 musl-static 后删编译 workaround；入口/字体/CLI packaging 保留 | b4fd65b198c5 | `packages/graphviz/` |
@@ -62,7 +63,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `nsight-systems` | ⚠️ 预编译 glibc | ⏳ | NVIDIA 只提供 glibc 动态发行物 | 上游提供可用的 musl-static 发行物 | — | `packages/nsight-systems/` |
 | `opencommit` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/opencommit/` |
 | `openssh_gssapi` | 🩹 + 📦 本地 | ❌ | 相对定位 helpers + 关预认证 sandbox（QEMU 拒 seccomp）；详见 nix 注释 | 可搬运 helper 定位与跨架构 SSH 必须保留 | — | `packages/openssh_gssapi/` |
-| `poppler` | 🩹 本地 | 🟡 | minimal+utils、关 openjpeg、补静态传递链接；graphite2 使用 native Python build tool，避免 static Python ctypes 失败；详见 nix 注释 | unstable 直接 musl-static，且 graphite2 构建不再使用 static Python；或仅保留命名差异 | b4fd65b198c5 | `packages/poppler/` |
+| `poppler` | 🩹 + 📦 本地 | 🟡 | minimal+utils、关 openjpeg、补静态传递链接；graphite2 使用 native Python build tool，避免 static Python ctypes 失败；用 wrapper 相对定位随包 fontconfig、DejaVu fonts 和 poppler-data；详见 nix 注释 | 静态构建 workaround 可回归后删除；可搬运资源打包保留 | b4fd65b198c5 | `packages/poppler/` |
 | `pkgconf` | 🩹 本地 | ✅ | 改系统路径，避免二进制残留 store 路径；详见 nix 注释 | stock 二进制不再编译进 store 路径 | b4fd65b198c5 | `packages/pkgconf/` |
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/parallel/` |
 | `patchelf` | 📌 `25.05` | ✅ | 历史 pin；unstable check `__TMC_END__` relocation 失败 | Linux 用 unstable 并满足 musl-static portability | b4fd65b198c5 | `manifests/default.nix` |

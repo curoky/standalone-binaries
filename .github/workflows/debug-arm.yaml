@@ -36,11 +36,28 @@ jobs:
         with:
           summarize: false
 
-      - name: Show environment
+      - name: Verify ARM64 environment
+        shell: bash
         run: |
+          set -euo pipefail
+
           uname -a
-          uname -m
           nix --version
+
+          case "$RUNNER_OS" in
+            Linux) expected_arch=aarch64 ;;
+            macOS) expected_arch=arm64 ;;
+            *)
+              echo "unsupported runner OS: $RUNNER_OS" >&2
+              exit 1
+              ;;
+          esac
+
+          actual_arch=$(uname -m)
+          if [[ "$actual_arch" != "$expected_arch" ]]; then
+            echo "expected $RUNNER_OS ARM64 ($expected_arch), got $actual_arch" >&2
+            exit 1
+          fi
 
       - name: Install Upterm
         shell: bash
@@ -139,7 +156,7 @@ jobs:
           set -euo pipefail
 
           while session_json=$("$UPTERM" session info "$UPTERM_SESSION_NAME" -o json 2>/dev/null); do
-            if [[ -e /continue || -e "$GITHUB_WORKSPACE/continue" ]]; then
+            if [[ -e "$GITHUB_WORKSPACE/continue" ]]; then
               "$UPTERM" session stop "$UPTERM_SESSION_NAME"
               break
             fi

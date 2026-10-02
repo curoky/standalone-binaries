@@ -31,6 +31,7 @@ rec {
   gocryptfs = pkgsStatic.callPackage ../../gocryptfs { };
   lua5_5 = pkgsStatic.callPackage ../../lua { };
   openssh_gssapi = pkgsStatic.callPackage ../../openssh_gssapi { };
+  poppler = pkgsStatic.callPackage ../../poppler { nativePython3 = pkgs.python3; };
   postgresql = pkgsStatic.callPackage ../../postgresql { };
   protobuf_3_9_2 = pkgsStatic.callPackage ../../protobuf/3_9_2 { };
   radare2 = pkgsStatic.callPackage ../../radare2 { };

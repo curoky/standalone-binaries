@@ -37,6 +37,9 @@ macOS ARM64 使用 `--runner macos-26`。脚本会：
 3. 等待对应 run 和 `upterm-<session>` artifact。
 4. 使用 `IdentitiesOnly=yes` 建立交互式 SSH 会话。
 
+workflow 会 fail-closed 校验实际架构：Linux 必须是 `aarch64`，macOS 必须是 `arm64`，
+避免 runner label 漂移后在错误架构上产生误导性的结果。
+
 首次使用或排查参数时先执行无副作用检查：
 
 ```bash
@@ -65,12 +68,16 @@ nix build .#<name>
 nix build .#tarballs.<system>.<name>
 ```
 
+Linux 用 `file`、`ldd` 检查 musl 全静态产物；macOS 用 `file`、`otool -L` 检查每个
+Mach-O 仅依赖 `/usr/lib`、`/System/Library/Frameworks` 或包内相对 dylib，并用
+`codesign --verify --strict` 验证 artifact 归一化后的签名。
+
 记录完整命令、exit code 和关键输出。不得把 eval、dry-run 或静态审查报告成实际构建通过。
 
 完成后必须在远端执行：
 
 ```bash
-touch /continue
+touch "$GITHUB_WORKSPACE/continue"
 exit
 ```
 

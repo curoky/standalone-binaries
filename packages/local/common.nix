@@ -19,6 +19,7 @@
   curl = pkgsStatic.callPackage ../curl { };
   eza-ls = pkgsStatic.callPackage ../eza-ls { };
   file = pkgsStatic.callPackage ../file { };
+  ghostscript = pkgsStatic.callPackage ../ghostscript { };
   gnupg = pkgsStatic.gnupg.override {
     enableMinimal = true;
     guiSupport = false;

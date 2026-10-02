@@ -1,0 +1,18 @@
+diff --git a/poppler/GlobalParams.cc b/poppler/GlobalParams.cc
+index 7bce036f..d433457f 100644
+--- a/poppler/GlobalParams.cc
++++ b/poppler/GlobalParams.cc
+@@ -53,2 +53,3 @@
+ #include <algorithm>
++#include <cstdlib>
+ #include <cstring>
+@@ -424,2 +425,6 @@ GlobalParams::GlobalParams(std::string customPopplerDataDir) : popplerDataDir(s
+ {
++    if (popplerDataDir.empty()) {
++        const char *envDataDir = std::getenv("POPPLER_DATADIR");
++        popplerDataDir = envDataDir ? envDataDir : POPPLER_DATADIR;
++    }
+     // scan the encoding in reverse because we want the lowest-numbered
+@@ -480 +485 @@ void GlobalParams::scanEncodingDirs()
+-    std::string dataRoot = !popplerDataDir.empty() ? popplerDataDir : std::string { POPPLER_DATADIR };
++    const std::string &dataRoot = popplerDataDir;

@@ -8,7 +8,6 @@ let
 in
 {
   git = pkgsStatic.callPackage ../../git { };
-  poppler = pkgsStatic.callPackage ../../poppler { nativePython3 = pkgs.python3; };
   python311 = mkPython {
     python = pkgsStatic.python311;
     setupLocal = ../../python/311/Setup.local;

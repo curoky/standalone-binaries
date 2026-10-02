@@ -165,7 +165,7 @@ if [[ ${#ssh_command[@]} -lt 2 || ${ssh_command[0]} != ssh ]]; then
   exit 1
 fi
 
-echo "connecting; run 'touch /continue' before exiting to release the runner"
+echo 'connecting; run `touch "$GITHUB_WORKSPACE/continue"` before exiting to release the runner'
 cleanup
 trap - EXIT
 exec ssh \

@@ -25,6 +25,8 @@ Go/CGO 公共 resolver 路径修正由 [`artifact`](../../cmd/artifact/AGENTS.md
 | `ffmpeg` | 🩹 本地 | 🟡 | 关无法静态化/可搬运的 feature；LAME 关 decoder；修 x265；`doCheck=false`（FATE flaky）；详见 nix 注释 | 逐 feature 恢复且无 store 引用；LAME 不再漏 mpg123 后恢复 decoder；上游修 flaky 后恢复检查 | b4fd65b198c5 | `packages/ffmpeg/` |
 | `file` | 🩹 + 📦 本地 | 🟡 | version check 直指真实二进制；wrapper 相对定位 `magic.mgc` | 上游检查可兼容 wrapper 后删除检查修正；资源定位必须保留 | b4fd65b198c5 | `packages/file/` |
 | `git-filter-repo` | 📦 本地 | ❌ | Python sibling runtime；macOS 暂用宿主 Python | runtime packaging 不会因上游构建修复消失 | — | `packages/git-filter-repo/` |
+| `ghostscript` | 🩹 本地 | ✅ | 与 Linux 共用静态 `gs` target override，避免上游固定的 shared `libgs` 构建路径 | `pkgsStatic.ghostscript_headless` 直接生成只依赖系统库的 `gs` 后删除 override | — | `packages/ghostscript/` |
+| `poppler` | 🩹 + 📦 本地 | 🟡 | 与 Linux 共用 minimal+utils、静态传递链接和相对资源 wrapper；static fontconfig 显式包含 `xlocale.h`，关闭假设 `/tmp` 不会规范化为 `/private/tmp` 的路径测试；HarfBuzz 关闭 Poppler 不使用且会引入无法静态构建的 GLib/GObject API、gtk-doc 文档生成与 CoreText backend | static fontconfig、HarfBuzz 与 poppler-utils 可直接构建并通过测试后删除构建 workaround；可搬运资源打包保留 | — | `packages/poppler/` |
 | `gnupg` | 📦 override | ❌ | 明确启用 minimal 并关闭 GUI | feature selection 是产品决策 | — | `packages/local/common.nix` |
 | `golangci-lint` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
 | `gost` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `manifests/default.nix`, `cmd/artifact/binary.go` |
