@@ -10,6 +10,10 @@
 跨平台包分别登记。公共 workaround 使用稳定候选 ID，并在「来源」中指向实现；候选 ID
 不一定是 package attr。
 
+经确认有较大希望整项回到 upstream 的纯包级 workaround 可以放在
+`packages/regression/<name>/`。这只是与回归队列对应的物理归档，不是 package family；
+目录内各 package 仍分别接线和回归，也不设置聚合 `default.nix`。
+
 ## 列约定
 
 - `回归`：✅ 整项回到 upstream；🟡 只回归 workaround；❌ 结构性 packaging；⏳ 长期例外。

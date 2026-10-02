@@ -3,7 +3,7 @@
 # Build a set of upstream nixpkgs packages from a declarative manifest for a
 # given system.
 #
-# Manifest schema (see manifests/default.nix for the full reference):
+# Manifest schema (see packages/upstream.nix for the full reference):
 #   <pkg> = {
 #     platforms = [ "x86_64-linux" "aarch64-darwin" ];  # omitted => allSystems
 #     version  = "unstable";   # which nixpkgs env (default "unstable")

@@ -19,7 +19,7 @@ aarch64-multiplatform-musl），以便 Node 的 Rust 依赖复用 build 平台�
 
 ## CLI Wrapper
 
-`packages/local/linux/node-tools.nix` 统一接入 Node CLI。wrapper 从自身路径定位：
+`packages/default.nix` 从 `packages/nodejsPackages/` 统一接入 Node CLI。wrapper 从自身路径定位：
 
 ```text
 <store>/nodejs-slim26/bin/node

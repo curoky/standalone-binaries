@@ -1,6 +1,6 @@
 ---
 name: "regress-patched-package-to-upstream"
-description: "定期 review 本仓库中被 patch 或被 pin 老版本的包，把「临时的编译修复」尽可能切回 unstable channel 的上游包，去掉本地 patch/老版本 pin，改在 manifests/default.nix 里维护。当 review/更新 packages/ 或 manifests/ 条目、bump nixpkgs、或审计本地 patch/版本 pin 是否仍必要时调用。"
+description: "定期 review 本仓库中被 patch 或被 pin 老版本的包，把「临时的编译修复」尽可能切回 unstable channel 的上游包，去掉本地 patch/老版本 pin，改在 packages/upstream.nix 里维护。当 review/更新 packages/ 条目、bump nixpkgs、或审计本地 patch/版本 pin 是否仍必要时调用。"
 ---
 
 # 回归 patched / pinned 包到上游
@@ -16,20 +16,20 @@ workaround；这个在 stock 构建重新可用时**去掉**它。
 
 本 skill 覆盖三种「偏离 unstable 上游」的情况，判定与回归方式不同：
 
-### A. 本地 patch 包（`packages/<pkg>/`）
+### A. 本地 patch 包（`packages/<pkg>/` 或 `packages/regression/<pkg>/`）
 
 `packages/` 下的本地 derivation 只应因两种原因存在：
 
 - **Workaround（regression 候选）**——绕过一个 `nixpkgs`（通常是 `pkgsStatic.<x>`）
   的构建/链接失败或 portability 问题。这类是临时的编译修复，上游修好后就该切回。
-  例如 `packages/diffutils/default.nix` 只是 `doCheck = false` 关掉一个失败的
+  例如 `packages/regression/diffutils/default.nix` 只是 `doCheck = false` 关掉一个失败的
   check，属于此类。
 - **Packaging decision（不是候选）**——刻意的 repackaging，改变了「这个包是什么/如何被消费」。
-  例如 `packages/cloc/default.nix` 把 `cloc` rename 成 `_cloc` 并放一个调用同级
+  例如 `packages/perlPackages/cloc.nix` 把 `cloc` rename 成 `_cloc` 并放一个调用同级
   `perl` 的 wrapper、vendor 它的 Perl 依赖——
   这种 **wrapper 类的包不需要切回上游**，无论上游怎么修都不会消失。
 
-### B. 被 pin 老版本的 manifest 条目（`manifests/default.nix`）
+### B. 被 pin 老版本的 manifest 条目（`packages/upstream.nix`）
 
 manifest 里任何写了非 `unstable` `version` 的条目（无论包级还是 per-platform key），
 默认都按临时 pin 审计，但先通过附近注释和 git history 确认原因。例如：
@@ -93,7 +93,7 @@ shellcheck = {
   rg '^\| .+ \| (✅|🟡)' docs/regression/*.md
   ```
 
-- 不在批量执行时重新扫描 `packages/` 或 `manifests/default.nix` 猜测候选。仓库扫描只用于维护
+- 不在批量执行时重新扫描 `packages/` 或 `packages/upstream.nix` 猜测候选。仓库扫描只用于维护
   `docs/regression/`、核对队列完整性，或用户明确要求全量审计时。
 - 每次只消费一行。先读包、定制、回归、原因与保留边界、回归判据、commit 和来源，再读取最终
   derivation 的 Nix 注释或公共组件说明。表格只提供简短索引，详细原因与当前修正以实现旁注释为准；
@@ -120,9 +120,10 @@ shellcheck = {
      表格陈旧时先修正表格；索引文件只保留分组标题和接线，不补写包级原因。
 
 2. **搞清 patch/pin 为何存在。**
-   - A 类：读本地 `packages/<pkg>/*.nix` 及其注释。先用上面「regression 候选？」分类——
+   - A 类：按回归表的「来源」读取本地 package Nix 文件及其注释。先用上面
+     「regression 候选？」分类——
      若是刻意 repackaging（wrapper、rename 二进制、bundle sibling 依赖，如
-     `packages/cloc`），**停手**，不可回归。否则注释几乎总会点名确切的失败
+     `packages/perlPackages/cloc.nix`），**停手**，不可回归。否则注释几乎总会点名确切的失败
      （如 "darwin `pkgsStatic.perl` fails at `mktables`"、"`liboapv` ships only a `.dylib`"、
      或 diffutils 的 check 失败）。那个失败就是你的 regression test。
    - B 类：找出这个包/平台当初为何被 pin 到老 `version`（看注释或 git 历史）。它的
@@ -152,16 +153,14 @@ shellcheck = {
      **既可构建又 portable** 时才回归。
 
 5. **执行回归**（验证通过后）：
-   - **A 类，整包可用上游：** **删除** `packages/<pkg>/`，从
-     `packages/local.nix` 的
-     `common`/`linux`/`darwin` 集合里移除它的 `callPackage ./<pkg>` 行，然后在
-     `manifests/default.nix`
+   - **A 类，整包可用上游：** **删除**对应的本地 derivation，从
+     `packages/default.nix` 移除它的 `callPackage` 接线，然后在 `packages/upstream.nix`
      里加/调条目（`isStatic = true`，正确的 `version`（省略 => unstable）/`platforms`/`output`/`alias`）。
    - **A 类，只有一个平台修好：** 只删那个平台的本地文件（如删 `darwin.nix`、留 `default.nix`），
      把该平台切到 manifest/上游；仍需 patch 的平台保留。
    - **A 类，partial regression：** 若 patch 只*部分*过时（如 feature-reduction override 里
      某个被禁的特性已能用），把 override 缩到仍必需的最小集，而不是删整个包。
-   - **B 类，去掉版本 pin：** 在 `manifests/default.nix` 里删掉那条 `version = "..."`（回到 unstable）。
+   - **B 类，去掉版本 pin：** 在 `packages/upstream.nix` 里删掉那条 `version = "..."`（回到 unstable）。
      若这个 pin 只在某个 per-platform key 下、且去掉后该 key 变空，就把整个 per-platform key
      也删掉；若删掉后整个包条目变成 `{ }`，保留 `<pkg> = { };` 即可。
    - **C 类，删除公共特例：** 只删除已验证过时的 matcher、helper、调用和专属测试；
@@ -169,7 +168,7 @@ shellcheck = {
      按各自行的判据处理，不因公共特例移除而连带删除。
 
 6. **清理你的改动产生的 orphan：** 不再被用到的 patch 文件、wrapper 脚本、
-   `packages/<pkg>/` 下的 vendor 配置、以及失效的 `callPackage` wiring。
+   本地 package 下的 vendor 配置、以及失效的 `callPackage` wiring。
    不要删与本次改动无关的既有代码。
 
 7. **重建受影响包的最终 standalone 产物**，重跑 step 4 的验证，确认回归后的构建仍 portable。

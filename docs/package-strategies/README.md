@@ -1,6 +1,6 @@
 # 包构建策略
 
-默认路径是在 `manifests/default.nix` 选择 unstable `pkgsStatic`，再由
+默认路径是在 `packages/upstream.nix` 选择 unstable `pkgsStatic`，再由
 `cmd/artifact/` 完成 assembly、校验和归档。专题文档只解释不能从代码表面看出的
 设计约束；具体包清单和回归状态分别以实现和[回归清单](../regression/AGENTS.md)为准。
 
@@ -30,9 +30,9 @@ wrapper 从自身路径求出共同 `store/` 目录，再显式执行同级 runt
 
 ### 平台拆分
 
-平台构建策略明显不同时，在 `packages/local/linux/` 和
-`packages/local/darwin.nix` 接入独立 derivation，不在单个文件堆叠条件。
-`packages/local/linux/` 再按架构拆成 `common.nix` 与 `x86_64.nix` / `aarch64.nix`。
+平台构建策略明显不同时，在对应 package 目录保存独立 derivation，例如
+`linux.nix` 与 `darwin.nix`，再由 `packages/default.nix` 按目标平台选择，不在单个
+derivation 文件堆叠条件。
 
 ### 状态管理
 

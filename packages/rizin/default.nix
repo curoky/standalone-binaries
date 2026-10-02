@@ -49,8 +49,8 @@
 }:
 
 (rizin.override {
-  libewf = callPackage ../libewf { };
-  tree-sitter = callPackage ../tree-sitter { };
+  libewf = callPackage ../regression/libewf { };
+  tree-sitter = callPackage ../regression/tree-sitter { };
   python3 = python3.override {
     packageOverrides = _: prev: {
       pyyaml = prev.pyyaml.overrideAttrs { doInstallCheck = false; };

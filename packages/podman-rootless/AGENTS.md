@@ -15,7 +15,8 @@
   wrapper。
 - 默认 rootless 网络是 pasta，`conf/networks` 初始为空并持久化。不要继承 rootful bridge，
   也不要增加 fuse-overlayfs fallback。
-- wrapper 只覆盖 rootful 与 rootless 的真实差异。共享策略应回到 `packages/podman/conf`，
+- wrapper 只覆盖 rootful 与 rootless 的真实差异。共享策略应回到
+  `packages/podman/conf`，
   避免维护第二份配置。
 
 ## Validation

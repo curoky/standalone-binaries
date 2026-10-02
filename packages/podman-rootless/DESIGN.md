@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD013 -->
+
 # Rootless Podman Deployment Design
 
 ## Installation

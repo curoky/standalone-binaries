@@ -1,7 +1,7 @@
 # Artifact Agent Guide
 
-`cmd/artifact/` 是所有包共享的后处理与归档工具，由
-`lib/make-artifacts.nix` 调用。全局产物约束见根
+`cmd/artifact/` 是所有包共享的后处理与归档工具，`package.nix` 构建工具本身，
+`lib/make-artifacts.nix` 调用构建结果。全局产物约束见根
 [`AGENTS.md`](../../AGENTS.md)；本文件定义该组件的行为边界。
 
 ## 输入与输出

@@ -1,4 +1,4 @@
-# manifests/default.nix
+# packages/upstream.nix
 #
 # Single declarative manifest of upstream nixpkgs packages.
 #
@@ -153,12 +153,7 @@
   fd = { };
   git-absorb = { };
   mcfly = { };
-  miniserve = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
-  };
+  miniserve = { };
   pnpm = { };
   procs = { };
   ripgrep = { };

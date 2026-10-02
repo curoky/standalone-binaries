@@ -43,9 +43,9 @@ sibling runtime、资源打包、产品行为和多版本发布也要进入总�
 
 ## 1. 决定平台拆分
 
-一个包通常各平台需要不同处理。经 `manifests/default.nix` 的 per-platform key、或经
-`packages/local.nix`（`linux` / `darwin` 集合）接好平台特定的 derivation。同一份构建
-到处都能用时留一个共享文件；不行时拆成 `default.nix`（Linux）+ `darwin.nix`。
+一个包通常各平台需要不同处理。经 `packages/upstream.nix` 的 per-platform key、或经
+`packages/default.nix` 接好平台特定的 derivation。同一份构建到处都能用时留一个共享
+文件；不行时在对应 package 目录拆成 `linux.nix` 与 `darwin.nix`。
 
 ## 2. 判断是否只有文本
 
@@ -55,8 +55,8 @@ sibling runtime、资源打包、产品行为和多版本发布也要进入总�
 - 确保 `normalize.sh` 能处理它（shebang 改写、剥 `/nix` path 片段）。
 - 若是需要 runtime 的脚本（perl/python/node），用 **sibling-wrapper** 模式：把 `bin/tool`
   rename 成 `bin/_tool`，放一个调用同级静态 runtime sibling（`$store/perl/bin/perl`、
-  `$store/python314/...`、`$store/nodejs-slim26/bin/node`）的 wrapper。见 `packages/exiftool`、
-  `packages/cloc`。
+  `$store/python314/...`、`$store/nodejs-slim26/bin/node`）的 wrapper。见
+  `packages/perlPackages/exiftool/`、`packages/perlPackages/cloc.nix`。
 
 Darwin 当前不发布 Python runtime，已有 Python wrapper 使用宿主 `python3`。这是根
 `AGENTS.md` 记录的现状缺口，不是新工具应复制的默认模式。
@@ -68,8 +68,9 @@ Darwin 当前不发布 Python runtime，已有 Python wrapper 使用宿主 `pyth
 
 1. **manifest 默认配置。** 直接从 unstable `pkgsStatic` 构建；能通过就停止。
 2. **Selective static override**——仅当 `pkgsStatic.<x>` 构建/链接失败时。从更轻的 base 构建、
-   经 `.override { <lib> = pkgsStatic.<lib>; }` 或把某模块构建指向 `pkgsStatic.<lib>` lib 目录
-   （只 ship `.a`）只注入所需静态归档。见 `packages/exiftool`（XS 压缩模块重指向
+   经 `.override { <lib> = pkgsStatic.<lib>; }` 或把某模块构建指向
+   `pkgsStatic.<lib>` lib 目录
+   （只 ship `.a`）只注入所需静态归档。见 `packages/perlPackages/exiftool/`（XS 压缩模块重指向
    `pkgsStatic.{zlib,bzip2,xz,brotli}`）。
 3. **Feature reduction**——仅当静态构建卡在可选特性上：从 `pkgsStatic.<tool>` 起步、
    `.override` 关掉惹事特性，保留每个 `.a` 能干净链接的库。模式见 `packages/ffmpeg/darwin.nix`
@@ -102,14 +103,17 @@ darwin 上完全静态不可能（没有静态 libSystem/libc）。目标：**�
    （上游缓存里已预编译、无需本地编 toolchain），把它每个非系统的动态依赖换成对应静态归档——
    即 `pkgs.<x>.override { <dep> = pkgsStatic.<dep>; }`（或把构建指向只 ship `.a` 的
    `pkgsStatic.<dep>` lib 目录）——使每个 nix 依赖静态链接、只有 `/usr/lib`/framework 库保持
-   动态。这不动 Mach-O load command 就达成最终目标。见 `packages/perl/darwin.nix`（native perl +
-   `libxcrypt = libxcryptStatic`）和 `packages/wget/darwin.nix`（逐依赖静态替换变体）。
+   动态。这不动 Mach-O load command 就达成最终目标。见
+   `packages/perlPackages/perl/darwin.nix`（native perl +
+   `libxcrypt = libxcryptStatic`）和 `packages/wget/darwin.nix`
+   （逐依赖静态替换变体）。
 
 3. **若 step 2 仍留下你无法静态替换的 `/nix/store` dylib：停手，先与用户确认。** 只有在显式
    确认后，才用 `install_name_tool` 路线，在 `postInstall` 里把残留的 `/nix/store` Mach-O
    install name 改写成 `@loader_path` 相对路径（`normalize.sh` 只删除指向 `/nix` 的
    `LC_RPATH`，**不**改写 install name 或 dylib 依赖的 load command）。
-   见 `packages/perl/darwin.nix` 里 repoint `libperl.dylib` 的 `install_name_tool -id`/`-change` 循环。
+   见 `packages/perlPackages/perl/darwin.nix` 里 repoint `libperl.dylib` 的
+   `install_name_tool -id`/`-change` 循环。
 
 4. **把 dylib 复制进包**（dylib-bundle）——绝对最后手段，仅当上述任何路线都无法静态链接某依赖时。
    **这需要用户显式确认后才能实施。** 不要静默做。到这一步时，停手并向用户询问（附上具体依赖及
@@ -126,7 +130,7 @@ darwin 路线，必须在 `postInstall` 里：
 - `install_name_tool -change "<old /nix or abs id>" "@loader_path/..." <consumer>`
 - 用 `otool -D` 读当前 id，用 `otool -L`/`file` 枚举。
 
-完整循环见 `packages/perl/darwin.nix`。
+完整循环见 `packages/perlPackages/perl/darwin.nix`。
 
 ## 5. 验证
 

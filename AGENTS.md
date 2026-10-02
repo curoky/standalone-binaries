@@ -38,8 +38,8 @@ macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`
 
 ## 包集合
 
-支持的平台是 `x86_64-linux`、`aarch64-linux` 和 `aarch64-darwin`。`flake.nix`
-为每个 nixpkgs input 创建普通和静态 package set：
+支持的平台是 `x86_64-linux`、`aarch64-linux` 和 `aarch64-darwin`。
+`lib/make-system-outputs.nix` 为每个 nixpkgs input 创建普通和静态 package set：
 
 - Linux 使用 arch 对应的 musl cross static set：`x86_64-linux` 用
   `pkgsCross.musl64.pkgsStatic`，`aarch64-linux` 用
@@ -47,10 +47,13 @@ macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`
   build platform 仍可复用 glibc Rust/LLVM 工具链。
 - Darwin 使用原生 `pkgsStatic`。
 
-包集合按 manifest、common local、platform local 的顺序合并，后者覆盖前者。
-`manifests/default.nix` 选择可直接使用的 nixpkgs 包，完整 schema 见该文件及
-`lib/make-manifest-packages.nix`。`packages/local.nix` 显式聚合本地包，不自动扫描
-目录。
+包集合由 `packages/upstream.nix` 中可直接使用的 nixpkgs 包与
+`packages/default.nix` 中的本地包合并，后者覆盖前者。Manifest 的完整 schema 见
+`packages/upstream.nix` 及 `lib/make-manifest-packages.nix`。本地 package index 显式
+接线，不自动扫描目录。共享编译技术栈且问题会一起回归，或运行时/产品强绑定的 package
+family 可共用子目录，但不增加子级 index。经确认有较大希望整项回到 upstream 的纯
+workaround 放在 `packages/regression/<name>/`；该目录只是回归队列的物理归档，其中每个
+package 仍独立接线、独立回归，不是共享实现的 family。
 
 ## 包接入
 
@@ -61,7 +64,7 @@ macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`
 - Manifest 不填写默认字段；包清单和 schema 以实现为准。
 - Manifest schema 在 eval 时 fail-closed：未知字段、平台、nixpkgs version、空或重复
   output 和错误字段类型必须直接报错。
-- `manifests/default.nix` 与 `packages/local/**` 只负责选择和接线；可以保留生态、平台等
+- `packages/upstream.nix` 与 `packages/default.nix` 只负责选择和接线；可以保留生态、平台等
   分组标题，不记录包级定制原因。每个本地包必须在最终 derivation 的 Nix 文件头部按项
   说明 stock 行为、具体失败和对应修正，并写清可删除边界；混合包另列必须保留的结构性
   packaging。不要省略 root cause，也不要保留验证流水、旧实现或 Git 历史。
@@ -96,9 +99,10 @@ cache segment 和 retention 规则见[发布与 cache 模型](docs/release-model
 
 | 需求 | 修改位置 |
 | --- | --- |
-| 接入可直接使用的 nixpkgs 包 | `manifests/default.nix` |
-| 添加 patch、wrapper 或平台拆分 | `packages/<name>/`、`packages/local/` |
-| 登记或回归本地定制 | `docs/regression/`、manifest、`packages/local/` |
+| 接入可直接使用的 nixpkgs 包 | `packages/upstream.nix` |
+| 添加 patch、wrapper 或平台拆分 | `packages/<name>/`、`packages/default.nix` |
+| 处理高概率整项回归的本地包 | `packages/regression/<name>/`、`docs/regression/` |
+| 登记/回归本地定制 | `docs/regression/`、package indexes |
 | 修改产物后处理与校验 | `cmd/artifact/AGENTS.md`、`lib/make-artifacts.nix` |
 | 修改包选择或 flake outputs | `lib/`、`flake.nix` |
 | 探测某包在某 channel 无 patch 能否构建 | `nix build .#probe.<system>.<channel>.<pkg>` |
@@ -138,14 +142,14 @@ build 成功判断；补充 `--version` 或代表性 smoke test。
 patch**，用于探测某个包在某 channel 上不打 patch 能否编译过、能否打包。
 
 - `<channel>`：`unstable`、`2605`、`2511`、`2505`、`2411`、`2405`、`2211`（见
-  `flake.nix` 的 `probeChannels`）。
+  `flake.nix` 的 `channels`）。
 - `<pkg>`：任意 nixpkgs 顶层 attr 名；带点的嵌套 attr（如
   `llvmPackages_18.clang-unwrapped`）因 flake attr 路径限制不支持。
 - 构建变体与正式流程一致：Linux musl cross static，Darwin 原生 static。
 - Probe 仍会应用 artifact 公共 workaround；评估公共 patch 能否删除时，必须按
   [回归清单](docs/regression/AGENTS.md)的专属步骤绕过该 patch，不能只凭 probe 成功。
 - 探针是探索入口，不进入包集合、发布或回归清单；非包或不可解析的 attr 在构建时
-  自然报错属预期。定型的包仍须回到 `manifests/default.nix` 或 `packages/`。
+  自然报错属预期。定型的包仍须回到 `packages/upstream.nix` 或 `packages/`。
 
 ## 文档规则
 
