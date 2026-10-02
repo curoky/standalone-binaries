@@ -12,7 +12,7 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | ---------------------------- | -------------------- | -- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------ | ---------------------------------------------------------------------------------- |
 | `7zz` | 📌 `gcc15-pin` | ✅ | 与 Linux 共用经全平台验证的 GCC 15 nixpkgs revision；当前 pin 的直接原因是 Linux 静态链接失败 | Darwin 用 unstable 构建且只动态链接系统库 | — | `manifests/default.nix`, `flake.nix` |
 | `artifact-darwin-cgo-resolv` | 🩹 公共 artifact patch | ✅ | 修正 Go/CGO 的 Nix resolver load command | 按 artifact 文档绕过修正后，全部 consumer 无需替换 | — | `cmd/artifact/binary.go`, `cmd/artifact/binary_test.go`, `lib/make-artifacts.nix` |
-| `aria2` | 📌 `24.11` | ❌ | unstable 静态 darwin 缺 iconv 符号链接失败 | 已确认必要，两平台都无可回归空间 | 624af665418d | `manifests/default.nix` |
+| `aria2` | 📌 `24.11` + 📦 `bin` output | ❌ | unstable 静态 darwin 缺 iconv 符号链接失败；CLI 位于独立 `bin` output | pin 已确认必要；多 output 选择是发布边界 | 624af665418d | `manifests/default.nix` |
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
 | `cloc` | 📦 本地 | 🟡 | sibling Perl 与模块 bundling；禁用 install check | 只恢复可运行的 install check | — | `packages/cloc/` |
@@ -54,5 +54,5 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |
 | `wget` | 🩹 + 📦 本地 | 🟡 | native Perl build tool + CA wrapper | 恢复 checks/build tool 后保留 CA packaging | — | `packages/wget/` |
-| `zsh` | 🩹 + 📦 本地 | 🟡 | 静态 module patches + FPATH wrapper/zshenv packaging | 逐项删编译 patch，保留 relocation packaging | — | `packages/zsh/` |
+| `zsh` | 🩹 + 📦 本地 | 🟡 | 静态 module patches + FPATH wrapper + 相对 module path/zshenv packaging | 逐项删编译 patch，保留 relocation packaging | — | `packages/zsh/` |
 | `zsh-plugins` | 📦 本地 | ❌ | 聚合 oh-my-zsh、plugins，并预生成 atuin/starship plugin | plugin bundle 与预生成 shell integration 是产品 | — | `packages/zsh-plugins/` |

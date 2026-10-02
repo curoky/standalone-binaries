@@ -3,11 +3,11 @@
 script_path="$(readlink -f "$0")"
 root=$(cd "$(dirname "$script_path")" && pwd)/..
 
-export PERL5LIB=$PERL5LIB:$root/share/automake-1.16
-export AUTOMAKE_LIBDIR=$root/share/automake-1.16
+export PERL5LIB=$PERL5LIB:$root/share/automake-@automake_version@
+export AUTOMAKE_LIBDIR=$root/share/automake-@automake_version@
 export ACLOCAL_PATH=$root/share/aclocal:$root/../libtool/share/aclocal
 
 exec -a "$0" "$root/bin/_aclocal" \
-  --automake-acdir=$root/share/aclocal-1.16 \
-  --system-acdir=$root/share/aclocal \
+  --automake-acdir="$root/share/aclocal-@automake_version@" \
+  --system-acdir="$root/share/aclocal" \
   "$@"

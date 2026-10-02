@@ -8,9 +8,11 @@
 #    at `/etc/zsh/zshenv`, the host-controlled system configuration path.
 # 3. Shell functions live inside the moved package. The wrapper derives FPATH
 #    from its own location instead of retaining an output path.
+# 4. Darwin keeps `link=either` modules as bundles under lib/zsh. Compile the
+#    default module_path relative to the executable so it survives relocation.
 #
 # Regress only the module change when stock static Zsh embeds them; retain the
-# zshenv and FPATH packaging policy.
+# zshenv, FPATH and module_path packaging policy.
 {
   lib,
   stdenv,
@@ -36,11 +38,19 @@ zsh.overrideAttrs (oldAttrs: rec {
     (lib.filter (f: !(lib.hasPrefix "--enable-zshenv=" f)) (oldAttrs.configureFlags or [ ]))
     ++ [ "--enable-zshenv=/etc/zsh/zshenv" ];
 
-  postPatch = (oldAttrs.postPatch or "") + ''
-    echo "link=either" >> Src/Modules/system.mdd
-    echo "link=either" >> Src/Modules/regex.mdd
-    echo "link=either" >> Src/Modules/mathfunc.mdd
-  '';
+  postPatch =
+    (oldAttrs.postPatch or "")
+    + ''
+      echo "link=either" >> Src/Modules/system.mdd
+      echo "link=either" >> Src/Modules/regex.mdd
+      echo "link=either" >> Src/Modules/mathfunc.mdd
+    ''
+    + lib.optionalString stdenv.hostPlatform.isDarwin ''
+      substituteInPlace Src/zsh.mdd \
+        --replace-fail \
+          "@echo '#define MODULE_DIR \"'\$(MODDIR)'\"' > zshpaths.h.tmp" \
+          "@echo '#define MODULE_DIR \"@executable_path/../lib/zsh/${zsh.version}\"' > zshpaths.h.tmp"
+    '';
 
   outputs = [
     "out"

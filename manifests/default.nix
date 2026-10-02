@@ -679,6 +679,7 @@
   aria2 = {
     "aarch64-darwin" = {
       version = "24.11";
+      output = [ "bin" ];
     };
   };
   shellcheck = {

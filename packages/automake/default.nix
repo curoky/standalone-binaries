@@ -18,6 +18,7 @@
 
 let
   automake_script = ./scripts;
+  automake_version = lib.versions.majorMinor automake.version;
 in
 
 automake.overrideAttrs (oldAttrs: {
@@ -25,7 +26,10 @@ automake.overrideAttrs (oldAttrs: {
     mv $out/bin/automake $out/bin/_automake
     mv $out/bin/aclocal $out/bin/_aclocal
 
-    cp -r ${automake_script}/* $out/bin
+    substitute ${automake_script}/automake $out/bin/automake \
+      --replace-fail '@automake_version@' '${automake_version}'
+    substitute ${automake_script}/aclocal $out/bin/aclocal \
+      --replace-fail '@automake_version@' '${automake_version}'
     chmod +x $out/bin/automake
     chmod +x $out/bin/aclocal
   '';

@@ -37,6 +37,7 @@ let
     store=$root/..
 
     if [[ "$(uname)" == "Darwin" ]]; then
+      export PYTHONPATH=$root/lib/python3.14/site-packages
       exec -a "$0" python3 "$root/bin/_netron_main.py" "$@"
     else
       export PYTHONHOME=$store/python314
