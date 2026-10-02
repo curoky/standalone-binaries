@@ -1,31 +1,27 @@
 # radare2 — musl-static dependency and Meson fixes.
 #
 # Why local:
-#   1. It pulls in libewf, whose configure aborts on OpenSSL AC_RUN_IFELSE
-#      probes it cannot run when cross compiling. Swap in the local libewf that
-#      caches the failing probes.
+#   Its bundled sdb subproject declares its library with meson
+#   `both_libraries()`, so a libsdb .so is always built even though the static
+#   build only link_wholes the static archive. Linking that .so under pure
+#   musl-static fails with "R_X86_64_32 against hidden symbol __TMC_END__".
+#   Turn sdb's library into a plain `library()` (respects
+#   default_library=static → archive only) and point its remaining
+#   `get_shared_lib()` reference at the static lib so no .so is produced.
+#   radare2's meson also grabs the shared half via `get_shared_lib()`; redirect
+#   that to the static archive it already link_wholes.
 #
-#   2. Its bundled sdb subproject declares its library with meson
-#      `both_libraries()`, so a libsdb .so is always built even though the static
-#      build only link_wholes the static archive. Linking that .so under pure
-#      musl-static fails with "R_X86_64_32 against hidden symbol __TMC_END__".
-#      Turn sdb's library into a plain `library()` (respects
-#      default_library=static → archive only) and point its remaining
-#      `get_shared_lib()` reference at the static lib so no .so is produced.
-#      radare2's meson also grabs the shared half via `get_shared_lib()`; redirect
-#      that to the static archive it already link_wholes.
-#
-# Remove each fix when the corresponding stock dependency or cross-build path
-# succeeds under the repository's static toolchain.
+# Remove this fix when the stock package succeeds under the repository's static
+# toolchain.
 {
   lib,
   stdenv,
-  callPackage,
+  libewf,
   radare2,
 }:
 
 (radare2.override {
-  libewf = callPackage ../libewf { };
+  inherit libewf;
 }).overrideAttrs
   (old: {
     postUnpack =

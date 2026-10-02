@@ -50,7 +50,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `go` | 🩹 + 📦 本地 | 🟡 | musl-static compiler；在 bootstrap 生成官方默认配置，对 race 强制外链，移除测试专用 dynamic ELF fixtures | 上游 static Go 默认值与 race link mode 对齐后删 patch；SDK packaging 与严格 ELF 门禁保留 | b4fd65b198c5 | `packages/go/` |
 | `gocryptfs` | 🩹 本地 | 🟡 | 清空 propagatedBuildInputs + 设 PKG_CONFIG_PATH | 上游 pcsclite doc 可构建、cross cgo 自动定位 openssl 后删 | b4fd65b198c5 | `packages/gocryptfs/` |
 | `gpgme` | 🩹 本地 | 🟡 | `gnupgMinimal` + `doCheck=false`；`--disable-gpg-test` 已删除 | 恢复完整 GnuPG 或 checks，保持 musl-static | b4fd65b198c5 | `packages/gpgme/` |
-| `libewf` | 🩹 本地 | ✅ | radare2/rizin 依赖；补 cross OpenSSL 探针 cache | 上游同 arch cross 不依赖运行探针后删 override | b4fd65b198c5 | `packages/regression/libewf/` |
+| `libewf` | 📌 `master` | ✅ | radare2/rizin 依赖；上游修复已合并但尚未进入 nixos-unstable，临时使用 master channel | nixos-unstable 包含该修复后去 pin | b4fd65b198c5 | `flake.nix`, `packages/default.nix` |
 | `libtool` | 📦 本地 | ❌ | 改写 `libtoolize` 的 baked data paths | 相对资源定位必须保留 | — | `packages/libtool/` |
 | `lua5_5` | 🩹 本地 | ✅ | 恢复 `/usr/local` module paths，避免嵌 store 路径 | stock 默认 module paths 无 store 路径 | b4fd65b198c5 | `packages/lua/` |
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |
@@ -86,9 +86,9 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `python313` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/pythonPackages/python/` |
 | `python314` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/pythonPackages/python/` |
 | `python315` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/pythonPackages/python/` |
-| `radare2` | 🩹 本地 | ✅ | libewf override + sdb `both_libraries`→`library` | 上游 sdb 静态构建不产 `.so` 后删 override | b4fd65b198c5 | `packages/regression/radare2/` |
+| `radare2` | 🩹 本地 | ✅ | sdb `both_libraries`→`library` | 上游 sdb 静态构建不产 `.so` 后删 override | b4fd65b198c5 | `packages/regression/radare2/` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
-| `rizin` | 🩹 本地 | ✅ | libewf/tree-sitter 与 cross-static 构建修正 | 上游补齐 native cc/wrap/静态构建后逐项删 | b4fd65b198c5 | `packages/rizin/` |
+| `rizin` | 🩹 本地 | ✅ | tree-sitter 与 cross-static 构建修正 | 上游补齐 native cc/wrap/静态构建后逐项删 | b4fd65b198c5 | `packages/rizin/` |
 | `runc` | 📦 native selection | ❌ | Linux 容器运行时，无 macOS 构建目标 | 无 macOS 端可回归空间（平台固有） | — | `packages/upstream.nix` |
 | `s6` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch | 上游修 s6 stack 后去 pin；输出无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6.nix`, `flake.nix` |
 | `s6-linux-init` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch + symlinkJoin | 上游修 s6 stack 后去 pin；产物与生成脚本无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6-linux-init.nix`, `flake.nix` |

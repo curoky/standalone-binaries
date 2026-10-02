@@ -55,6 +55,7 @@ let
   upstreamPackages = makeManifestPackages system (import ../packages/upstream.nix);
   localPackages = import ../packages {
     inherit system pkgs pkgsStatic;
+    masterPkgsStatic = envs.master.pkgsStatic;
     s6PkgsStatic = envs."s6-pin".pkgsStatic;
   };
   sourcePackages = upstreamPackages // localPackages;

@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
     nixpkgs-gcc15-2026-09-07.url = "github:NixOS/nixpkgs/dc5d91f840324650bac8c379428c7037a416959a";
     nixpkgs-s6-2026-08-23.url = "github:NixOS/nixpkgs/56c02bc00adcf003215cc4bd996d6efaf4cff188";
     nixpkgs-2605.url = "github:NixOS/nixpkgs/nixos-26.05";
@@ -32,6 +33,7 @@
         "22.11" = inputs.nixpkgs-2211;
       };
       pins = {
+        master = inputs.nixpkgs-master;
         "gcc15-pin" = inputs.nixpkgs-gcc15-2026-09-07;
         "s6-pin" = inputs.nixpkgs-s6-2026-08-23;
       };
