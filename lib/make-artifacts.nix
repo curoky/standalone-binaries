@@ -1,11 +1,13 @@
 {
   pkgs,
   artifactTool,
+  validateNativeBuildInputs,
 }:
 name: drv:
 let
   isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
   allowDynamicElf = name == "nsight-systems";
+  validatedDrv = validateNativeBuildInputs drv;
 in
 pkgs.runCommand "${name}-standalone"
   {
@@ -24,7 +26,7 @@ pkgs.runCommand "${name}-standalone"
   }
   ''
     artifact \
-      --source ${drv} \
+      --source ${validatedDrv} \
       --output "$out" \
       --archive "$archive" \
       --name ${pkgs.lib.escapeShellArg name} \

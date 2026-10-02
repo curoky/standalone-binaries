@@ -1,8 +1,8 @@
 # Node.js 24 — versioned musl-static runtime.
 #
 # Why local:
-# 1. Gyp imports ctypes, which the static target Python cannot load. Configure
-#    with build-platform Python instead.
+# 1. Gyp imports ctypes, which the static target Python cannot load. The shared
+#    static package set therefore supplies build-platform Python.
 # 2. Ada's tests expect fuzzer executables that its static build does not
 #    produce, so disable only that dependency's checks.
 # 3. Static stdenv appends autotools flags that Node's Python configure script
@@ -19,7 +19,6 @@
 {
   lib,
   pkgsStatic,
-  python3,
 }:
 
 let
@@ -29,7 +28,7 @@ let
     }
   );
 
-  patchedNode = (pkgsStaticNode.nodejs-slim_24.override { python3 = python3; }).overrideAttrs (old: {
+  patchedNode = pkgsStaticNode.nodejs-slim_24.overrideAttrs (old: {
     configureFlags = builtins.filter (
       f:
       f != "--enable-static"

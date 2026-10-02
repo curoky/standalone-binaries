@@ -49,19 +49,15 @@ let
     cmake_3_27_9 = pkgsStatic.callPackage ./cmake/3_27_9 { };
     cmake_4_1_2 = pkgsStatic.callPackage ./cmake/4_1_2 { };
     diffutils = pkgsStatic.callPackage ./regression/diffutils { };
-    ffmpeg = pkgsStatic.callPackage ./ffmpeg/linux.nix {
-      nativePython3 = pkgs.python3;
-    };
+    ffmpeg = pkgsStatic.callPackage ./ffmpeg/linux.nix { };
     fuse = pkgsStatic.callPackage ./fuse { };
-    graphviz = pkgsStatic.callPackage ./graphviz {
-      inherit (pkgs) python3;
-    };
+    graphviz = pkgsStatic.callPackage ./graphviz { };
     gnutar = pkgsStatic.callPackage ./regression/gnutar { };
     go = pkgsStatic.callPackage ./go { go = pkgsStatic.go_latest; };
     gocryptfs = pkgsStatic.callPackage ./gocryptfs { };
     lua5_5 = pkgsStatic.callPackage ./lua { };
     openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
-    poppler = pkgsStatic.callPackage ./poppler { nativePython3 = pkgs.python3; };
+    poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql { };
     protobuf_3_9_2 = pkgsStatic.callPackage ./protobuf/3_9_2 { };
     radare2 = pkgsStatic.callPackage ./regression/radare2 { };
@@ -166,12 +162,8 @@ let
     podman6-rootless = pkgsStatic.callPackage ./podman-rootless { podman = podman6; };
 
     # Node.js runtime and sibling-runtime tools.
-    nodejs-slim24 = pkgsStatic.callPackage ./nodejsPackages/nodejs/24.nix {
-      inherit (pkgs) python3;
-    };
-    nodejs-slim26 = pkgsStatic.callPackage ./nodejsPackages/nodejs/26.nix {
-      inherit (pkgs) python3;
-    };
+    nodejs-slim24 = pkgsStatic.callPackage ./nodejsPackages/nodejs/24.nix { };
+    nodejs-slim26 = pkgsStatic.callPackage ./nodejsPackages/nodejs/26.nix { };
     prettier = pkgsStatic.callPackage ./nodejsPackages/prettier.nix {
       inherit nodejs-slim26;
       inherit (pkgs) prettier;
@@ -191,18 +183,16 @@ let
     # Partial-static C packages.
     ffmpeg = pkgsStatic.callPackage ./ffmpeg/darwin.nix { };
     krb5 = pkgsStatic.callPackage ./krb5/darwin.nix { };
-    poppler = pkgsStatic.callPackage ./poppler { nativePython3 = pkgs.python3; };
+    poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql/darwin.nix { };
     rsync = pkgsStatic.callPackage ./regression/rsync/darwin.nix {
-      inherit (pkgs) python3 libiconv;
+      inherit (pkgs) libiconv;
       nativeCC = pkgs.stdenv.cc;
     };
     smartmontools = pkgsStatic.callPackage ./smartmontools/darwin.nix {
       inherit (pkgs) autoreconfHook hostname;
     };
-    wget = pkgsStatic.callPackage ./wget/darwin-static.nix {
-      inherit (pkgs) perlPackages;
-    };
+    wget = pkgsStatic.callPackage ./wget/darwin-static.nix { };
 
     # Perl.
     perl = pkgs.callPackage ./perlPackages/perl/darwin.nix {

@@ -47,6 +47,12 @@ macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`
   build platform 仍可复用 glibc Rust/LLVM 工具链。
 - Darwin 使用原生 `pkgsStatic`。
 
+正式包集合在 raw `pkgsStatic` 上统一应用
+`packages/static-build-tools.nix`：只对明确仅在构建期执行解释器的 producer 注入当前 channel
+的 native 解释器，不改变 `pkgsStatic` 中解释器及其 package set 的 target 语义。Artifact
+求值会递归检查 native inputs 的 host platform 是否等于 consumer 的 build platform；probe
+保留 raw package set，既不应用公共修正，也不运行该门禁。
+
 包集合由 `packages/upstream.nix` 中可直接使用的 nixpkgs 包与
 `packages/default.nix` 中的本地包合并，后者覆盖前者。Manifest 的完整 schema 见
 `packages/upstream.nix` 及 `lib/make-manifest-packages.nix`。本地 package index 显式
@@ -148,6 +154,8 @@ patch**，用于探测某个包在某 channel 上不打 patch 能否编译过、
 - 构建变体与正式流程一致：Linux musl cross static，Darwin 原生 static。
 - Probe 仍会应用 artifact 公共 workaround；评估公共 patch 能否删除时，必须按
   [回归清单](docs/regression/AGENTS.md)的专属步骤绕过该 patch，不能只凭 probe 成功。
+- Probe 使用 raw `pkgsStatic`，不会应用 `packages/static-build-tools.nix` 的正式包公共
+  build-tool 修正或对应 native-input 门禁。
 - 探针是探索入口，不进入包集合、发布或回归清单；非包或不可解析的 attr 在构建时
   自然报错属预期。定型的包仍须回到 `packages/upstream.nix` 或 `packages/`。
 

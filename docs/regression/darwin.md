@@ -14,6 +14,7 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | `aria2` | 📌 `24.11` + 📦 `bin` output | ❌ | unstable 静态 darwin 缺 iconv 符号链接失败；CLI 位于独立 `bin` output | pin 已确认必要；多 output 选择是发布边界 | 624af665418d | `packages/upstream.nix` |
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
+| `build-tool-splicing` | 🩹 公共 package-set patch | ✅ | Graphite2/rsync 的 build-only Python 和 wget 的 build-only Perl 强制使用 native package set，并门禁错误平台的 native inputs | 各 upstream producer 正确选择 native interpreter 后逐项删除 override；门禁保留 | — | `packages/static-build-tools.nix`, `lib/validate-native-build-inputs.nix` |
 | `cloc` | 📦 本地 | 🟡 | sibling Perl 与模块 bundling；禁用 install check | 只恢复可运行的 install check | — | `packages/perlPackages/cloc.nix` |
 | `colima` | 📦 native selection | ✅ | Darwin native；Go 资源仍含 store 引用 | 资源路径 portable 后恢复默认；resolver 独立回归 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/normalize.go`, `cmd/artifact/binary.go` |
 | `curl` | 📦 本地 | ❌ | 内置 CA bundle 与相对路径 wrapper | 自包含证书定位是 packaging | — | `packages/curl/` |
@@ -43,13 +44,13 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | `rclone` | 📦 native selection | ✅ | Darwin native；保留三项 Go 资源 store 引用 | 资源路径 portable 后关闭；resolver 独立回归 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/binary.go`, `docs/package-strategies/go.md` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
 | `rizin` | ⏸️ 停用 darwin | ❌ | 产品不要求 macOS 支持；仅在 Linux 包集合接入 | 产品边界，不作为上游回归目标 | — | `packages/default.nix` |
-| `rsync` | 🩹 本地 | ✅ | 注入 native Python/check compiler + libiconv 指系统库 | stock 不再求值静态 Python、测试完整、不嵌 libiconv store 路径 | dc5d91f84032 | `packages/regression/rsync/`, `packages/default.nix`, `packages/upstream.nix` |
+| `rsync` | 🩹 本地 | ✅ | 注入 native check compiler + libiconv 指系统库 | stock 测试完整且不嵌 libiconv store 路径 | dc5d91f84032 | `packages/regression/rsync/`, `packages/default.nix`, `packages/upstream.nix` |
 | `shellcheck` | 📌 `25.11` | ❌ | unstable 静态 darwin GHC External interpreter terminated | 已确认必要，无可回归空间 | 624af665418d | `packages/upstream.nix` |
 | `smartmontools` | 🩹 本地 | 🟡 | 关外部 drive DB + native autoreconfHook/hostname（避 static Perl） | static Perl 修复后删 build-tool override；CLI 配置保留 | dc5d91f84032 | `packages/smartmontools/darwin.nix`, `packages/default.nix` |
 | `supercronic` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/binary.go` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |
-| `wget` | 🩹 + 📦 本地 | 🟡 | native Perl build tool + CA wrapper | 恢复 checks/build tool 后保留 CA packaging | — | `packages/wget/` |
+| `wget` | 🩹 + 📦 本地 | 🟡 | 公共 native Perl build tool override + CA wrapper | upstream 正确选择 native Perl 后删公共 override；保留 CA packaging | — | `packages/static-build-tools.nix`, `packages/wget/` |
 | `zsh` | 🩹 + 📦 本地 | 🟡 | 静态 module patches + FPATH wrapper + 相对 module path/zshenv packaging | 逐项删编译 patch，保留 relocation packaging | — | `packages/zsh/` |
 | `zsh-plugins` | 📦 本地 | ❌ | 聚合 oh-my-zsh、plugins，并预生成 atuin/starship plugin | plugin bundle 与预生成 shell integration 是产品 | — | `packages/zsh-plugins/` |

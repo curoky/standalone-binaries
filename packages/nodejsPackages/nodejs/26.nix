@@ -1,8 +1,8 @@
 # Node.js 26 — versioned musl-static runtime.
 #
 # Why local:
-# 1. Gyp imports ctypes, which the static target Python cannot load. Configure
-#    with build-platform Python instead.
+# 1. Gyp imports ctypes, which the static target Python cannot load. The shared
+#    static package set therefore supplies build-platform Python.
 # 2. Ada's tests expect fuzzer executables that its static build does not
 #    produce, so disable only that dependency's checks.
 # 3. LIEF forces Python bindings, reaching a pydantic-core cdylib that the
@@ -24,7 +24,6 @@
 {
   lib,
   pkgsStatic,
-  python3,
 }:
 
 let
@@ -74,7 +73,7 @@ let
     }
   );
 
-  patchedNode = (pkgsStaticNode.nodejs-slim_26.override { python3 = python3; }).overrideAttrs (old: {
+  patchedNode = pkgsStaticNode.nodejs-slim_26.overrideAttrs (old: {
     configureFlags = builtins.filter (
       f:
       f != "--enable-static"

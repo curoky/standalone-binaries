@@ -16,6 +16,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
 | `aardvark-dns` | 🩹 本地 | ✅ | musl 无 `close_range` wrapper，patch 改用 raw syscall | 上游改用 musl-safe close_range 后删 patch | b4fd65b198c5 | `packages/regression/aardvark-dns/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
+| `build-tool-splicing` | 🩹 公共 package-set patch | ✅ | Graphite2、Node 和 Rizin 的 build-only Python，以及 Rizin/Radare2 的 build-only Perl 强制使用 native package set，并门禁错误平台的 native inputs | 各 upstream producer 正确选择 native interpreter 后逐项删除 override；门禁保留 | — | `packages/static-build-tools.nix`, `lib/validate-native-build-inputs.nix` |
 | `busybox` | 🩹 + 📦 本地 | 🟡 | udhcpc 与配套脚本改为 sibling 相对定位 | 上游支持可搬运资源定位后删 patch；保留脚本 packaging | b4fd65b198c5 | `packages/busybox/` |
 | `catatonit` | 🩹 本地 | ✅ | 补 build-for-build binutils 让 installCheck 的 readelf 可用 | 上游把 binutils 加进 nativeBuildInputs 后恢复 | b4fd65b198c5 | `packages/regression/catatonit/` |
 | `clang-tools-18` | 📦 本地 | ❌ | 固定 LLVM 18，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
@@ -38,7 +39,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `exiftool` | 📦 本地 | ❌ | sibling Perl wrapper 与模块 bundling 使 install check 在构建沙箱中不可运行 | runtime packaging 与对应的 check 边界必须保留 | — | `packages/perlPackages/` |
 | `eza-ls` | 📦 本地 | ❌ | 自定义 `ls` 兼容层与 bundled eza | 独立产品行为，不是上游 bug | — | `packages/eza-ls/` |
 | `file` | 🩹 + 📦 本地 | 🟡 | version check 直指真实二进制；wrapper 相对定位 `magic.mgc` | 上游检查可兼容 wrapper 后删除检查修正；资源定位必须保留 | b4fd65b198c5 | `packages/file/` |
-| `ffmpeg` | 🩹 本地 | 🟡 | 裁剪 static-unsupported 依赖链、libbluray、LAME decoder、x265 multibit；Graphite2 改用 native Python；修正 SoXR/libssh/SVT-AV1/x265 静态产物；增大 musl 线程栈以容纳 MPEG-TS PAT parser | 逐 feature 恢复并去掉 build-tool/依赖 override；上游不再在线程栈放置超大 `struct Program` 后删除 stack-size；保持 musl-static、无 store 引用 | — | `packages/ffmpeg/linux.nix`, `packages/default.nix` |
+| `ffmpeg` | 🩹 本地 | 🟡 | 裁剪 static-unsupported 依赖链、libbluray、LAME decoder、x265 multibit；修正 SoXR/libssh/SVT-AV1/x265 静态产物；增大 musl 线程栈以容纳 MPEG-TS PAT parser | 逐 feature 恢复并去掉依赖 override；上游不再在线程栈放置超大 `struct Program` 后删除 stack-size；保持 musl-static、无 store 引用 | — | `packages/ffmpeg/linux.nix` |
 | `fuse` | 🩹 本地 | 🟡 | 去 shadow/完整 util-linux 依赖（explicit_bzero SIGABRT） | 上游 libbsd 通过或 fuse2 不引 shadow 后删 override | b4fd65b198c5 | `packages/fuse/` |
 | `gdb` | 📌 `25.11` | ❌ | 历史 pin；unstable dejagnu→expect 链接失败（tclStubsPtr） | 已确认必要，无可回归空间 | 624af665418d | `packages/upstream.nix` |
 | `git` | 🩹 本地 | 🟡 | test locale FAIL + 静态传递链接 + 相对资源 wrapper | 逐项删构建 workaround，保留 wrapper | b4fd65b198c5 | `packages/git/` |
@@ -87,7 +88,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `python315` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/pythonPackages/python/` |
 | `radare2` | 🩹 本地 | ✅ | libewf override + sdb `both_libraries`→`library` | 上游 sdb 静态构建不产 `.so` 后删 override | b4fd65b198c5 | `packages/regression/radare2/` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
-| `rizin` | 🩹 本地 | ✅ | libewf/tree-sitter 与 cross-static 构建修正 | 上游补齐 native cc/wrap/静态构建、pyyaml float repr 测试跨 arch 稳定后逐项删 | b4fd65b198c5 | `packages/rizin/` |
+| `rizin` | 🩹 本地 | ✅ | libewf/tree-sitter 与 cross-static 构建修正 | 上游补齐 native cc/wrap/静态构建后逐项删 | b4fd65b198c5 | `packages/rizin/` |
 | `runc` | 📦 native selection | ❌ | Linux 容器运行时，无 macOS 构建目标 | 无 macOS 端可回归空间（平台固有） | — | `packages/upstream.nix` |
 | `s6` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch | 上游修 s6 stack 后去 pin；输出无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6.nix`, `flake.nix` |
 | `s6-linux-init` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch + symlinkJoin | 上游修 s6 stack 后去 pin；产物与生成脚本无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6-linux-init.nix`, `flake.nix` |

@@ -3,8 +3,8 @@
 # Why local:
 # 1. Darwin `pkgsStatic.perl` crashes while its `mktables` step generates Unicode
 #    tables, so stock static wget cannot finish building its build-time Perl.
-#    Wget uses Perl only during the build; inject native Perl while keeping all
-#    wget target libraries static.
+#    Wget uses Perl only during the build; the shared static package set injects
+#    native Perl while keeping all wget target libraries static.
 # 2. A standalone wget cannot rely on a Nix CA path. Bundle cacert and use a
 #    wrapper that resolves it relative to the executable.
 #
@@ -14,15 +14,10 @@
   stdenv,
   wget,
   cacert,
-  perlPackages,
   writeText,
 }:
 
 let
-  wget_static = wget.override {
-    inherit perlPackages;
-  };
-
   wrapperScript = writeText "wrapper.sh" ''
     #!/usr/bin/env bash
 
@@ -41,8 +36,8 @@ stdenv.mkDerivation rec {
 
   installPhase = ''
     mkdir -p $out
-    cp -r ${wget_static}/bin $out/bin
-    cp -r ${wget_static}/etc $out/etc
+    cp -r ${wget}/bin $out/bin
+    cp -r ${wget}/etc $out/etc
 
     chmod +w $out/etc/
     mkdir -p $out/etc/wget/

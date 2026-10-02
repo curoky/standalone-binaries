@@ -8,13 +8,10 @@
 # 3. The minimal build omits private static archives needed by the CLI link:
 #    fontconfig, freetype, expat, bzip2, brotli and graphite2. Patch CMakeLists in
 #    dependency order so every symbol resolves.
-# 4. Graphite2 and HarfBuzz need Python only as a build tool. Target static
-#    Python cannot load ctypes/FreeType during fonttools collection, so inject
-#    native Python without changing target linkage.
-# 5. Darwin fontconfig misses xlocale declarations and has `/tmp` path tests
+# 4. Darwin fontconfig misses xlocale declarations and has `/tmp` path tests
 #    incompatible with `/private/tmp`; HarfBuzz's unused GLib/docs/CoreText paths
 #    also fail or introduce unwanted frameworks. Apply those Darwin-only fixes.
-# 6. Poppler CLIs require fontconfig, DejaVu fonts and poppler-data at runtime.
+# 5. Poppler CLIs require fontconfig, DejaVu fonts and poppler-data at runtime.
 #    Bundle them and use wrappers that resolve all data relative to the package.
 #
 # Build fixes are regression candidates; the CLI-only output and relative data
@@ -25,7 +22,6 @@
   poppler-utils,
   harfbuzz,
   graphite2,
-  nativePython3,
   fontconfig,
   freetype,
   expat,
@@ -73,12 +69,10 @@ let
       })
     else
       fontconfig;
-  graphite2WithNativePython = graphite2.override { python3 = nativePython3; };
-  harfbuzzWithNativeGraphite2 =
+  harfbuzzForPoppler =
     let
       harfbuzzWithGraphite2 = harfbuzz.override {
-        graphite2 = graphite2WithNativePython;
-        python3 = nativePython3;
+        inherit graphite2;
         withIntrospection = false;
         withCoreText = false;
       };
@@ -126,11 +120,11 @@ let
   popplerHarfBuzzLibsOld = "set(poppler_LIBS \${poppler_LIBS} harfbuzz::harfbuzz harfbuzz::subset)";
   popplerHarfBuzzLibsNew =
     "set(poppler_LIBS \${poppler_LIBS} harfbuzz::harfbuzz harfbuzz::subset "
-    + "${graphite2WithNativePython}/lib/libgraphite2.a)";
+    + "${graphite2}/lib/libgraphite2.a)";
 in
 (poppler-utils.override {
   minimal = true;
-  harfbuzz = harfbuzzWithNativeGraphite2;
+  harfbuzz = harfbuzzForPoppler;
   fontconfig = fontconfigForPoppler;
 }).overrideAttrs
   (oldAttrs: {

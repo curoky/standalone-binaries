@@ -14,15 +14,22 @@ let
     input:
     let
       base = import input { inherit system; };
-      linuxStatic =
+      rawLinuxStatic =
         if system == "aarch64-linux" then
           base.pkgsCross.aarch64-multiplatform-musl.pkgsStatic
         else
           base.pkgsCross.musl64.pkgsStatic;
+      rawPkgsStatic = if isDarwin then base.pkgsStatic else rawLinuxStatic;
+      pkgsStatic = rawPkgsStatic.extend (
+        import ../packages/static-build-tools.nix {
+          inherit (base) lib;
+          nativePkgs = base;
+        }
+      );
     in
     {
       pkgs = base;
-      pkgsStatic = if isDarwin then base.pkgsStatic else linuxStatic;
+      inherit pkgsStatic rawPkgsStatic;
     };
 
   channelEnvs = lib.mapAttrs (_: mkEnv) channels;
@@ -32,12 +39,17 @@ let
   pkgs = envs.unstable.pkgs;
   pkgsStatic = envs.unstable.pkgsStatic;
   artifactTool = pkgs.callPackage ../cmd/artifact/package.nix { };
+  validateNativeBuildInputs = import ./validate-native-build-inputs.nix { inherit lib; };
   makeManifestPackages = import ./make-manifest-packages.nix {
     inherit lib envs;
     allSystems = systems;
   };
   makeArtifacts = import ./make-artifacts.nix {
+    inherit pkgs artifactTool validateNativeBuildInputs;
+  };
+  makeProbeArtifacts = import ./make-artifacts.nix {
     inherit pkgs artifactTool;
+    validateNativeBuildInputs = drv: drv;
   };
 
   upstreamPackages = makeManifestPackages system (import ../packages/upstream.nix);
@@ -53,7 +65,9 @@ let
 
   mkProbeChannel =
     env:
-    lib.genAttrs (builtins.attrNames env.pkgsStatic) (name: makeArtifacts name env.pkgsStatic.${name});
+    lib.genAttrs (builtins.attrNames env.rawPkgsStatic) (
+      name: makeProbeArtifacts name env.rawPkgsStatic.${name}
+    );
   probe = lib.mapAttrs' (
     name: env: lib.nameValuePair (lib.replaceStrings [ "." ] [ "" ] name) (mkProbeChannel env)
   ) channelEnvs;

@@ -16,7 +16,6 @@
   graphviz-nox,
   gd,
   dejavu_fonts,
-  python3,
 }:
 
 let
@@ -72,7 +71,6 @@ in
   gd = gdMinimal;
   pango = null;
   fontconfig = null;
-  inherit python3;
 }).overrideAttrs
   (oldAttrs: {
     buildInputs = builtins.filter (input: input != null) oldAttrs.buildInputs;
