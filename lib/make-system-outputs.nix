@@ -7,6 +7,7 @@
 system:
 let
   isDarwin = lib.hasSuffix "darwin" system;
+  isUpstreamOnly = system == "aarch64-linux";
 
   # Linux uses a musl cross-static set so the target stays fully static while
   # build tools can reuse the native glibc Rust and LLVM toolchains.
@@ -20,12 +21,18 @@ let
         else
           base.pkgsCross.musl64.pkgsStatic;
       rawPkgsStatic = if isDarwin then base.pkgsStatic else rawLinuxStatic;
-      pkgsStatic = rawPkgsStatic.extend (
-        import ../packages/static-build-tools.nix {
-          inherit (base) lib;
-          nativePkgs = base;
-        }
-      );
+      # aarch64-linux is an upstream-only, best-effort platform. Keep its
+      # package set stock instead of carrying local producer overrides.
+      pkgsStatic =
+        if isUpstreamOnly then
+          rawPkgsStatic
+        else
+          rawPkgsStatic.extend (
+            import ../packages/static-build-tools.nix {
+              inherit (base) lib;
+              nativePkgs = base;
+            }
+          );
     in
     {
       pkgs = base;
@@ -53,11 +60,15 @@ let
   };
 
   upstreamPackages = makeManifestPackages system (import ../packages/upstream.nix);
-  localPackages = import ../packages {
-    inherit system pkgs pkgsStatic;
-    masterPkgsStatic = envs.master.pkgsStatic;
-    s6PkgsStatic = envs."s6-pin".pkgsStatic;
-  };
+  localPackages =
+    if isUpstreamOnly then
+      { }
+    else
+      import ../packages {
+        inherit system pkgs pkgsStatic;
+        masterPkgsStatic = envs.master.pkgsStatic;
+        s6PkgsStatic = envs."s6-pin".pkgsStatic;
+      };
   sourcePackages = upstreamPackages // localPackages;
 
   artifacts = lib.mapAttrs makeArtifacts sourcePackages;

@@ -4,6 +4,10 @@
 `cmd/artifact/` 完成 assembly、校验和归档。专题文档只解释不能从代码表面看出的
 设计约束；具体包清单和回归状态分别以实现和[回归清单](../regression/AGENTS.md)为准。
 
+`aarch64-linux` 只走这条默认路径，并直接使用 raw `pkgsStatic`；不应用本地 package-set
+overlay，也不接入 `packages/default.nix`。该平台 stock 构建失败时在 manifest 中停用，
+不进入下述本地 patch 或 packaging 路线。
+
 | 生态 | 文档 | 主要案例 |
 | --- | --- | --- |
 | C / autotools | [c-autotools.md](c-autotools.md) | 静态链接、资源路径、s6 |
@@ -32,7 +36,8 @@ wrapper 从自身路径求出共同 `store/` 目录，再显式执行同级 runt
 
 平台构建策略明显不同时，在对应 package 目录保存独立 derivation，例如
 `linux.nix` 与 `darwin.nix`，再由 `packages/default.nix` 按目标平台选择，不在单个
-derivation 文件堆叠条件。
+derivation 文件堆叠条件。该机制只服务 `x86_64-linux` 与 `aarch64-darwin`；
+`aarch64-linux` 不接入本地 derivation。
 
 ### 状态管理
 

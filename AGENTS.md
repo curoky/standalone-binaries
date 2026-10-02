@@ -38,7 +38,11 @@ macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`
 
 ## 包集合
 
-支持的平台是 `x86_64-linux`、`aarch64-linux` 和 `aarch64-darwin`。
+支持的平台是 `x86_64-linux`、`aarch64-linux` 和 `aarch64-darwin`。其中
+`aarch64-linux` 是 upstream-only 的最小支持平台：只发布
+`packages/upstream.nix` 中 stock nixpkgs 能直接通过完整 artifact 流程的包，不为该平台维护
+本地 patch、override、wrapper 或结构性 repackaging。stock 包失败时从该平台停用，不新增
+本地修复。
 `lib/make-system-outputs.nix` 为每个 nixpkgs input 创建普通和静态 package set：
 
 - Linux 使用 arch 对应的 musl cross static set：`x86_64-linux` 用
@@ -47,19 +51,21 @@ macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`
   build platform 仍可复用 glibc Rust/LLVM 工具链。
 - Darwin 使用原生 `pkgsStatic`。
 
-正式包集合在 raw `pkgsStatic` 上统一应用
+除 `aarch64-linux` 外，正式包集合在 raw `pkgsStatic` 上应用
 `packages/static-build-tools.nix`：只对明确仅在构建期执行解释器的 producer 注入当前 channel
-的 native 解释器，不改变 `pkgsStatic` 中解释器及其 package set 的 target 语义。Artifact
-求值会递归检查 native inputs 的 host platform 是否等于 consumer 的 build platform；probe
-保留 raw package set，既不应用公共修正，也不运行该门禁。
+的 native 解释器，不改变 `pkgsStatic` 中解释器及其 package set 的 target 语义。
+`aarch64-linux` 与 probe 均保留 raw package set；前者仍运行正式 artifact 的 native-input
+门禁，后者既不应用公共修正，也不运行该门禁。Artifact 求值会递归检查 native inputs 的
+host platform 是否等于 consumer 的 build platform。
 
-包集合由 `packages/upstream.nix` 中可直接使用的 nixpkgs 包与
-`packages/default.nix` 中的本地包合并，后者覆盖前者。Manifest 的完整 schema 见
-`packages/upstream.nix` 及 `lib/make-manifest-packages.nix`。本地 package index 显式
-接线，不自动扫描目录。共享编译技术栈且问题会一起回归，或运行时/产品强绑定的 package
-family 可共用子目录，但不增加子级 index。经确认有较大希望整项回到 upstream 的纯
-workaround 放在 `packages/regression/<name>/`；该目录只是回归队列的物理归档，其中每个
-package 仍独立接线、独立回归，不是共享实现的 family。
+`x86_64-linux` 与 `aarch64-darwin` 的包集合由 `packages/upstream.nix` 中可直接使用的
+nixpkgs 包与 `packages/default.nix` 中的本地包合并，后者覆盖前者；`aarch64-linux` 只使用
+前者，并禁止导入本地 package index。Manifest 的完整 schema 见 `packages/upstream.nix` 及
+`lib/make-manifest-packages.nix`。本地 package index 显式接线，不自动扫描目录。共享编译
+技术栈且问题会一起回归，或运行时/产品强绑定的 package family 可共用子目录，但不增加
+子级 index。经确认有较大希望整项回到 upstream 的纯 workaround 放在
+`packages/regression/<name>/`；该目录只是回归队列的物理归档，其中每个 package 仍独立
+接线、独立回归，不是共享实现的 family。
 
 ## 包接入
 
@@ -68,6 +74,8 @@ package 仍独立接线、独立回归，不是共享实现的 family。
 单独确认。
 
 - Manifest 不填写默认字段；包清单和 schema 以实现为准。
+- `aarch64-linux` 只允许在 manifest 中选择、pin、重命名、选择 output 或停用 stock 包；
+  不得为恢复该平台新增任何本地 derivation、patch、override、wrapper 或 package-set overlay。
 - Manifest schema 在 eval 时 fail-closed：未知字段、平台、nixpkgs version、空或重复
   output 和错误字段类型必须直接报错。
 - `packages/upstream.nix` 与 `packages/default.nix` 只负责选择和接线；可以保留生态、平台等

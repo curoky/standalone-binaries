@@ -3,8 +3,10 @@
 本目录只维护回归队列，不解释 patch 实现。包级原因和保留边界以最终 derivation 的 Nix
 注释为准；公共 workaround 以其组件实现和 `AGENTS.md` 为准。
 
-- [`linux.md`](linux.md)：x86_64-linux 与 aarch64-linux 共用的定制。
-- [`linux-aarch64.md`](linux-aarch64.md)：仅 aarch64-linux 的差异。
+- [`linux.md`](linux.md)：x86_64-linux 本地定制及两个 Linux 平台共用的 upstream
+  manifest 选择。
+- [`linux-aarch64.md`](linux-aarch64.md)：aarch64-linux upstream-only 边界及
+  manifest 差异。
 - [`darwin.md`](darwin.md)：aarch64-darwin 的定制。
 
 跨平台包分别登记。公共 workaround 使用稳定候选 ID，并在「来源」中指向实现；候选 ID

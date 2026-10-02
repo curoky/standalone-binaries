@@ -1,10 +1,12 @@
-# Linux 回归表（跨架构共享）
+# Linux 回归表
 
 <!-- markdownlint-disable MD013 -->
 
-适用于 x86_64-linux 与 aarch64-linux，只列该平台有定制的包。仅 aarch64-linux 特有的差异见
-[`linux-aarch64.md`](linux-aarch64.md)。表格约定、状态/定制图例与批量回归命令见
-[`AGENTS.md`](AGENTS.md)。
+记录 x86_64-linux 的本地定制，以及两个 Linux 平台共用的 upstream manifest 选择。
+`aarch64-linux` 不消费表中来源位于 `packages/` 的本地 derivation 或
+`packages/static-build-tools.nix` overlay；该平台只在
+[`linux-aarch64.md`](linux-aarch64.md) 记录 upstream-only 边界与 manifest 差异。表格约定、
+状态/定制图例与批量回归命令见 [`AGENTS.md`](AGENTS.md)。
 
 Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 [`packages/podman/DESIGN.md`](../../packages/podman/DESIGN.md) 和

@@ -43,6 +43,11 @@ sibling runtime、资源打包、产品行为和多版本发布也要进入总�
 
 ## 1. 决定平台拆分
 
+`aarch64-linux` 是 upstream-only 的最小支持平台，不进入本 skill 的本地 patch 路线。它只允许
+在 `packages/upstream.nix` 选择 stock 包；stock 包不能通过完整 artifact 流程时，在 manifest
+中停用该平台，不新增本地 derivation、patch、override、wrapper 或 package-set overlay。下面的
+Linux 本地修复步骤只适用于 `x86_64-linux`。
+
 一个包通常各平台需要不同处理。经 `packages/upstream.nix` 的 per-platform key、或经
 `packages/default.nix` 接好平台特定的 derivation。同一份构建到处都能用时留一个共享
 文件；不行时在对应 package 目录拆成 `linux.nix` 与 `darwin.nix`。
@@ -61,7 +66,7 @@ sibling runtime、资源打包、产品行为和多版本发布也要进入总�
 Darwin 当前不发布 Python runtime，已有 Python wrapper 使用宿主 `python3`。这是根
 `AGENTS.md` 记录的现状缺口，不是新工具应复制的默认模式。
 
-## 3. Linux 路线
+## 3. x86_64 Linux 路线
 
 目标：一个完全静态的 ELF（musl）。**这不要求字面上在 manifest 里写 `pkgsStatic.<x>`**——
 它指*结果*是静态链接的。按顺序尝试路线；**若更早的路线已能构建就不要 patch**：

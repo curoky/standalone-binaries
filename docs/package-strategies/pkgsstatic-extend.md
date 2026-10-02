@@ -2,6 +2,8 @@
 
 Linux 的 `pkgsStatic` 是 musl cross package set：target 产物使用 musl-static，build 平台仍使用
 glibc 工具链。`pkgsStatic.extend` 会同时影响 target 包和 `buildPackages` 中的同名包。
+正式 `aarch64-linux` 包集合为降低维护成本而直接使用 raw `pkgsStatic`，不应用本节的本地
+overlay；本节只适用于 `x86_64-linux` 和 Darwin 的正式本地包。
 
 只为静态 target 准备的 override 必须限定在
 `pkg.stdenv.hostPlatform.isStatic`：
@@ -22,7 +24,7 @@ nixpkgs 会按依赖位置选择 `__spliced.buildHost`，但 `python3.withPackag
 expression 也会把仅构建期执行的 Perl 放进 `buildInputs`。同一规则适用于 compiler、linker、
 assembler、code generator、build system 和测试工具：只要工具会在构建期间执行，就必须能在
 build platform 上运行；为 target 生成代码或作为产品运行期 helper 的工具仍属于 target。
-正式包集合通过
+需要本地修复的正式包集合通过
 [`packages/static-build-tools.nix`](../../packages/static-build-tools.nix)
 在 producer 边界统一注入当前 channel 的 native build tool。不得把整个
 `pkgsStatic.python3`、`pkgsStatic.perl` 或对应 package set 改成 native，否则会破坏静态
@@ -32,8 +34,8 @@ runtime 和需要链接 target interpreter library 的包。
 source closure：具有 `stdenv` 的 native input，其 host platform 必须与 consumer 的 build
 platform 一致。该门禁无法推断 `buildInputs` 中某个解释器是否只在构建期执行，因此这类
 upstream 误分类必须在 producer override 中明确登记。新增例外前应先修正 producer 的
-dependency splicing。Probe 使用未应用上述修正与门禁的 raw package set，继续代表 stock
-upstream 行为。
+dependency splicing。`aarch64-linux` 使用未应用上述修正的 raw package set，但保留门禁；
+probe 既不应用修正也不运行门禁，继续代表 stock upstream 行为。
 
 当前正式闭包中保留的 target-static interpreter 只有两类运行期依赖：`iproute2` 的独立
 Python scripts output，以及 `groff` 的 Perl tools output（由 `man` 闭包引入）。它们不是

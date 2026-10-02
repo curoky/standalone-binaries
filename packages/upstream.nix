@@ -1,6 +1,10 @@
 # packages/upstream.nix
 #
 # Single declarative manifest of upstream nixpkgs packages.
+# aarch64-linux support is intentionally limited to this manifest: it uses the
+# selected nixpkgs package as-is, without the local package index or package-set
+# overlays. If a stock package fails, disable it on that platform instead of
+# adding an aarch64-linux patch or override.
 #
 # Schema (first-level key = package attr name in nixpkgs):
 #
@@ -31,7 +35,12 @@
       version = "gcc15-pin";
     };
   };
-  bash = { };
+  bash = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
+  };
   "bats.unresholved" = {
     alias = "bats";
   };

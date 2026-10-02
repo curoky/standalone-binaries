@@ -5,6 +5,7 @@
   masterPkgsStatic,
   s6PkgsStatic,
 }:
+assert system != "aarch64-linux";
 let
   inherit (pkgs) lib;
   mkClangTools = pkgsStatic.callPackage ./clang-tools { };
