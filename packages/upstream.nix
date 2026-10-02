@@ -24,7 +24,12 @@
 
   _7zz = {
     alias = "7zz";
-    version = "gcc15-pin";
+    "x86_64-linux" = {
+      version = "gcc15-pin";
+    };
+    "aarch64-linux" = {
+      version = "gcc15-pin";
+    };
   };
   bash = {
     platforms = [
@@ -694,9 +699,5 @@
       version = "25.11";
     };
   };
-  uv = {
-    "aarch64-darwin" = {
-      version = "25.11";
-    };
-  };
+  uv = { };
 }

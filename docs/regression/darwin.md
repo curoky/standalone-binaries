@@ -10,7 +10,6 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 
 | 包 | 定制 | 回归 | 原因与保留边界 | 回归判据 | commit | 来源 |
 | ---------------------------- | -------------------- | -- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------ | ---------------------------------------------------------------------------------- |
-| `7zz` | 📌 `gcc15-pin` | ✅ | 与 Linux 共用经全平台验证的 GCC 15 nixpkgs revision；当前 pin 的直接原因是 Linux 静态链接失败 | Darwin 用 unstable 构建且只动态链接系统库 | — | `packages/upstream.nix`, `flake.nix` |
 | `artifact-darwin-cgo-resolv` | 🩹 公共 artifact patch | ✅ | 修正 Go/CGO 的 Nix resolver load command | 按 artifact 文档绕过修正后，全部 consumer 无需替换 | — | `cmd/artifact/binary.go`, `cmd/artifact/binary_test.go`, `lib/make-artifacts.nix` |
 | `aria2` | 📌 `24.11` + 📦 `bin` output | ❌ | unstable 静态 darwin 缺 iconv 符号链接失败；CLI 位于独立 `bin` output | pin 已确认必要；多 output 选择是发布边界 | 624af665418d | `packages/upstream.nix` |
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
@@ -49,7 +48,6 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | `smartmontools` | 🩹 本地 | 🟡 | 关外部 drive DB + native autoreconfHook/hostname（避 static Perl） | static Perl 修复后删 build-tool override；CLI 配置保留 | dc5d91f84032 | `packages/smartmontools/darwin.nix`, `packages/default.nix` |
 | `supercronic` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/binary.go` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
-| `uv` | 📌 `25.11` | ❌ | unstable 静态 darwin aws-lc-sys cc-wrapper `posix_spawn failed` | 已确认必要，无可回归空间 | 624af665418d | `packages/upstream.nix` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |
 | `wget` | 🩹 + 📦 本地 | 🟡 | native Perl build tool + CA wrapper | 恢复 checks/build tool 后保留 CA packaging | — | `packages/wget/` |
