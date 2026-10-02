@@ -25,7 +25,6 @@
   makeself = pkgsStatic.callPackage ../makeself { };
   pkgconf = pkgsStatic.callPackage ../pkgconf { };
   vim = pkgsStatic.callPackage ../vim { };
-  watchexec = pkgsStatic.callPackage ../watchexec { };
   zsh = pkgsStatic.callPackage ../zsh { };
 
   # Sibling-runtime wrappers.

@@ -104,7 +104,6 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `tree-sitter` | 🩹 本地 | ✅ | rizin 依赖；精确删 `.so` 安装行（sed range 缺陷） | 上游修正 sed range 或静态不装 `.so` 后删 override | b4fd65b198c5 | `packages/tree-sitter/` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |
-| `watchexec` | 🩹 本地 | ✅ | `--package=watchexec-cli` 排除 test crate | stock 输出不含 `test-socketfd` 且满足 portability | b4fd65b198c5 | `packages/watchexec/` |
 | `wget` | 🩹 + 📦 本地 | 🟡 | `doCheck=false`（fuzzer segfault）+ CA wrapper packaging | 恢复 checks/build tool 后保留 CA packaging | b4fd65b198c5 | `packages/wget/` |
 | `zsh` | 🩹 + 📦 本地 | 🟡 | 三个 `link=either` module + FPATH wrapper/zshenv packaging | 上游默认内建三 module 后删 patch，保留 packaging | b4fd65b198c5 | `packages/zsh/` |
 | `zsh-plugins` | 📦 本地 | ❌ | 聚合 oh-my-zsh、plugins，并预生成 atuin/starship plugin | plugin bundle 与预生成 shell integration 是产品 | — | `packages/zsh-plugins/` |

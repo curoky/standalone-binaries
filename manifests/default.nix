@@ -165,6 +165,7 @@
   ruff = { };
   starship = { };
   tokei = { };
+  watchexec = { };
   yazi-unwrapped = {
     alias = "yazi";
   };
