@@ -38,6 +38,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `exiftool` | 📦 本地 | ❌ | sibling Perl wrapper 与模块 bundling 使 install check 在构建沙箱中不可运行 | runtime packaging 与对应的 check 边界必须保留 | — | `packages/perlPackages/` |
 | `eza-ls` | 📦 本地 | ❌ | 自定义 `ls` 兼容层与 bundled eza | 独立产品行为，不是上游 bug | — | `packages/eza-ls/` |
 | `file` | 🩹 + 📦 本地 | 🟡 | version check 直指真实二进制；wrapper 相对定位 `magic.mgc` | 上游检查可兼容 wrapper 后删除检查修正；资源定位必须保留 | b4fd65b198c5 | `packages/file/` |
+| `ffmpeg` | 🩹 本地 | 🟡 | 裁剪 static-unsupported 依赖链、libbluray、LAME decoder、x265 multibit；Graphite2 改用 native Python；修正 SoXR/libssh/SVT-AV1/x265 静态产物；增大 musl 线程栈以容纳 MPEG-TS PAT parser | 逐 feature 恢复并去掉 build-tool/依赖 override；上游不再在线程栈放置超大 `struct Program` 后删除 stack-size；保持 musl-static、无 store 引用 | — | `packages/ffmpeg/linux.nix`, `packages/default.nix` |
 | `fuse` | 🩹 本地 | 🟡 | 去 shadow/完整 util-linux 依赖（explicit_bzero SIGABRT） | 上游 libbsd 通过或 fuse2 不引 shadow 后删 override | b4fd65b198c5 | `packages/fuse/` |
 | `gdb` | 📌 `25.11` | ❌ | 历史 pin；unstable dejagnu→expect 链接失败（tclStubsPtr） | 已确认必要，无可回归空间 | 624af665418d | `packages/upstream.nix` |
 | `git` | 🩹 本地 | 🟡 | test locale FAIL + 静态传递链接 + 相对资源 wrapper | 逐项删构建 workaround，保留 wrapper | b4fd65b198c5 | `packages/git/` |

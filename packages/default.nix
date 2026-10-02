@@ -49,6 +49,9 @@ let
     cmake_3_27_9 = pkgsStatic.callPackage ./cmake/3_27_9 { };
     cmake_4_1_2 = pkgsStatic.callPackage ./cmake/4_1_2 { };
     diffutils = pkgsStatic.callPackage ./regression/diffutils { };
+    ffmpeg = pkgsStatic.callPackage ./ffmpeg/linux.nix {
+      nativePython3 = pkgs.python3;
+    };
     fuse = pkgsStatic.callPackage ./fuse { };
     graphviz = pkgsStatic.callPackage ./graphviz {
       inherit (pkgs) python3;

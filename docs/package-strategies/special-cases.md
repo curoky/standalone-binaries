@@ -7,9 +7,10 @@
 
 ### ffmpeg
 
-macOS 发布 headless、feature-reduced 的 ffmpeg。启用的依赖必须能静态链接，最终 Mach-O
-只能依赖系统 dylib 和 framework。恢复 codec、filter 或 network feature 时，必须重新检查完整
-依赖闭包，不能只验证 ffmpeg configure 成功。
+各平台发布 headless、feature-reduced 的 ffmpeg。Linux 关闭无法组成 musl-static 闭包的宿主
+采集与硬件加速 feature；macOS 启用的依赖必须能静态链接，最终 Mach-O 只能依赖系统 dylib 和
+framework。恢复 codec、filter 或 network feature 时，必须重新检查完整依赖闭包，不能只验证
+ffmpeg configure 成功。
 
 ### PostgreSQL
 
