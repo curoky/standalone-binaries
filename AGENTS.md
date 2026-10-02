@@ -107,6 +107,8 @@ cache segment 和 retention 规则见[发布与 cache 模型](docs/release-model
 
 处理静态构建失败时使用
 [`patch-nixpkgs-standalone`](.trae/skills/patch-nixpkgs-standalone/SKILL.md)。
+把本地定制整理并提交为 nixpkgs 上游 PR 时使用
+[`submit-nixpkgs-fix`](.trae/skills/submit-nixpkgs-fix/SKILL.md)。
 回归本地 patch 或版本 pin 时使用
 [`regress-patched-package-to-upstream`](.trae/skills/regress-patched-package-to-upstream/SKILL.md)，
 并以[回归清单](docs/regression/AGENTS.md)为候选清单。

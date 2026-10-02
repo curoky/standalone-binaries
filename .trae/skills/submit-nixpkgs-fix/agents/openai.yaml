@@ -1,0 +1,4 @@
+interface:
+  display_name: "Submit Nixpkgs Fix"
+  short_description: "Upstream local package fixes to Nixpkgs"
+  default_prompt: "Use $submit-nixpkgs-fix to turn this local package workaround into a verified Nixpkgs pull request."
