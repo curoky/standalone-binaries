@@ -31,12 +31,7 @@
       version = "gcc15-pin";
     };
   };
-  bash = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-darwin"
-    ];
-  };
+  bash = { };
   "bats.unresholved" = {
     alias = "bats";
   };
