@@ -103,6 +103,10 @@ let
       llvmPackages = pkgsStatic.llvmPackages_22;
       version = "22.0.0";
     };
+    clang-tools-23 = mkClangTools {
+      llvmPackages = pkgsStatic.llvmPackages_23;
+      version = "23.0.0";
+    };
 
     # Python.
     python312 = mkPython {
@@ -195,6 +199,10 @@ let
     };
     smartmontools = pkgsStatic.callPackage ./smartmontools/darwin.nix {
       inherit (pkgs) autoreconfHook hostname;
+    };
+    tesseract = pkgsStatic.callPackage ./tesseract/darwin.nix {
+      darwinLibiconv = pkgsStatic.darwin.libiconv.dev;
+      nmedit = "${pkgs.cctools}/bin/nmedit";
     };
     wget = pkgsStatic.callPackage ./wget/darwin-static.nix { };
 

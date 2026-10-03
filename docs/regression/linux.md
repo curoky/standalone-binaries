@@ -26,6 +26,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `clang-tools-20` | 📦 本地 | ❌ | 固定 LLVM 20，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-21` | 📦 本地 | ❌ | 固定 LLVM 21，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-22` | 📦 本地 | ❌ | 固定 LLVM 22，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-23` | 📦 本地 | ❌ | 固定 LLVM 23，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `cloc` | 📦 本地 | ❌ | sibling Perl wrapper 使 install check 在无 sibling runtime 的沙箱中不可运行 | runtime packaging 与对应的 check 边界必须保留 | — | `packages/perlPackages/cloc.nix` |
 | `codex` | 🩹 本地 | 🟡 | CLI-only build、移除 store PATH wrapper、补 OpenSSL build tool | 上游 CLI 不再需要 code-mode-host 或 denoland 出 musl librusty_v8 后回 stock | b4fd65b198c5 | `packages/codex/` |
 | `cmake_3_27_9` | 📌 源码版本 + 🩹 | 🟡 | 保留 cstdint patch、`BUILD_TESTING=false`、openssl/curses 关闭 | 上游修复后删剩余 workaround，保留版本化 output | b4fd65b198c5 | `packages/cmake/3_27_9/` |
