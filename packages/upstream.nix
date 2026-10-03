@@ -142,18 +142,12 @@
   };
 
   # fonts
-  fira-code = {
-    isStatic = false;
-  };
-  lxgw-wenkai = {
-    isStatic = false;
-  };
+  fira-code = { };
+  lxgw-wenkai = { };
   "nerd-fonts.fira-code" = {
-    isStatic = false;
     alias = "nerd-fonts-fira-code";
   };
   "nerd-fonts.ubuntu-mono" = {
-    isStatic = false;
     alias = "nerd-fonts-ubuntu-mono";
   };
 
@@ -394,43 +388,23 @@
 
   # s6 stack
   s6-dns = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
-    version = "s6-pin";
+    platforms = [ "x86_64-linux" ];
     output = [ "bin" ];
   };
   s6-linux-utils = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
-    version = "s6-pin";
+    platforms = [ "x86_64-linux" ];
     output = [ "bin" ];
   };
   s6-networking = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
-    version = "s6-pin";
+    platforms = [ "x86_64-linux" ];
     output = [ "bin" ];
   };
   s6-portable-utils = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
-    version = "s6-pin";
+    platforms = [ "x86_64-linux" ];
     output = [ "bin" ];
   };
   skalibs = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
-    version = "s6-pin";
+    platforms = [ "x86_64-linux" ];
   };
 
   # go pkgs

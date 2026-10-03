@@ -37,7 +37,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `diffutils` | 🩹 本地 | ✅ | 禁用 checks（9 个 gnulib 多线程/setlocale 测试 SIGABRT） | 上游全量 checks 与 musl-static 验证通过 | b4fd65b198c5 | `packages/regression/diffutils/` |
 | `dive` | 📌 `25.11` | ✅ | 去 pin 失败（openldap 缺 Cyrus SASL） | Linux 用 unstable 并满足 musl-static portability | b4fd65b198c5 | `packages/upstream.nix` |
 | `dool` | 📦 本地 | ❌ | Python sibling runtime wrapper，默认追加 `--bytes` | runtime 与产品默认行为必须保留 | — | `packages/pythonPackages/dool.nix` |
-| `execline` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch | 上游修 s6 stack 后去 pin；输出无 store 路径 | b4fd65b198c5 | `packages/s6Packages/execline.nix`, `flake.nix` |
+| `execline` | 🩹 本地 | 🟡 | 去 baked prefix patch | 输出无 store 路径 | b4fd65b198c5 | `packages/s6Packages/execline.nix` |
 | `exiftool` | 📦 本地 | ❌ | sibling Perl wrapper 与模块 bundling 使 install check 在构建沙箱中不可运行 | runtime packaging 与对应的 check 边界必须保留 | — | `packages/perlPackages/` |
 | `eza-ls` | 📦 本地 | ❌ | 自定义 `ls` 兼容层与 bundled eza | 独立产品行为，不是上游 bug | — | `packages/eza-ls/` |
 | `file` | 🩹 + 📦 本地 | 🟡 | version check 直指真实二进制；wrapper 相对定位 `magic.mgc` | 上游检查可兼容 wrapper 后删除检查修正；资源定位必须保留 | b4fd65b198c5 | `packages/file/` |
@@ -92,15 +92,11 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
 | `rizin` | 🩹 本地 | ✅ | tree-sitter 与 cross-static 构建修正 | 上游补齐 native cc/wrap/静态构建后逐项删 | b4fd65b198c5 | `packages/rizin/` |
 | `runc` | 📦 native selection | ❌ | Linux 容器运行时，无 macOS 构建目标 | 无 macOS 端可回归空间（平台固有） | — | `packages/upstream.nix` |
-| `s6` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch | 上游修 s6 stack 后去 pin；输出无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6.nix`, `flake.nix` |
-| `s6-linux-init` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch + symlinkJoin | 上游修 s6 stack 后去 pin；产物与生成脚本无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6-linux-init.nix`, `flake.nix` |
-| `s6-rc` | 📌 `s6-pin` + 🩹 本地 | 🟡 | s6 stack 统一 pin + 去 baked prefix patch | 上游修 s6 stack 后去 pin；产物与生成服务无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6-rc.nix`, `flake.nix` |
-| `s6-dns` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch | 上游修 s6 stack 后去 `version` pin | b4fd65b198c5 | `packages/upstream.nix`, `flake.nix` |
-| `s6-linux-utils` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch | 上游修 s6 stack 后去 `version` pin | b4fd65b198c5 | `packages/upstream.nix`, `flake.nix` |
-| `s6-networking` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch | 上游修 s6 stack 后去 `version` pin | b4fd65b198c5 | `packages/upstream.nix`, `flake.nix` |
-| `s6-portable-utils` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch | 上游修 s6 stack 后去 `version` pin | b4fd65b198c5 | `packages/upstream.nix`, `flake.nix` |
+| `s6` | 🩹 本地 | 🟡 | 去 baked prefix patch | 输出无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6.nix` |
+| `s6-linux-init` | 🩹 + 📦 本地 | 🟡 | 去 baked prefix patch + symlinkJoin | 产物与生成脚本无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6-linux-init.nix` |
+| `s6-rc` | 🩹 本地 | 🟡 | 去 baked prefix patch | 产物与生成服务无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6-rc.nix` |
 | `shadow` | 🩹 + 📦 本地 | 🟡 | 关闭 libbsd 避免 musl `explicit_bzero` 测试 SIGABRT，并合并 `su` output | libbsd checks 修复后恢复 feature；保留完整命令集 packaging | b4fd65b198c5 | `packages/shadow/` |
-| `skalibs` | 📌 `s6-pin` | 🟡 | s6 stack 统一 pin，无本地 patch | 上游修 s6 stack 后去 `version` pin | b4fd65b198c5 | `packages/upstream.nix`, `flake.nix` |
+| `skaware-build-pkg-config` | 🩹 公共 | 🟡 | cross-static scope 注入 build-platform pkg-config | 上游 scope 正确 splice pkg-config 后删除公共 override | b4fd65b198c5 | `packages/static-build-tools.nix` |
 | `sudo` | 🩹 本地 | 🟡 | 去 pam（`--disable-pam`）纯静态；setuid 外部设置 | 上游 pam 可静态化后删 override；setuid 边界保留 | b4fd65b198c5 | `packages/sudo/` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
 | `tree-sitter` | 🩹 本地 | ✅ | rizin 依赖；精确删 `.so` 安装行（sed range 缺陷） | 上游修正 sed range 或静态不装 `.so` 后删 override | b4fd65b198c5 | `packages/regression/tree-sitter/` |

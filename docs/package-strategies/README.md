@@ -17,7 +17,7 @@ overlay，也不接入 `packages/default.nix`。该平台 stock 构建失败时�
 | `pkgsStatic.extend` | [pkgsstatic-extend.md](pkgsstatic-extend.md) | target 与 build platform 边界 |
 | Perl | [perl.md](perl.md) | 平台拆分解释器、纯 Perl 工具、XS 模块 |
 | Python | [python.md](python.md) | 静态解释器、同级 Python wrapper |
-| Rust | [rust.md](rust.md) | zellij |
+| Rust | [rust.md](rust.md) |  |
 | 特殊案例 | [special-cases.md](special-cases.md) | 非默认产物与动态例外 |
 
 ## 共用模式

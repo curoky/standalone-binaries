@@ -12,12 +12,15 @@
 # 3. Node's Gyp configure path and Darwin rsync's build hooks also execute
 #    Python during the build. None of these interpreters is linked into or
 #    shipped with the corresponding product.
-# 4. Override the producer once so every consumer inherits the native tool.
+# 4. The skaware package scope resolves `pkg-config` before normal native-input
+#    splicing, so cross-static consumers cannot execute an unprefixed
+#    `pkg-config` during configure.
+# 5. Override the producer once so every consumer inherits the native tool.
 #    The current failures happen to involve Python, Perl, and Git, but the
-#    platform rule also applies to compilers, linkers, code generators, build
-#    systems, and test tools. Add them here only when a patched producer
-#    actually picks a target tool for build-only execution.
-# 5. Do not replace `pkgsStatic.python3`, `pkgsStatic.perl`, or their package
+#    platform rule also applies to pkg-config, compilers, linkers, code
+#    generators, build systems, and test tools. Add them here only when a
+#    patched producer actually picks a target tool for build-only execution.
+# 6. Do not replace `pkgsStatic.python3`, `pkgsStatic.perl`, or their package
 #    sets: runtimes and packages embedding an interpreter still require the
 #    target-static interpreter and libraries.
 #
@@ -57,6 +60,15 @@ lib.optionalAttrs prev.stdenv.hostPlatform.isStatic (
       python3 = nativePkgs.python3;
     }
   )
+  // lib.optionalAttrs (prev.stdenv.hostPlatform.isLinux && prev ? skawarePackages) {
+    skawarePackages = prev.skawarePackages.overrideScope (
+      _: skawarePrev: {
+        buildPackage = skawarePrev.buildPackage.override {
+          pkg-config = nativePkgs.pkg-config;
+        };
+      }
+    );
+  }
   // lib.optionalAttrs (prev.stdenv.hostPlatform.isDarwin && prev ? rsync) (
     useNativeBuildTools "rsync" { python3 = nativePkgs.python3; }
   )

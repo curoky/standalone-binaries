@@ -16,3 +16,8 @@ x86_64-linux 与 Darwin 的定制见各自表格。表格约定与图例见 [`AG
 | `git` | ⏸️ 停用 aarch64 | 🟡 | stock unstable 的 Rust `libgitcore.a` 引用 musl 不提供的 `*64` 符号；`26.05`、`25.11`、`25.05` stock 均失败于 `t2082` | 任一受支持 channel 的 stock 包完整构建及 artifact 校验通过后恢复 | b4fd65b198c5 | `packages/upstream.nix` |
 | `patchelf` | 📌 `25.05` + ⏸️ 停用 aarch64 | 🟡 | unstable checks 构建测试共享库时找不到 `-lbar` 与 `-lbar-scoped`；x86_64 仍走 `25.05` pin | unstable 完整构建及 artifact 校验通过后恢复 | b4fd65b198c5 | `packages/upstream.nix` |
 | `python311` | ⏸️ 停用 aarch64 | 🟡 | stock unstable 带动态 ELF `lib-dynload/*.so`，不满足 Linux 纯静态产物约束 | stock artifact 不再包含动态 ELF 后恢复 | b4fd65b198c5 | `packages/upstream.nix` |
+| `s6-dns` | ⏸️ 停用 aarch64 | 🟡 | 最新版需要本地 skaware pkg-config producer override，超出 upstream-only 边界 | stock 包无需本地 override 即可完整构建后恢复 | — | `packages/upstream.nix` |
+| `s6-linux-utils` | ⏸️ 停用 aarch64 | 🟡 | 最新版需要本地 skaware pkg-config producer override，超出 upstream-only 边界 | stock 包无需本地 override 即可完整构建后恢复 | — | `packages/upstream.nix` |
+| `s6-networking` | ⏸️ 停用 aarch64 | 🟡 | 最新版需要本地 skaware pkg-config producer override，超出 upstream-only 边界 | stock 包无需本地 override 即可完整构建后恢复 | — | `packages/upstream.nix` |
+| `s6-portable-utils` | ⏸️ 停用 aarch64 | 🟡 | 最新版需要本地 skaware pkg-config producer override，超出 upstream-only 边界 | stock 包无需本地 override 即可完整构建后恢复 | — | `packages/upstream.nix` |
+| `skalibs` | ⏸️ 停用 aarch64 | 🟡 | 最新版需要本地 skaware pkg-config producer override，超出 upstream-only 边界 | stock 包无需本地 override 即可完整构建后恢复 | — | `packages/upstream.nix` |

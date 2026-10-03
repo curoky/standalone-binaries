@@ -3,7 +3,6 @@
   pkgs,
   pkgsStatic,
   masterPkgsStatic,
-  s6PkgsStatic,
 }:
 assert system != "aarch64-linux";
 let
@@ -127,14 +126,14 @@ let
     dool = pkgs.callPackage ./pythonPackages/dool.nix { };
 
     # s6 stack.
-    execline = s6PkgsStatic.callPackage ./s6Packages/execline.nix { };
-    s6 = s6PkgsStatic.callPackage ./s6Packages/s6.nix {
+    execline = pkgsStatic.callPackage ./s6Packages/execline.nix { };
+    s6 = pkgsStatic.callPackage ./s6Packages/s6.nix {
       inherit execline;
     };
-    s6-linux-init = s6PkgsStatic.callPackage ./s6Packages/s6-linux-init.nix {
+    s6-linux-init = pkgsStatic.callPackage ./s6Packages/s6-linux-init.nix {
       inherit s6 execline;
     };
-    s6-rc = s6PkgsStatic.callPackage ./s6Packages/s6-rc.nix {
+    s6-rc = pkgsStatic.callPackage ./s6Packages/s6-rc.nix {
       inherit s6 execline;
     };
 

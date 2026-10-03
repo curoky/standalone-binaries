@@ -21,9 +21,10 @@ onlyStatic =
 
 nixpkgs 会按依赖位置选择 `__spliced.buildHost`，但 `python3.withPackages` 等组合 derivation
 可能丢失 splice metadata，使 target-static Python 留在 `nativeBuildInputs`；有些 upstream
-expression 也会把仅构建期执行的 Perl 放进 `buildInputs`。同一规则适用于 compiler、linker、
-assembler、code generator、build system 和测试工具：只要工具会在构建期间执行，就必须能在
-build platform 上运行；为 target 生成代码或作为产品运行期 helper 的工具仍属于 target。
+expression 也会把仅构建期执行的 Perl 放进 `buildInputs`，skaware 的内部 scope 则在正常
+splicing 前解析 `pkg-config`。同一规则适用于 compiler、linker、assembler、code generator、
+build system 和测试工具：只要工具会在构建期间执行，就必须能在 build platform 上运行；
+为 target 生成代码或作为产品运行期 helper 的工具仍属于 target。
 需要本地修复的正式包集合通过
 [`packages/static-build-tools.nix`](../../packages/static-build-tools.nix)
 在 producer 边界统一注入当前 channel 的 native build tool。不得把整个
