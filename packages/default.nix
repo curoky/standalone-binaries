@@ -31,6 +31,7 @@ let
     libtool = pkgsStatic.callPackage ./libtool { };
     makeself = pkgsStatic.callPackage ./makeself { };
     pkgconf = pkgsStatic.callPackage ./pkgconf { };
+    tesseract = pkgsStatic.callPackage ./tesseract { };
     vim = pkgsStatic.callPackage ./vim { };
     zsh = pkgsStatic.callPackage ./zsh { };
 

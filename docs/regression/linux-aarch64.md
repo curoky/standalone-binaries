@@ -21,3 +21,4 @@ x86_64-linux 与 Darwin 的定制见各自表格。表格约定与图例见 [`AG
 | `s6-networking` | ⏸️ 停用 aarch64 | 🟡 | 最新版需要本地 skaware pkg-config producer override，超出 upstream-only 边界 | stock 包无需本地 override 即可完整构建后恢复 | — | `packages/upstream.nix` |
 | `s6-portable-utils` | ⏸️ 停用 aarch64 | 🟡 | 最新版需要本地 skaware pkg-config producer override，超出 upstream-only 边界 | stock 包无需本地 override 即可完整构建后恢复 | — | `packages/upstream.nix` |
 | `skalibs` | ⏸️ 停用 aarch64 | 🟡 | 最新版需要本地 skaware pkg-config producer override，超出 upstream-only 边界 | stock 包无需本地 override 即可完整构建后恢复 | — | `packages/upstream.nix` |
+| `tesseract` | ⏸️ 停用 aarch64 | 🟡 | stock wrapper 归档后递归调用自身且 tessdata 路径失效；本地相对资源 packaging 超出 upstream-only 边界 | stock artifact 能以相对路径找到真实二进制和 tessdata 并完成 OCR 后恢复 | b4fd65b198c5 | `packages/default.nix`, `packages/tesseract/` |
