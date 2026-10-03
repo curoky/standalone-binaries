@@ -48,7 +48,7 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | `shellcheck` | 📌 `25.11` | ❌ | unstable 静态 darwin GHC External interpreter terminated | 已确认必要，无可回归空间 | 624af665418d | `packages/upstream.nix` |
 | `smartmontools` | 🩹 本地 | 🟡 | 关外部 drive DB + native autoreconfHook/hostname（避 static Perl） | static Perl 修复后删 build-tool override；CLI 配置保留 | dc5d91f84032 | `packages/smartmontools/darwin.nix`, `packages/default.nix` |
 | `supercronic` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/binary.go` |
-| `tesseract` | 🩹 + 📦 本地 | 🟡 | 去 training-only Pango 避免 static GLib 配置失败；同时链接 GNU/Apple iconv ABI 时仅隐藏 Apple archive 内重复的 `__libiconv_version`；保留独立的相对路径 runtime packaging | static GLib/Pango 可构建且 iconv ABI 冲突消失后删 override；保留 Darwin runtime packaging | — | `packages/tesseract/darwin.nix`, `packages/default.nix` |
+| `tesseract` | 🩹 + 📦 本地 | 🟡 | 去 training-only Pango 避免 static GLib 配置失败；同时链接 GNU/Apple iconv ABI 时仅隐藏 Apple archive 内重复的 `__libiconv_version`；相对路径 runtime 内置 `tessdata_best` 的 `eng`/`chi_sim`/`chi_tra`/`osd`，其他模型由外部 `TESSDATA_PREFIX` 提供 | static GLib/Pango 可构建且 iconv ABI 冲突消失后删 override；保留 Darwin runtime packaging | e12c65a91594 | `packages/tesseract/darwin.nix`, `packages/default.nix` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |

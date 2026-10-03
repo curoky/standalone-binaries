@@ -99,7 +99,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `shadow` | 🩹 + 📦 本地 | 🟡 | 关闭 libbsd 避免 musl `explicit_bzero` 测试 SIGABRT，并合并 `su` output | libbsd checks 修复后恢复 feature；保留完整命令集 packaging | b4fd65b198c5 | `packages/shadow/` |
 | `skaware-build-pkg-config` | 🩹 公共 | 🟡 | cross-static scope 注入 build-platform pkg-config | 上游 scope 正确 splice pkg-config 后删除公共 override | b4fd65b198c5 | `packages/static-build-tools.nix` |
 | `sudo` | 🩹 本地 | 🟡 | 去 pam（`--disable-pam`）纯静态；setuid 外部设置 | 上游 pam 可静态化后删 override；setuid 边界保留 | b4fd65b198c5 | `packages/sudo/` |
-| `tesseract` | 📦 本地 | ❌ | 真实二进制与完整语言数据使用相对路径 wrapper 共同打包 | 可搬运 tessdata 定位必须保留 | — | `packages/tesseract/` |
+| `tesseract` | 📦 本地 | ❌ | 真实二进制与 `tessdata_best` 的 `eng`/`chi_sim`/`chi_tra`/`osd` 使用相对路径 wrapper 共同打包，其他模型由外部 `TESSDATA_PREFIX` 提供 | 可搬运 tessdata 定位和中英文最高精度默认数据必须保留 | e12c65a91594 | `packages/tesseract/` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
 | `tree-sitter` | 🩹 本地 | ✅ | rizin 依赖；精确删 `.so` 安装行（sed range 缺陷） | 上游修正 sed range 或静态不装 `.so` 后删 override | b4fd65b198c5 | `packages/regression/tree-sitter/` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |

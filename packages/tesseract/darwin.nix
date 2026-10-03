@@ -14,11 +14,16 @@
 # 5. Nixpkgs wraps the executable with an absolute TESSDATA_PREFIX and leaves
 #    the real binary in a separate store output, so package both independently
 #    from the Linux implementation with a relative-path runtime wrapper.
+# 6. The upstream wrapper bundles every standard language model by default
+#    (about 1 GiB). Ship only the accuracy-first tessdata_best models for
+#    English, simplified Chinese, traditional Chinese, and orientation/script
+#    detection; users can point TESSDATA_PREFIX at alternatives when needed.
 #
 # Delete only the base override when static GLib/Pango builds on Darwin and
 # nixpkgs selects the Apple ABI iconv; keep the Darwin runtime packaging.
 {
   darwinLibiconv,
+  fetchurl,
   lib,
   nmedit,
   stdenvNoCC,
@@ -27,6 +32,7 @@
 }:
 
 let
+  tessdataBest = import ./tessdata-best.nix { inherit fetchurl; };
   tesseractBase = tesseract.tesseractBase.overrideAttrs (oldAttrs: {
     buildInputs = lib.filter (input: (input.pname or null) != "pango") (oldAttrs.buildInputs or [ ]);
     propagatedBuildInputs = lib.filter (input: (input.pname or null) != "pango") (
@@ -68,7 +74,10 @@ stdenvNoCC.mkDerivation {
     cp ${wrapperScript} $out/bin/tesseract
     chmod +x $out/bin/tesseract
     cp -rL ${tesseractBase}/share/tessdata/* $out/share/tessdata/
-    cp -rL ${tesseract.tessdata}/* $out/share/tessdata/
+    cp -L ${tessdataBest.eng} $out/share/tessdata/eng.traineddata
+    cp -L ${tessdataBest.chi_sim} $out/share/tessdata/chi_sim.traineddata
+    cp -L ${tessdataBest.chi_tra} $out/share/tessdata/chi_tra.traineddata
+    cp -L ${tessdataBest.osd} $out/share/tessdata/osd.traineddata
 
     runHook postInstall
   '';
