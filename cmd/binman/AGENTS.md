@@ -38,7 +38,9 @@ resolve 并发为 4，blob download 并发为 16，解压并发为
 
 `link-to` 是相对 prefix 的目录：`.` 表示 prefix，自定义值如 `profile/go`。省略表示只安装
 到 store。同一 package 可以有多个 target；同一 target 中的文件冲突由后执行的 link
-覆盖。所有链接都使用相对 symlink，因此 prefix 可整体移动。
+覆盖。所有链接都使用相对 symlink，因此 prefix 可整体移动。Package 内指向目录的 symlink
+只保留在 store，不投影到 link target，避免 `sbin -> bin` 等别名占用共享目录；指向文件的
+symlink 仍作为叶子文件投影。
 
 修改 prefix 的阶段持有 `<prefix>/store/.lock` 文件锁；网络与解压阶段不持锁。同一批次
 不会在下载或解压失败后修改 prefix，但串行 commit 不提供整批回滚，失败后重新执行相同命令

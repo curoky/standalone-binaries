@@ -256,6 +256,99 @@ func TestInstallLinksAndReconcilesTargetsWithoutDownload(t *testing.T) {
 	}
 }
 
+func TestInstallKeepsDirectorySymlinksInsideStore(t *testing.T) {
+	c := startRegistry(t, nil, map[string][]byte{
+		"tool": archiveTarGz(t, "tool",
+			archiveEntry{Name: "bin/tool", Body: "tool"},
+			archiveEntry{Name: "bin/tool-alias", Type: tar.TypeSymlink, LinkName: "tool"},
+			archiveEntry{Name: "sbin", Type: tar.TypeSymlink, LinkName: "bin"},
+		),
+	})
+	prefix := t.TempDir()
+	if err := os.Mkdir(filepath.Join(prefix, "sbin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(prefix, "sbin", "existing")
+	if err := os.WriteFile(marker, []byte("existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := (manifest{Installs: []installGroup{{Packages: []string{"tool"}, LinkTo: "."}}}).plan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.install(context.Background(), prefix, plan); err != nil {
+		t.Fatal(err)
+	}
+
+	assertRelativeLink(t, filepath.Join(prefix, "bin", "tool"))
+	alias := filepath.Join(prefix, "bin", "tool-alias")
+	assertRelativeLink(t, alias)
+	if content, err := os.ReadFile(alias); err != nil || string(content) != "tool" {
+		t.Fatalf("alias content=%q err=%v", content, err)
+	}
+	if info, err := os.Lstat(filepath.Join(prefix, "sbin")); err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("prefix sbin info=%v err=%v", info, err)
+	}
+	if content, err := os.ReadFile(marker); err != nil || string(content) != "existing" {
+		t.Fatalf("existing sbin content=%q err=%v", content, err)
+	}
+	storeLink := filepath.Join(storePath(prefix, "tool"), "sbin")
+	if target, err := os.Readlink(storeLink); err != nil || target != "bin" {
+		t.Fatalf("store sbin target=%q err=%v", target, err)
+	}
+
+	if err := c.remove(prefix, []string{"tool"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(alias); !os.IsNotExist(err) {
+		t.Fatalf("remove left file symlink: %v", err)
+	}
+	if content, err := os.ReadFile(marker); err != nil || string(content) != "existing" {
+		t.Fatalf("remove changed existing sbin content=%q err=%v", content, err)
+	}
+}
+
+func TestInstallAndRemoveCleanLegacyDirectorySymlinks(t *testing.T) {
+	c := startRegistry(t, nil, map[string][]byte{
+		"tool": archiveTarGz(t, "tool",
+			archiveEntry{Name: "bin/tool", Body: "tool"},
+			archiveEntry{Name: "sbin", Type: tar.TypeSymlink, LinkName: "bin"},
+		),
+	})
+	prefix := t.TempDir()
+	plan, err := (manifest{Installs: []installGroup{{Packages: []string{"tool"}, LinkTo: "."}}}).plan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.install(context.Background(), prefix, plan); err != nil {
+		t.Fatal(err)
+	}
+	legacyLink := filepath.Join(prefix, "sbin")
+	if _, err := os.Lstat(legacyLink); !os.IsNotExist(err) {
+		t.Fatalf("new install projected directory symlink: %v", err)
+	}
+
+	if err := os.Symlink(filepath.Join("store", "tool", "sbin"), legacyLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.install(context.Background(), prefix, plan); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(legacyLink); !os.IsNotExist(err) {
+		t.Fatalf("reinstall left legacy directory symlink: %v", err)
+	}
+
+	if err := os.Symlink(filepath.Join("store", "tool", "sbin"), legacyLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.remove(prefix, []string{"tool"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(legacyLink); !os.IsNotExist(err) {
+		t.Fatalf("remove left legacy directory symlink: %v", err)
+	}
+}
+
 func TestInstallConflictOrder(t *testing.T) {
 	c := startRegistry(t, nil, map[string][]byte{
 		"first":  packageArchive(t, "first", "tool", "first"),
@@ -452,6 +545,25 @@ func TestExtractRejectsUnsafeArchives(t *testing.T) {
 	}
 }
 
+func TestExtractRejectsEscapingSymlinkChain(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "outside"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	filename := filepath.Join(root, "archive.tar.gz")
+	archive := archiveTarGz(t, "pkg",
+		archiveEntry{Name: "inside/up", Type: tar.TypeSymlink, LinkName: ".."},
+		archiveEntry{Name: "link", Type: tar.TypeSymlink, LinkName: "inside/up/../outside"},
+	)
+	if err := os.WriteFile(filename, archive, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := extractTarGz(filename, filepath.Join(root, "out"), "pkg"); err == nil {
+		t.Fatal("escaping symlink chain accepted")
+	}
+}
+
 func TestLinkRefusesExistingFilesAndSymlinkParents(t *testing.T) {
 	t.Parallel()
 	prefix := t.TempDir()
@@ -482,6 +594,30 @@ func TestLinkRefusesExistingFilesAndSymlinkParents(t *testing.T) {
 	}
 	if err := linkPackage(prefix, "tool", "."); err == nil {
 		t.Fatal("symlink parent was followed")
+	}
+}
+
+func TestLinkRejectsEscapingStoreSymlinkChain(t *testing.T) {
+	t.Parallel()
+	prefix := t.TempDir()
+	store := storePath(prefix, "tool")
+	if err := os.MkdirAll(filepath.Join(store, "inside"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(storeRoot(prefix), "outside"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("..", filepath.Join(store, "inside", "up")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("inside", "up", "..", "outside"), filepath.Join(store, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := linkPackage(prefix, "tool", "."); err == nil {
+		t.Fatal("escaping store symlink chain was linked")
+	}
+	if _, err := os.Lstat(filepath.Join(prefix, "link")); !os.IsNotExist(err) {
+		t.Fatalf("unsafe prefix link created: %v", err)
 	}
 }
 

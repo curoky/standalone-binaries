@@ -92,7 +92,7 @@ func extractTarGz(filename, destination, packageName string) error {
 	for {
 		header, err := archive.Next()
 		if err == io.EOF {
-			return nil
+			return validateExtractedSymlinks(root)
 		}
 		if err != nil {
 			return err
@@ -148,6 +148,18 @@ func extractTarGz(filename, destination, packageName string) error {
 	}
 }
 
+func validateExtractedSymlinks(root *os.Root) error {
+	return fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.Type()&os.ModeSymlink == 0 {
+			return err
+		}
+		if _, err := root.Stat(filepath.FromSlash(name)); err != nil {
+			return fmt.Errorf("resolve symlink %s: %w", name, err)
+		}
+		return nil
+	})
+}
+
 func archivePath(name, packageName string) (string, error) {
 	for strings.HasPrefix(name, "./") {
 		name = strings.TrimPrefix(name, "./")
@@ -186,11 +198,26 @@ func writeArchiveFile(root *os.Root, name string, mode os.FileMode, source io.Re
 	return errors.Join(copyErr, file.Close())
 }
 
-func packageFiles(store string) ([]string, error) {
+func packageFiles(store string, includeDirectorySymlinks bool) ([]string, error) {
 	var files []string
-	err := fs.WalkDir(os.DirFS(store), ".", func(name string, entry fs.DirEntry, err error) error {
+	root, err := os.OpenRoot(store)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	storeFS := root.FS()
+	err = fs.WalkDir(storeFS, ".", func(name string, entry fs.DirEntry, err error) error {
 		if err != nil || name == "." || entry.IsDir() {
 			return err
+		}
+		if !includeDirectorySymlinks && entry.Type()&os.ModeSymlink != 0 {
+			info, statErr := root.Stat(filepath.FromSlash(name))
+			if statErr != nil {
+				return fmt.Errorf("resolve symlink %s: %w", name, statErr)
+			}
+			if info.IsDir() {
+				return nil
+			}
 		}
 		if name != metaFile && name != metaFile+".tmp" {
 			files = append(files, filepath.FromSlash(name))
@@ -201,7 +228,7 @@ func packageFiles(store string) ([]string, error) {
 }
 
 func linkPackage(prefix, packageName, linkTo string) error {
-	files, err := packageFiles(storePath(prefix, packageName))
+	files, err := packageFiles(storePath(prefix, packageName), false)
 	if err != nil {
 		return err
 	}
@@ -250,7 +277,7 @@ func linkPackage(prefix, packageName, linkTo string) error {
 }
 
 func unlinkPackage(prefix, packageName string, targets []string) error {
-	files, err := packageFiles(storePath(prefix, packageName))
+	files, err := packageFiles(storePath(prefix, packageName), true)
 	if err != nil {
 		return err
 	}

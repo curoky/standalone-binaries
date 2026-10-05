@@ -29,8 +29,9 @@ bm --prefix /opt/bm install ripgrep fd
 ```
 
 默认将 package 安装到 `<prefix>/store/<package>`，并把其中的叶子文件以相对
-symlink 链接到 prefix。重新执行 install 会检查远端 layer digest：内容未变化时只调和
-链接，内容变化时下载并替换 store。
+symlink 链接到 prefix。Package 内指向目录的 symlink 只保留在 store，不会占用 prefix
+中的共享目录；指向文件的 symlink 仍会链接。重新执行 install 会检查远端 layer digest：
+内容未变化时只调和链接，内容变化时下载并替换 store。
 
 自定义 link target 或只安装到 store：
 
