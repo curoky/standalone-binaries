@@ -2,7 +2,6 @@
   system,
   pkgs,
   pkgsStatic,
-  masterPkgsStatic,
 }:
 assert system != "aarch64-linux";
 let
@@ -62,12 +61,8 @@ let
     poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql { };
     protobuf_3_9_2 = pkgsStatic.callPackage ./protobuf/3_9_2 { };
-    radare2 = pkgsStatic.callPackage ./regression/radare2 {
-      libewf = masterPkgsStatic.libewf;
-    };
-    rizin = pkgsStatic.callPackage ./rizin {
-      libewf = masterPkgsStatic.libewf;
-    };
+    radare2 = pkgsStatic.callPackage ./regression/radare2 { };
+    rizin = pkgsStatic.callPackage ./rizin { };
     shadow = pkgsStatic.callPackage ./shadow {
       inherit (pkgs) symlinkJoin;
     };

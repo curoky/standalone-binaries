@@ -3,7 +3,6 @@
 
   inputs = {
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
     nixpkgs-gcc15-2026-09-07.url = "github:NixOS/nixpkgs/dc5d91f840324650bac8c379428c7037a416959a";
     nixpkgs-2605.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
@@ -32,7 +31,6 @@
         "22.11" = inputs.nixpkgs-2211;
       };
       pins = {
-        master = inputs.nixpkgs-master;
         "gcc15-pin" = inputs.nixpkgs-gcc15-2026-09-07;
       };
       makeSystemOutputs = import ./lib/make-system-outputs.nix {

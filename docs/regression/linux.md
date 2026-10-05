@@ -35,7 +35,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `copyparty` | 📦 本地 | ❌ | 纯 Python + sibling runtime + 功能裁剪 | sibling runtime、依赖裁剪和功能边界属 packaging | — | `packages/pythonPackages/copyparty.nix` |
 | `crun` | 🩹 本地 | 🟡 | feature 禁用（elfutils badPlatform）+ `doCheck=false` + json-c 迁移 | 逐项恢复 features/checks，保持 musl-static | b4fd65b198c5 | `packages/crun/` |
 | `curl` | 📦 本地 | ❌ | 内置 CA bundle 与相对路径 wrapper | 自包含证书定位是 packaging | — | `packages/curl/` |
-| `diffutils` | 🩹 本地 | ✅ | 禁用 checks（9 个 gnulib 多线程/setlocale 测试 SIGABRT） | 上游全量 checks 与 musl-static 验证通过 | b4fd65b198c5 | `packages/regression/diffutils/` |
+| `diffutils` | 🩹 本地 | ✅ | 禁用 checks（6 个 gnulib 多线程/locale 测试失败） | 上游全量 checks 与 musl-static 验证通过 | a7868a727837 | `packages/regression/diffutils/` |
 | `dive` | 📌 `25.11` | ✅ | 去 pin 失败（openldap 缺 Cyrus SASL） | Linux 用 unstable 并满足 musl-static portability | b4fd65b198c5 | `packages/upstream.nix` |
 | `dool` | 📦 本地 | ❌ | Python sibling runtime wrapper，默认追加 `--bytes` | runtime 与产品默认行为必须保留 | — | `packages/pythonPackages/dool.nix` |
 | `execline` | 🩹 本地 | 🟡 | 去 baked prefix patch | 输出无 store 路径 | b4fd65b198c5 | `packages/s6Packages/execline.nix` |
@@ -53,7 +53,6 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `go` | 🩹 + 📦 本地 | 🟡 | musl-static compiler；在 bootstrap 生成官方默认配置，对 race 强制外链，移除测试专用 dynamic ELF fixtures | 上游 static Go 默认值与 race link mode 对齐后删 patch；SDK packaging 与严格 ELF 门禁保留 | b4fd65b198c5 | `packages/go/` |
 | `gocryptfs` | 🩹 本地 | 🟡 | 清空 propagatedBuildInputs + 设 PKG_CONFIG_PATH | 上游 pcsclite doc 可构建、cross cgo 自动定位 openssl 后删 | b4fd65b198c5 | `packages/gocryptfs/` |
 | `gpgme` | 🩹 本地 | 🟡 | `gnupgMinimal` + `doCheck=false`；`--disable-gpg-test` 已删除 | 恢复完整 GnuPG 或 checks，保持 musl-static | b4fd65b198c5 | `packages/gpgme/` |
-| `libewf` | 📌 `master` | ✅ | radare2/rizin 依赖；上游修复已合并但尚未进入 nixos-unstable，临时使用 master channel | nixos-unstable 包含该修复后去 pin | b4fd65b198c5 | `flake.nix`, `packages/default.nix` |
 | `libtool` | 📦 本地 | ❌ | 改写 `libtoolize` 的 baked data paths | 相对资源定位必须保留 | — | `packages/libtool/` |
 | `lua5_5` | 🩹 本地 | ✅ | 恢复 `/usr/local` module paths，避免嵌 store 路径 | stock 默认 module paths 无 store 路径 | b4fd65b198c5 | `packages/lua/` |
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |

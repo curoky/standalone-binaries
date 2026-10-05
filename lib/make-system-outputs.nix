@@ -66,7 +66,6 @@ let
     else
       import ../packages {
         inherit system pkgs pkgsStatic;
-        masterPkgsStatic = envs.master.pkgsStatic;
       };
   sourcePackages = upstreamPackages // localPackages;
 
