@@ -59,7 +59,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `lua5_5` | 🩹 本地 | ✅ | 恢复 `/usr/local` module paths，避免嵌 store 路径 | stock 默认 module paths 无 store 路径 | b4fd65b198c5 | `packages/lua/` |
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |
 | `markdownlint-cli2` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/nodejsPackages/markdownlint-cli2.nix` |
-| `mise` | 🩹 本地 | 🟡 | 跳过代理相关 DNS 测试 + PATH helper | DNS 测试不再受构建代理影响后删 test workaround；保留 PATH portability patch | b4fd65b198c5 | `packages/mise/` |
+| `mise` | 🩹 本地 | 🟡 | 修复 static-musl nextest list fixture 竞争、为 FHS 测试注入 native tools + PATH helper | upstream list guard 改用可靠的 phase signal、测试不再硬编码 FHS 路径后逐项删 test workaround；保留 PATH portability patch | b4fd65b198c5 | `packages/mise/` |
 | `netron` | 📦 本地 | ❌ | wheel 重打包并绑定 sibling/宿主 Python | runtime packaging 必须保留 | — | `packages/pythonPackages/netron.nix` |
 | `nodejs-slim24` | 🩹 本地 | 🟡 | 保留 `ada` doCheck 与 node configureFlags | 逐 patch 验证删除，保留 Node 24 runtime | b4fd65b198c5 | `packages/nodejsPackages/nodejs/24.nix` |
 | `nodejs-slim26` | 🩹 本地 | 🟡 | 保留 `ada`/`lief`/`temporal_capi` 与 configureFlags | 逐 patch 删除，满足各平台动态依赖规则 | b4fd65b198c5 | `packages/nodejsPackages/nodejs/26.nix` |
