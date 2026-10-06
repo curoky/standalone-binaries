@@ -18,7 +18,9 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
 | `aardvark-dns` | 🩹 本地 | ✅ | musl 无 `close_range` wrapper，patch 改用 raw syscall | 上游改用 musl-safe close_range 后删 patch | b4fd65b198c5 | `packages/regression/aardvark-dns/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
+| `buildah` | 🩹 本地 | ✅ | 纯 Go OpenPGP 避开完整 GnuPG→OpenLDAP 的 musl-static Cyrus SASL 失败 | stock `buildah-unwrapped` 使用静态兼容的签名 backend 通过完整 artifact 流程 | — | `packages/regression/buildah/` |
 | `build-tool-splicing` | 🩹 公共 package-set patch | ✅ | Graphite2、Node 和 Rizin 的 build-only Python、Rizin/Radare2 的 build-only Perl，以及 Mise 的 Git check tool 强制使用 native package set，并门禁错误平台的 native inputs | 各 upstream producer 正确选择 native build tool 后逐项删除 override；门禁保留 | — | `packages/static-build-tools.nix`, `lib/validate-native-build-inputs.nix` |
+| `go-build-tool` | 🩹 公共 package-set patch | ✅ | 默认及版本化 `buildGoModule` 的 native Go 只移除三个 nixpkgs 资源路径 patch，恢复标准 tzdata/MIME/IANA lookup | stock native Go 不再向 consumer 嵌入 store 资源路径 | — | `packages/static-build-tools.nix` |
 | `busybox` | 🩹 + 📦 本地 | 🟡 | udhcpc 与配套脚本改为 sibling 相对定位 | 上游支持可搬运资源定位后删 patch；保留脚本 packaging | b4fd65b198c5 | `packages/busybox/` |
 | `catatonit` | 🩹 本地 | ✅ | 补 build-for-build binutils 让 installCheck 的 readelf 可用 | 上游把 binutils 加进 nativeBuildInputs 后恢复 | b4fd65b198c5 | `packages/regression/catatonit/` |
 | `clang-tools-18` | 📦 本地 | ❌ | 固定 LLVM 18，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |

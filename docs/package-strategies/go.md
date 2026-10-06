@@ -4,6 +4,12 @@ Linux Go 工具默认使用 manifest 的 `pkgsStatic`。macOS 可选择 native C
 最终产物仅依赖系统 dylib；不要为了“更静态”机械设置 `CGO_ENABLED=0`，因为这可能把
 Go compiler store path 写入产物并触发 `disallowedReferences`。
 
+正式 x86_64 Linux package set 的默认及版本化 `buildGoModule` producer 统一使用
+build-platform Go compiler，但只移除 nixpkgs 注入 `tzdata`、`mailcap` 和 `iana-etc` store
+路径的三个 source patch；其余 nixpkgs patch 和 compiler defaults 均保留。这个 override
+只改变构建工具，不改变 consumer 的 musl-static target；probe 和 upstream-only 的
+aarch64-linux 仍使用 raw package set。
+
 ## Go Compiler
 
 `go` 只在 Linux 发布，使用 unstable 的 `pkgsStatic.go_latest` 从源码构建完整 SDK。编译器

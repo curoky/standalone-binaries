@@ -30,6 +30,7 @@ let
           rawPkgsStatic.extend (
             import ../packages/static-build-tools.nix {
               inherit (base) lib;
+              goBuildPkgs = rawPkgsStatic.buildPackages;
               nativePkgs = base;
             }
           );

@@ -142,6 +142,7 @@ let
     conmon = pkgsStatic.callPackage ./regression/conmon { };
     crun = pkgsStatic.callPackage ./crun { };
     gpgme = pkgsStatic.callPackage ./gpgme { };
+    buildah = pkgsStatic.callPackage ./regression/buildah { };
     aardvark-dns = pkgsStatic.callPackage ./regression/aardvark-dns { };
     podman5 = pkgsStatic.callPackage ./podman/podman5.nix {
       inherit

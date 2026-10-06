@@ -20,7 +20,12 @@
 #    platform rule also applies to pkg-config, compilers, linkers, code
 #    generators, build systems, and test tools. Add them here only when a
 #    patched producer actually picks a target tool for build-only execution.
-# 6. Do not replace `pkgsStatic.python3`, `pkgsStatic.perl`, or their package
+# 6. Nixpkgs' native Go compiler is on the correct build platform, but three
+#    source patches embed Nix paths for tzdata, MIME types and IANA data in
+#    every consumer. Remove only those patches from the native Go used by the
+#    default and versioned buildGoModule producers. Keep the remaining nixpkgs
+#    patches and all compiler defaults unchanged.
+# 7. Do not replace `pkgsStatic.python3`, `pkgsStatic.perl`, or their package
 #    sets: runtimes and packages embedding an interpreter still require the
 #    target-static interpreter and libraries.
 #
@@ -29,6 +34,7 @@
 # entry independently when its upstream expression selects the build-platform
 # interpreter without a local override.
 {
+  goBuildPkgs,
   lib,
   nativePkgs,
 }:
@@ -37,9 +43,35 @@ let
   useNativeBuildTools = name: tools: {
     "${name}" = prev.${name}.override tools;
   };
+  withoutNixDataPathPatches =
+    go:
+    go.overrideAttrs (oldAttrs: {
+      patches = builtins.filter (
+        patch:
+        let
+          name = builtins.baseNameOf (toString patch);
+        in
+        !(lib.hasInfix "-iana-etc-" name || lib.hasInfix "-mailcap-" name || lib.hasInfix "-tzdata-" name)
+      ) oldAttrs.patches;
+    });
+  usePortableGoBuilder =
+    builder: compiler:
+    lib.optionalAttrs (builtins.hasAttr builder prev && builtins.hasAttr compiler goBuildPkgs) {
+      "${builder}" = prev.${builder}.override {
+        go = withoutNixDataPathPatches goBuildPkgs.${compiler};
+      };
+    };
 in
 lib.optionalAttrs prev.stdenv.hostPlatform.isStatic (
-  lib.optionalAttrs (prev ? graphite2) (
+  lib.optionalAttrs prev.stdenv.hostPlatform.isLinux (
+    usePortableGoBuilder "buildGoModule" "go"
+    // usePortableGoBuilder "buildGoLatestModule" "go_latest"
+    // usePortableGoBuilder "buildGo123Module" "go_1_23"
+    // usePortableGoBuilder "buildGo125Module" "go_1_25"
+    // usePortableGoBuilder "buildGo126Module" "go_1_26"
+    // usePortableGoBuilder "buildGo127Module" "go_1_27"
+  )
+  // lib.optionalAttrs (prev ? graphite2) (
     useNativeBuildTools "graphite2" { python3 = nativePkgs.python3; }
   )
   // lib.optionalAttrs (prev.stdenv.hostPlatform.isLinux && prev ? mise) (
