@@ -160,7 +160,12 @@
   git-absorb = { };
   mcfly = { };
   miniserve = { };
-  pnpm = { };
+  pnpm = {
+    platforms = [
+      "aarch64-linux"
+      "aarch64-darwin"
+    ];
+  };
   procs = { };
   ripgrep = { };
   ruff = { };

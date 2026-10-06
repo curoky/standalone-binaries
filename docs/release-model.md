@@ -98,9 +98,10 @@ segment，这只减少跨 matrix leg 的临时复用，不影响构建与发布�
 或改变选择语义时，必须同步两个 build workflow 和本表。
 
 Linux-only Node.js runtime 和同级 runtime 工具（`nodejs-slim*`、`markdownlint-cli2`、
-`opencommit`、`prettier`）以及 `pnpm`、`nil`、`nixfmt`、`shellcheck`、`gdb`、
+`opencommit`、`prettier`）以及 `nil`、`nixfmt`、`shellcheck`、`gdb`、
 `clang-tools-{18..23}` 编译慢，仅在 `push` 触发时通过平台配置的 `push_exclude_pkgs`
-从候选中排除，避免拖慢普通代码 push。其中 Node.js runtime 与同级工具、`nil`、`nixfmt`、
+从候选中排除，避免拖慢普通代码 push。`pnpm` 仅在 ARM 平台保留该排除；
+x86_64 Linux 的本地修正需要在 push 中持续回归。其中 Node.js runtime 与同级工具、`nil`、`nixfmt`、
 `gdb`、`clang-tools-*` 只在 Linux 暴露，Darwin 的排除列表相应更短。`schedule` 和
 `workflow_dispatch` 不受此排除影响，仍会构建并发布它们。改动 `push_exclude_pkgs`
 时须同步 `.github/release-platforms.json` 和本说明。

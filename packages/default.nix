@@ -72,6 +72,7 @@ let
     # Rust.
     codex = pkgsStatic.callPackage ./codex { };
     mise = pkgsStatic.callPackage ./mise { };
+    pnpm = pkgsStatic.callPackage ./regression/pnpm/linux.nix { };
 
     # Perl.
     perl = pkgsStatic.callPackage ./perlPackages/perl/linux.nix { };

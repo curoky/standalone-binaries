@@ -71,6 +71,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/perlPackages/parallel.nix` |
 | `patchelf` | 📌 `25.05` | ✅ | 历史 pin；unstable check `__TMC_END__` relocation 失败 | Linux 用 unstable 并满足 musl-static portability | b4fd65b198c5 | `packages/upstream.nix` |
 | `perl` | 🩹 + 📦 本地 | 🟡 | 注入 Compress::Raw::Lzma + IO::Compress::Brotli 静态 XS + wrapper | 只删 stock 已覆盖的依赖/link patch | b4fd65b198c5 | `packages/perlPackages/` |
+| `pnpm` | 🩹 本地 | ✅ | Rust 依赖的 host C helper 错误继承全局 `-static`，仅对该 helper 禁用此 flag | stock `pkgsStatic.pnpm` 的完整 artifact 流程通过 | a7868a727837 | `packages/regression/pnpm/linux.nix` |
 | `podman5` | 🩹 + 📦 本地 | 🟡 | 跟随 5.x；packaging 与产品边界见 podman DESIGN.md | 分别回归编译修正；packaging 保留 | b4fd65b198c5 | `packages/podman/DESIGN.md`、`packages/podman/podman5.nix` |
 | `podman5-rootless` | 📦 本地 | ❌ | per-user wrapper、宿主 ID-map 接口、状态与 s6 packaging | 独立 rootless 产品边界必须保留 | — | `packages/podman-rootless/` |
 | `podman6` | 📌 + 🩹 + 📦 本地 | 🟡 | 固定 6.1.0；packaging 与产品边界见 podman DESIGN.md | 分别回归 pin/编译修正；packaging 保留 | b4fd65b198c5 | `packages/podman/DESIGN.md`、`packages/podman/podman6.nix` |
