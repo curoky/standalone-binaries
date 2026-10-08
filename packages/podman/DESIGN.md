@@ -8,8 +8,8 @@
 上游 tmpfiles 配置不会进入 bundle；`/run/podman` 完全由 unit 的 `RuntimeDirectory` 管理。
 
 socket activation 在第一次连接 `/run/podman/podman.sock` 时启动 `bin/podman-server`。
-`bin/podman` 与 `bin/docker` 是 remote client，始终连接这个 socket；`_podman` 只供 bundle
-内部调用。Podman 5 与 6 使用相同 unit 和 socket 名，宿主只能激活其中一版。
+`bin/podman` 是 remote client，始终连接这个 socket；`_podman` 只供 bundle 内部调用。
+Podman 5 与 6 使用相同 unit 和 socket 名，宿主只能激活其中一版。
 
 ## 文件与状态
 

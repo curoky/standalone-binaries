@@ -21,7 +21,6 @@ cmp "$root/libexec/podman/crun" "$base_root/libexec/podman/crun"
 test -x "$root/bin/podman"
 test -x "$root/bin/podman-server"
 test ! -e "$root/bin/podman-stop"
-cmp "$root/bin/docker" "$root/bin/podman"
 test ! -e "$root/conf/podmanxd.service"
 test ! -e "$root/conf/podmanxd.socket"
 test ! -e "$root/lib/tmpfiles.d"
@@ -131,7 +130,6 @@ grep -Fx 'PODMAN_DATA_DIR=' "$PODMAN_TEST_LOG"
 grep -Fx 'PODMAN_RUNTIME_DIR=' "$PODMAN_TEST_LOG"
 test ! -e "$root/data"
 test ! -e "$runtime"
-cmp "$root/bin/docker" "$root/bin/podman"
 
 # s6 finish reuses the server's local-engine environment after the API is gone.
 sed -i \

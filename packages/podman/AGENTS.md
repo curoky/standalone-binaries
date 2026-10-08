@@ -8,7 +8,7 @@
 
 - 两版共用 `bin/`、`conf/`、patch 与 tests；版本差异留在 `podman5.nix` 和
   `podman6.nix`，不再抽一层 builder。
-- `_podman` 是内部静态二进制，`podman`/`docker` 是固定 rootful socket 的 remote client，
+- `_podman` 是内部静态二进制，`podman` 是固定 rootful socket 的 remote client，
   `podman-server` 是唯一 local engine 入口。
 - 所有持久状态相对 bundle，所有 boot-sensitive 状态位于 `/run/podman`。不要增加宿主
   `/etc/containers`、用户 XDG 配置或 PATH helper fallback。

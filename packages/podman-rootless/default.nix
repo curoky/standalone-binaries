@@ -47,7 +47,6 @@ stdenvNoCC.mkDerivation {
     install -m644 ${./conf/s6-rc.d/podman/type} "$out/conf/s6-rc.d/podman/type"
     install -m644 ${./conf/s6-rc.d/podman/run} "$out/conf/s6-rc.d/podman/run"
     install -m644 ${./conf/s6-rc.d/podman/finish} "$out/conf/s6-rc.d/podman/finish"
-    ln -sfn podman "$out/bin/docker"
 
     runHook postInstall
   '';

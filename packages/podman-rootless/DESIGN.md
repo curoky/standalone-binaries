@@ -20,8 +20,8 @@ updating a live system. The run script creates the required directories and
 sets their ownership as root before using the host `s6-setuidgid` to execute
 `bin/podman-server` as the target user. The server listens directly on the
 user's socket. `podman-server` resets `USER` and `LOGNAME` from its post-drop
-UID instead of inheriting root's identity, while `bin/podman` and `bin/docker`
-connect using the current UID.
+UID instead of inheriting root's identity, while `bin/podman` connects using
+the current UID.
 
 ## Files and State
 
