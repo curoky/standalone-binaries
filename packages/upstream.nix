@@ -161,10 +161,7 @@
   mcfly = { };
   miniserve = { };
   pnpm = {
-    platforms = [
-      "aarch64-linux"
-      "aarch64-darwin"
-    ];
+    platforms = [ "aarch64-darwin" ];
   };
   procs = { };
   ripgrep = { };
