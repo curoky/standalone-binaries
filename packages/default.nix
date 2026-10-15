@@ -56,6 +56,7 @@ let
     gnutar = pkgsStatic.callPackage ./regression/gnutar { };
     go = pkgsStatic.callPackage ./go { go = pkgsStatic.go_latest; };
     gocryptfs = pkgsStatic.callPackage ./gocryptfs { };
+    imagemagick = pkgsStatic.callPackage ./regression/imagemagick/linux.nix { };
     openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
     poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql { };
@@ -181,6 +182,7 @@ let
   darwin = {
     # Partial-static C packages.
     ffmpeg = pkgsStatic.callPackage ./ffmpeg/darwin.nix { };
+    imagemagick = pkgsStatic.callPackage ./regression/imagemagick/darwin.nix { };
     krb5 = pkgsStatic.callPackage ./krb5/darwin.nix { };
     poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql/darwin.nix { };

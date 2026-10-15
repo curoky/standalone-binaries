@@ -53,6 +53,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `go` | 🩹 + 📦 本地 | 🟡 | musl-static compiler；在 bootstrap 生成官方默认配置，对 race 强制外链，移除测试专用 dynamic ELF fixtures | 上游 static Go 默认值与 race link mode 对齐后删 patch；SDK packaging 与严格 ELF 门禁保留 | b4fd65b198c5 | `packages/go/` |
 | `gocryptfs` | 🩹 本地 | 🟡 | 清空 propagatedBuildInputs + 设 PKG_CONFIG_PATH | 上游 pcsclite doc 可构建、cross cgo 自动定位 openssl 后删 | b4fd65b198c5 | `packages/gocryptfs/` |
 | `gpgme` | 🩹 本地 | 🟡 | `gnupgMinimal` + `doCheck=false`；`--disable-gpg-test` 已删除 | 恢复完整 GnuPG 或 checks，保持 musl-static | b4fd65b198c5 | `packages/gpgme/` |
+| `imagemagick` | 🩹 + 📦 本地 | 🟡 | 修正 Potrace cross getopt 误判，关闭静态构建失败的四项 delegate，并嵌入 zero-configuration 资源 | 逐项恢复 stock 依赖；保留可搬运配置，ImageMagick 完整 artifact 通过 | — | `packages/regression/imagemagick/linux.nix` |
 | `libtool` | 📦 本地 | ❌ | 改写 `libtoolize` 的 baked data paths | 相对资源定位必须保留 | — | `packages/libtool/` |
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |
 | `markdownlint-cli2` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/nodejsPackages/markdownlint-cli2.nix` |

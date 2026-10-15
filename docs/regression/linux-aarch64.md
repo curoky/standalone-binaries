@@ -14,6 +14,7 @@ x86_64-linux 与 Darwin 的定制见各自表格。表格约定与图例见 [`AG
 | `coreutils` | ⏸️ 停用 aarch64 | 🟡 | stock unstable 带动态 ELF `libexec/coreutils/libstdbuf.so`，不满足 Linux 纯静态产物约束 | stock artifact 不再包含动态 ELF 后恢复 | b4fd65b198c5 | `packages/upstream.nix` |
 | `dive` | 📌 `25.11` + ⏸️ 停用 aarch64 | 🟡 | unstable 的 `openldap` static 依赖找不到 Cyrus SASL；x86_64 仍走 `25.11` pin | unstable 完整构建及 artifact 校验通过后恢复 | b4fd65b198c5 | `packages/upstream.nix` |
 | `git` | ⏸️ 停用 aarch64 | 🟡 | stock unstable 的 Rust `libgitcore.a` 引用 musl 不提供的 `*64` 符号；`26.05`、`25.11`、`25.05` stock 均失败于 `t2082` | 任一受支持 channel 的 stock 包完整构建及 artifact 校验通过后恢复 | b4fd65b198c5 | `packages/upstream.nix` |
+| `imagemagick` | ⏸️ 停用 aarch64 | 🟡 | stock Potrace cross configure 误用 bundled getopt，且四项可选 delegate 静态构建失败；本地修正超出 upstream-only 边界 | stock ImageMagick 完整构建及 artifact 校验通过后恢复 | — | `packages/default.nix`, `packages/regression/imagemagick/` |
 | `patchelf` | 📌 `25.05` + ⏸️ 停用 aarch64 | 🟡 | unstable checks 构建测试共享库时找不到 `-lbar` 与 `-lbar-scoped`；x86_64 仍走 `25.05` pin | unstable 完整构建及 artifact 校验通过后恢复 | b4fd65b198c5 | `packages/upstream.nix` |
 | `pnpm` | ⏸️ 停用 aarch64 | 🟡 | ARM64 Linux 不再作为 pnpm 的发布目标 | 重新纳入产品范围且 stock 包完整构建及 artifact 校验通过后恢复 | — | `packages/upstream.nix` |
 | `python311` | ⏸️ 停用 aarch64 | 🟡 | stock unstable 带动态 ELF `lib-dynload/*.so`，不满足 Linux 纯静态产物约束 | stock artifact 不再包含动态 ELF 后恢复 | b4fd65b198c5 | `packages/upstream.nix` |

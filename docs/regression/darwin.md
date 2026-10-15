@@ -26,6 +26,7 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | `file` | 🩹 + 📦 本地 | 🟡 | version check 直指真实二进制；wrapper 相对定位 `magic.mgc` | 上游检查可兼容 wrapper 后删除检查修正；资源定位必须保留 | b4fd65b198c5 | `packages/file/` |
 | `git-filter-repo` | 📦 本地 | ❌ | Python sibling runtime；macOS 暂用宿主 Python | runtime packaging 不会因上游构建修复消失 | — | `packages/pythonPackages/git-filter-repo.nix` |
 | `ghostscript` | 🩹 本地 | ✅ | 与 Linux 共用静态 `gs` target override，避免上游固定的 shared `libgs` 构建路径 | `pkgsStatic.ghostscript_headless` 直接生成只依赖系统库的 `gs` 后删除 override | — | `packages/ghostscript/` |
+| `imagemagick` | 🩹 + 📦 本地 | 🟡 | 关闭可选 FFTW，避开 static OpenMP 的 broken target Python，并嵌入 zero-configuration 资源 | FFTW/OpenMP 可构建后恢复 feature；保留可搬运配置 | — | `packages/regression/imagemagick/darwin.nix` |
 | `poppler` | 🩹 + 📦 本地 | 🟡 | 静态依赖裁剪与链接修正；Darwin fontconfig/HarfBuzz 修正；相对资源包装 | static fontconfig、HarfBuzz 与 poppler-utils 可直接构建并通过测试后删除构建 workaround；可搬运资源打包保留 | — | `packages/poppler/` |
 | `golangci-lint` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/binary.go` |
 | `gost` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/binary.go` |

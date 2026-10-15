@@ -1,0 +1,12 @@
+diff --git a/configure b/configure
+index ee47bbd..2cf5e08 100755
+--- a/configure
++++ b/configure
+@@ -12615,7 +12615,6 @@ if test "$have_getopt_long" = "yes"; then
+    if test "$cross_compiling" = yes; then :
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: maybe (cross-compiling)" >&5
+ $as_echo "maybe (cross-compiling)" >&6; }
+-   have_getopt_long=no
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
