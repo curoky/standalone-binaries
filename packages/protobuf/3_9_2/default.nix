@@ -1,4 +1,4 @@
-# Protobuf 3.9.2 — exact legacy musl-static output.
+# Protobuf 3.9.2 musl-static output.
 #
 # Why local:
 # 1. This exact version is part of the published product set, but current

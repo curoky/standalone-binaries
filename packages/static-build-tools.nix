@@ -1,38 +1,17 @@
-# Cross-static producer overrides for tools that execute only while building.
+# 为静态包选择构建期工具；不替换 target runtime。
 #
-# Why local:
-# 1. nixpkgs normally selects `__spliced.buildHost` for nativeBuildInputs, but
-#    composed environments such as `python3.withPackages` no longer carry that
-#    splice metadata. Graphite2 and Rizin therefore receive target-static
-#    Python environments that either cannot load ctypes or are not executable
-#    on a different build architecture.
-# 2. Some expressions put build-only interpreters in `buildInputs`, where
-#    automatic splicing deliberately keeps the target package. Wget does this
-#    for Perl on Darwin; Rizin and Radare2 do it for source generators.
-# 3. Node's Gyp configure path and Darwin rsync's build hooks also execute
-#    Python during the build. None of these interpreters is linked into or
-#    shipped with the corresponding product.
-# 4. The skaware package scope resolves `pkg-config` before normal native-input
-#    splicing, so cross-static consumers cannot execute an unprefixed
-#    `pkg-config` during configure.
-# 5. Override the producer once so every consumer inherits the native tool.
-#    The current failures happen to involve Python, Perl, and Git, but the
-#    platform rule also applies to pkg-config, compilers, linkers, code
-#    generators, build systems, and test tools. Add them here only when a
-#    patched producer actually picks a target tool for build-only execution.
-# 6. Nixpkgs' native Go compiler is on the correct build platform, but three
-#    source patches embed Nix paths for tzdata, MIME types and IANA data in
-#    every consumer. Remove only those patches from the native Go used by the
-#    default and versioned buildGoModule producers. Keep the remaining nixpkgs
-#    patches and all compiler defaults unchanged.
-# 7. Do not replace `pkgsStatic.python3`, `pkgsStatic.perl`, or their package
-#    sets: runtimes and packages embedding an interpreter still require the
-#    target-static interpreter and libraries.
+# 当前问题与修正：
+# - Graphite2/Rizin 的组合 Python 环境丢失 splice metadata，Node/rsync 的
+#   hooks 也需执行 Python。向 producer 注入 native Python。
+# - Wget、Rizin、Radare2 将生成工具放进 target 依赖；注入 native Perl。
+# - Mise 的 checks 需执行 Git；注入 native gitMinimal。
+# - Skaware scope 在正常 splicing 前解析 pkg-config；在 scope 内注入 native 工具。
+# - Go compiler 的三项资源 patch 将 tzdata/MIME/IANA store 路径嵌入 consumer；
+#   仅移除这些 patch，保留其余 compiler 行为。
 #
-# Every override is restricted to the static target scope because
-# `pkgsStatic.extend` also evaluates the overlay for buildPackages. Remove each
-# entry independently when its upstream expression selects the build-platform
-# interpreter without a local override.
+# 仅在 static target scope 应用，避免 extend 同时修改 buildPackages。
+# 上游正确选择 build tools 后逐项删除对应 override；Go override 在资源查找恢复
+# 标准路径后删除。保留 target Python/Perl 及其 package set 的静态语义。
 {
   goBuildPkgs,
   lib,

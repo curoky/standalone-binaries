@@ -6,9 +6,9 @@ Perl 包按平台构建独立 runtime，脚本工具在运行期显式使用同�
 
 ## 平台 Runtime
 
-### Linux
+### x86_64 Linux
 
-Linux 发布 musl 全静态 Perl。解释器以 `-Uusedl` 构建，不能在运行期加载 XS `.so`，因此
+解释器以 `-Uusedl` 构建为 musl 全静态，不能在运行期加载 XS `.so`，因此
 所需 XS 扩展必须作为 static extension 编入解释器。
 
 `exiftool` 需要的压缩扩展也遵守该约束：Linux 的 `perl` runtime 内建这些 XS 扩展，

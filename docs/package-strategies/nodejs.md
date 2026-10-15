@@ -1,19 +1,14 @@
 # Node.js 构建策略
 
-Node.js 仅在 Linux 发布，分为独立 runtime 和绑定同级 runtime 的 CLI 工具：
+Node.js runtime 和 JS CLI 仅在 x86_64 Linux 发布：
 
 - runtime 是 musl 全静态；
 - CLI 只发布 JS 和 wrapper，运行时显式执行同级 `nodejs-slim26`。
 
 ## Runtime
 
-Node 构建需要 native Python 和平台构建工具；不要把 target 静态 Python 当 build tool。
-需要 patch 内层依赖时使用局部 `pkgsStatic.extend`，并通过
-`stdenv.hostPlatform.isStatic` 限制到 target 副本。否则 overlay 会污染
-`buildPackages`，改变 cmake、LLVM 和 rustc 的 hash，导致大型工具链失去 binary cache。
-
-使用 arch 对应的 musl cross static set（x86_64 用 musl64，aarch64 用
-aarch64-multiplatform-musl），以便 Node 的 Rust 依赖复用 build 平台缓存工具链。
+Node 需要 native Python 和构建工具，Rust 依赖复用 build 平台工具链。
+修改内层依赖时按 [Build tools](build-tools.md) 限制局部 overlay 的作用范围。
 
 具体 patch 和禁用检查的状态见[回归清单](../regression/AGENTS.md)。
 

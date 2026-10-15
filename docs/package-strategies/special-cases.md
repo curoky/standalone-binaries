@@ -1,45 +1,42 @@
-# 非默认产物
+# Artifact boundaries
 
-本页只记录偏离“直接发布完整 `pkgsStatic` 工具”的稳定产品边界。具体 patch、禁用 feature 和
-回归状态以实现及[回归清单](../regression/AGENTS.md)为准。
+通用目标见根 [AGENTS.md](../../AGENTS.md)。本页集中记录输出裁剪和已允许的例外；
+修改这些产品边界前确认需求，再同步实现、校验和[定制记录](../regression/AGENTS.md)。
 
-## 裁剪产物
+## Output selection
 
-### ffmpeg
+- FFmpeg 发布 headless 工具；恢复 codec、filter、采集或加速 feature 时重新验证完整
+  静态依赖闭包和实际功能。
+- PostgreSQL 发布 `psql` client；不恢复 server、扩展或无关开发工具。
+- `clang-tools-*` 只提取 `clang-format`。多版本工具、runtime、插件和数据包按各自输出
+  发布，不能因为上游构建已修好就删除产品包装。
 
-各平台发布 headless、feature-reduced 的 ffmpeg。Linux 关闭无法组成 musl-static 闭包的宿主
-采集与硬件加速 feature；macOS 启用的依赖必须能静态链接，最终 Mach-O 只能依赖系统 dylib 和
-framework。恢复 codec、filter 或 network feature 时，必须重新检查完整依赖闭包，不能只验证
-ffmpeg configure 成功。
+## Dynamic libraries
 
-### PostgreSQL
+Linux 只有 `nsight-systems` 允许 NVIDIA 的 glibc 动态发行物；interpreter 和 rpath 使用
+宿主 ABI 路径，仍不得依赖 Nix store。例外在 `lib/make-artifacts.nix` 接入。
 
-Linux 只发布静态链接 `libpq` 的 `psql` 客户端，不发布 server、扩展或开发工具集合。
-构建不得重新引入需要动态加载模块的 server 路径。
+macOS 系统库只允许 `/usr/lib` 和 `/System/Library/Frameworks`。非系统依赖优先静态
+链接；需要携带 dylib 时，install name 与 load command 使用 `@loader_path` 或
+`@rpath`，rpath 限于 `@loader_path` 及其子目录。新增 dylib bundling 需确认。
+Perl 已允许携带相对路径 `libperl.dylib`，见 [Perl](perl.md)。
 
-### 单工具输出
+Darwin arm64 Go/CGO 的特定 `libresolv.9.dylib` 路径由
+[artifact](../../cmd/artifact/AGENTS.md#darwin-cgo-resolver) 修正，不能扩展到其他库或格式。
+路径含 `openssl` 的文件免于 binary validation，但仍执行规范化；改变该豁免需确认。
 
-版本化 LLVM 包只提取所需工具；类似裁剪属于产品边界。不要为了贴近上游输出而恢复无关二进制、
-库或开发文件。
+## Host dependencies
 
-## 构建期依赖
+- Darwin `git-filter-repo` 和 `netron` 使用宿主 `python3`。
+- `eza-ls` 允许调用 `/bin/ls`。
+- Java 工具使用外部 `JAVA_HOME`，见 [Java](java.md)。
+- Podman 的服务、内核和宿主权限接口分别见
+  [rootful](../../packages/podman/DESIGN.md) 与 [rootless](../../packages/podman-rootless/DESIGN.md)。
 
-构建工具可以使用 native 包，只要它不会进入目标产物的运行期闭包。例如 macOS 的静态 wget
-使用 native Perl 作为生成工具，但 wget 的所有非系统运行期依赖仍需静态链接。
+这些依赖仅适用于对应产品；新增宿主依赖需确认。
 
-build-time override 必须只替换构建工具，不得改变 target 包的链接边界。
+## Known gap
 
-## Linux 动态例外
-
-当前只允许一个动态 ELF 例外：
-
-- `nsight-systems`：NVIDIA 提供的预编译 glibc 分发物。
-
-这些包仍必须满足：
-
-- 不引用 `/nix/store`；
-- ELF interpreter 和 rpath 只指向明确的宿主 ABI 路径；
-- 例外同时登记在 `lib/make-artifacts.nix`、根 `AGENTS.md` 和[回归清单](../regression/AGENTS.md)；
-- 新增例外必须先确认，不能通过放宽全局校验实现。
-
-除这两个包外，Linux ELF 必须通过 musl 全静态校验。
+Darwin Rclone 使用 stock native Go，保留 `tzdata`、`mailcap` 和 `iana-etc` 资源 store
+引用。这是已知可移植性缺口，只允许这三类资源，不放宽动态库或其他包的要求。
+修复和验证范围见 [Go 资源路径](go.md#resource-paths)。

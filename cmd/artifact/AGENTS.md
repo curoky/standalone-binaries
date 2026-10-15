@@ -48,10 +48,16 @@ Artifact 只做规范化与约束校验，不会把动态程序变成静态程�
 flags 和 runtime，尤其不能丢失 Lima 的 virtualization entitlement。不使用无法保留这些
 metadata 的 nixpkgs sigtool 0.1.3。此依赖只用于构建，不引入产物运行时依赖。
 
-resolver 替换是临时 workaround，以 `artifact-darwin-cgo-resolv` 独立进入
-[回归队列](../../docs/regression/darwin.md#darwin-cgo-resolver-回归)。nixpkgs 更新后必须
-在绕过该替换的条件下重新评估；普通 artifact / probe 成功不算移除依据。删除 resolver
-特例时保留通用 Nix rpath 清理及必要重签。
+### Removing the resolver fix
+
+`artifact-darwin-cgo-resolv` 在[定制记录](../../docs/regression/darwin.md)中独立跟踪。
+先遍历 `sources.aarch64-darwin` 的未规范化产物，按上述 matcher 条件确定完整受影响集合；
+不能只从 manifest 的 `isStatic=false` 或旧记录推测。评估删除时，在一次性工作副本中
+让 `darwinCGOResolvDependencies` 不返回替换项，保留
+Mach-O 检查、rpath 清理、签名和校验。用同一 lock 为所有当前命中该 matcher 的包重建
+artifact，并在 Darwin ARM64 上运行 smoke test；涉及 entitlement 的包还需验证其功能。
+任一包失败即保留修正，全部通过才删除 matcher 和专属测试。正常经过修正的 probe 或
+artifact 构建不算移除证据。
 
 ## Binary Validation
 
@@ -67,7 +73,7 @@ resolver 替换是临时 workaround，以 `artifact-darwin-cgo-resolv` 独立进
 
 不要通过放宽全局校验修复单包问题。新增动态例外或改变 `openssl` 豁免前先确认，并同步
 `lib/make-artifacts.nix`、[回归清单](../../docs/regression/AGENTS.md) 和
-根 [`AGENTS.md`](../../AGENTS.md)。
+[产物边界](../../docs/package-strategies/special-cases.md)。
 
 ## 实现边界
 

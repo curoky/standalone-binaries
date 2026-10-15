@@ -25,7 +25,7 @@
 }:
 
 (rizin.override {
-  tree-sitter = callPackage ../regression/tree-sitter { };
+  tree-sitter = callPackage ../tree-sitter { };
 }).overrideAttrs
   (old: {
     depsBuildBuild = (old.depsBuildBuild or [ ]) ++ [ buildPackages.stdenv.cc ];

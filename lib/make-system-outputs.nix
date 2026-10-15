@@ -70,8 +70,8 @@ let
           system
           pkgs
           pkgsStatic
-          upstreamPackages
           ;
+        pkgsStaticMaster = envs.master.pkgsStatic;
       };
   sourcePackages = upstreamPackages // localPackages;
 

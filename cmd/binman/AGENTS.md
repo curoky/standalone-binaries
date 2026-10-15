@@ -18,9 +18,7 @@ Package tag 是 `<package>-<architecture>`。Manifest 必须恰好包含一个
 顶层目录。Client 使用 layer digest 判断已安装内容是否需要重新下载。
 
 一次 install 只创建一个共享 `remote.Puller`，通常只触发一次 token exchange。Manifest
-resolve 并发为 4，blob download 并发为 16，解压并发为
-`runtime.GOMAXPROCS(0)`。所有下载和解压成功后，store replacement 与 link 按声明顺序串行
-执行。
+解析、下载和解压并发执行；全部成功后，store replacement 与 link 按声明顺序串行执行。
 
 ## Layout 与状态
 
@@ -80,9 +78,6 @@ prefix 的 link target 必须报错。CLI packages 追加在 YAML groups 后，�
 - `registry.go`：共享 Puller、manifest resolve 和 blob 下载。
 - `install.go`：分阶段并发、串行 commit 和 remove。
 - `store.go`：metadata、文件锁、基于 Go `os.Root` 的安全解压、store replacement 与 link。
-
-不要重新引入 profile、search/list、outdated、独立 download、archive cache、依赖解析或兼容
-旧布局的迁移逻辑。
 
 ## 验证
 

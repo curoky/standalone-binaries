@@ -1,0 +1,4 @@
+interface:
+  display_name: "Submit Nixpkgs Fixes"
+  short_description: "提交已验证的 nixpkgs 修复，处理 PR review 和上游覆盖检查"
+  default_prompt: "Use $submit-nixpkgs-fix to prepare or update a verified nixpkgs fix and its pull request."

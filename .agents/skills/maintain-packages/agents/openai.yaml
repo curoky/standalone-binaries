@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintain Packages"
+  short_description: "接入和修复 standalone 包，验证并移除多余的本地定制"
+  default_prompt: "Use $maintain-packages to update this package and verify its standalone artifacts."

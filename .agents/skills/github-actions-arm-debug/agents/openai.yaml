@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify on ARM"
+  short_description: "使用 GitHub Actions ARM runner 构建并运行验证"
+  default_prompt: "Use $github-actions-arm-debug to verify this change on a Linux ARM64 or macOS ARM64 runner."

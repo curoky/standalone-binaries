@@ -1,175 +1,46 @@
-# standalone-binaries Agent Guide
+# standalone-binaries
 
-先阅读：
+## Core goals
 
-- 修改具体生态时阅读[包构建策略](docs/package-strategies/README.md)
-- 修改 `cmd/artifact/`、`cmd/binman/` 或 `cmd/nixcache/` 时阅读对应目录的
-  `AGENTS.md`
+把 nixpkgs 软件构建成可搬运目录和确定性 tar.gz，在没有 Nix 的机器上运行。
+优先使用 unstable 上游包，只维护构建和可移植性所必需的本地定制。
+用户查包看 [Package support](docs/packages.md)。
 
-本仓库将 nixpkgs 包和必要的本地定制转换为可搬运目录，再生成确定性 tar.gz。
-包级与公共组件 workaround 的回归状态以[回归清单](docs/regression/AGENTS.md)为准。
+## Key conventions
 
-## 产物不变量
+- Linux ELF 使用 musl 全静态链接。macOS 只加载系统库或包内相对路径 dylib。
+  程序、脚本、资源和 helper 不得依赖运行机器的 `/nix/store`。
+  已有例外集中在[产物边界](docs/package-strategies/special-cases.md)，新增或改变例外需确认。
+- 支持 `x86_64-linux`、`aarch64-linux`、`aarch64-darwin`。ARM64 Linux 只接入
+  stock nixpkgs 包，允许选择 channel、output 和别名；不维护本地 patch、override 或 wrapper。
+  stock 构建失败时停用该平台。
+- `packages/upstream.nix` 选择上游包，默认 unstable、静态、`out`；省略默认字段。
+  `packages/default.nix` 显式接入本地包，并覆盖同名上游包。索引只负责选择和接线。
+  仅供其他包使用的依赖放在内部 `let`，不单独生成产物。
+- 本地定制复用上游 derivation。文件头写清当前问题、修正及删除条件；资源包装、同级
+  runtime、多版本输出等产品行为另说明保留理由。具体构建规则见[包构建](docs/package-strategies/AGENTS.md)。
+- 新增或改变包、平台、pin、patch、wrapper 或例外时，同步[支持表](docs/packages.md)和
+  [定制记录](docs/regression/AGENTS.md)，核对 `.github/release-platforms.json` 的发布排除项。
+- 先验证受影响目标。构建成功后检查链接、搬迁和实际运行；eval、缓存命中、实际编译、
+  smoke test 分别报告。涉及其他平台时，在目标环境验证后再删除其修正。
+- `bm` 安装 tar.gz，不解析包依赖；同级 runtime 需分别安装。Nix cache 与工具发布分别
+  判断完成状态。修改归档、OCI 或 cache 协议时同步消费方、workflow 和[发布模型](docs/release-model.md)。
+- 沟通默认用中文，先报告结果、证据和剩余问题。已明确的目标与授权继续执行；需要确认时
+  给出具体改动、原因和选择，不重复询问。Commit 不添加 `Co-authored-by`。
+- 文档只保留当前规则。根文档负责目标和入口，组件 `AGENTS.md` 负责契约，skill 负责流程，
+  实现旁注释负责原因；各处使用相对链接，不重复包名单、参数表或测试历史。
 
-1. 所有平台都不得运行时引用 `/nix/store`。
-2. Linux 常规 ELF 必须使用 musl 全静态链接。
-3. macOS 不得动态链接 Nix store 中的库；允许系统动态库和随包提供的相对路径 dylib。
-4. 资源和 helper 使用相对路径；脚本工具通过同级 runtime wrapper 绑定解释器。
-5. 纯脚本、字体和数据包没有静态链接要求，但仍不得保留 Nix store 路径。
+## Workflows
 
-Linux 当前只有 `nsight-systems` 一个动态 ELF 例外。路径含
-`openssl` 的文件保留既有 binary validation 豁免。改变这些例外前必须先确认。
-
-Darwin 的 `git-filter-repo` 和 `netron` 使用宿主 `python3`，`eza-ls` 可回退
-`/bin/ls`。这些是明确的产品边界，不应扩展为新包的默认策略。
-
-macOS 系统动态库只允许来自 `/usr/lib` 和 `/System/Library/Frameworks`。随包携带
-非系统 dylib 时，install name 和 load command 必须使用 `@loader_path` 或
-`@rpath`，且 rpath 必须位于 `@loader_path` 下。
-
-已确认的 Darwin arm64 Go/CGO `libresolv.9` store dependency 由 artifact 统一修正；
-必须匹配 Go build info 和完整库路径，不泛化到其他 Mach-O。门禁和构建期签名规则见
-[`cmd/artifact/AGENTS.md`](cmd/artifact/AGENTS.md#darwin-cgo-resolver)。
-
-经用户确认，Darwin Rclone 先取消 Go 资源 hash 清理，暂时保留已知的
-`tzdata/mailcap/iana-etc` store 引用；这是待修复缺口，不是完整 portability 回归成功。
-该边界仅限上述资源，不放宽动态库或其他包的校验；详情见
-[Go 资源路径](docs/package-strategies/go.md#go-资源路径)。
-
-## 包集合
-
-支持的平台是 `x86_64-linux`、`aarch64-linux` 和 `aarch64-darwin`。其中
-`aarch64-linux` 是 upstream-only 的最小支持平台：只发布
-`packages/upstream.nix` 中 stock nixpkgs 能直接通过完整 artifact 流程的包，不为该平台维护
-本地 patch、override、wrapper 或结构性 repackaging。stock 包失败时从该平台停用，不新增
-本地修复。
-`lib/make-system-outputs.nix` 为每个 nixpkgs input 创建普通和静态 package set：
-
-- Linux 使用 arch 对应的 musl cross static set：`x86_64-linux` 用
-  `pkgsCross.musl64.pkgsStatic`，`aarch64-linux` 用
-  `pkgsCross.aarch64-multiplatform-musl.pkgsStatic`。Target 是 musl-static，
-  build platform 仍可复用 glibc Rust/LLVM 工具链。
-- Darwin 使用原生 `pkgsStatic`。
-
-除 `aarch64-linux` 外，正式包集合在 raw `pkgsStatic` 上应用
-`packages/static-build-tools.nix`：只对明确仅在构建期执行解释器的 producer 注入当前 channel
-的 native 解释器，不改变 `pkgsStatic` 中解释器及其 package set 的 target 语义。
-`aarch64-linux` 与 probe 均保留 raw package set；前者仍运行正式 artifact 的 native-input
-门禁，后者既不应用公共修正，也不运行该门禁。Artifact 求值会递归检查 native inputs 的
-host platform 是否等于 consumer 的 build platform。
-
-`x86_64-linux` 与 `aarch64-darwin` 的包集合由 `packages/upstream.nix` 中可直接使用的
-nixpkgs 包与 `packages/default.nix` 中的本地包合并，后者覆盖前者；`aarch64-linux` 只使用
-前者，并禁止导入本地 package index。Manifest 的完整 schema 见 `packages/upstream.nix` 及
-`lib/make-manifest-packages.nix`。本地 package index 显式接线，不自动扫描目录。共享编译
-技术栈且问题会一起回归，或运行时/产品强绑定的 package family 可共用子目录，但不增加
-子级 index。经确认有较大希望整项回到 upstream 的纯 workaround 放在
-`packages/regression/<name>/`；该目录只是回归队列的物理归档，其中每个 package 仍独立
-接线、独立回归，不是共享实现的 family。
-
-## 包接入
-
-默认从 unstable 的 `pkgsStatic` 和 manifest 开始；失败后依次选择最小 override、
-静态依赖替换、关闭非必要 feature、相对资源或同级 runtime wrapper。动态例外必须
-单独确认。
-
-- Manifest 不填写默认字段；包清单和 schema 以实现为准。
-- `aarch64-linux` 只允许在 manifest 中选择、pin、重命名、选择 output 或停用 stock 包；
-  不得为恢复该平台新增任何本地 derivation、patch、override、wrapper 或 package-set overlay。
-- Manifest schema 在 eval 时 fail-closed：未知字段、平台、nixpkgs version、空或重复
-  output 和错误字段类型必须直接报错。
-- `packages/upstream.nix` 与 `packages/default.nix` 只负责选择和接线；可以保留生态、平台等
-  分组标题，不记录包级定制原因。每个本地包必须在最终 derivation 的 Nix 文件头部按项
-  说明 stock 行为、具体失败和对应修正，并写清可删除边界；混合包另列必须保留的结构性
-  packaging。不要省略 root cause，也不要保留验证流水、旧实现或 Git 历史。
-- 本地包只修 root cause，不复制 upstream derivation。
-- 优先最小 override，避免 target overlay 污染 `buildPackages`。只针对静态 target
-  的 override 必须检查 `stdenv.hostPlatform.isStatic`。
-- 新增或改变 pin、patch、override、禁用检查、结构性 packaging、宿主依赖或动态
-  例外时同步[回归清单](docs/regression/AGENTS.md)。
-- Wrapper、资源、证书和同级 runtime 要做行为 smoke test，不能只验证 derivation
-  构建成功。
-
-具体生态和特殊案例见[包构建策略](docs/package-strategies/README.md)。Artifact
-规范化、校验和归档契约见
-[`cmd/artifact/AGENTS.md`](cmd/artifact/AGENTS.md)。
-
-## 发布边界
-
-普通 workflow 构建同一 derivation 的 `out` 与 `archive` output。两者及 source 输出的
-closure 进入 `ghcr.io/curoky/standalone-binaries-cache`，tar.gz 另发布到
-`ghcr.io/curoky/standalone-binaries:<package>-<architecture>`。缓存可用与发布完成分别判断；
-`cacheRoots` 暴露全平台当前目标，手动清理优先保护 master roots 并采用 24 小时候选宽限期。
-
-`bm` 消费 tar.gz artifact，不解析包依赖；包与 runtime 必须分别安装。发布触发、
-cache segment 和 retention 规则见[发布与 cache 模型](docs/release-model.md)。组件协议见
-[`cmd/binman/AGENTS.md`](cmd/binman/AGENTS.md) 和
-[`cmd/nixcache/AGENTS.md`](cmd/nixcache/AGENTS.md)。
-
-修改 tag、layer、归档布局、cache schema 或 client 状态格式时，同步相关 workflow
-和组件 `AGENTS.md`。
-
-## 改动入口
-
-| 需求 | 修改位置 |
+| 工作 | 入口与 skill |
 | --- | --- |
-| 接入可直接使用的 nixpkgs 包 | `packages/upstream.nix` |
-| 添加 patch、wrapper 或平台拆分 | `packages/<name>/`、`packages/default.nix` |
-| 处理高概率整项回归的本地包 | `packages/regression/<name>/`、`docs/regression/` |
-| 登记/回归本地定制 | `docs/regression/`、package indexes |
-| 修改产物后处理与校验 | `cmd/artifact/AGENTS.md`、`lib/make-artifacts.nix` |
-| 修改包选择或 flake outputs | `lib/`、`flake.nix` |
-| 探测某包在某 channel 无 patch 能否构建 | `nix build .#probe.<system>.<channel>.<pkg>` |
-| 修改 `bm` | `cmd/binman/AGENTS.md` |
-| 修改 Nix cache | `cmd/nixcache/AGENTS.md`、`docs/release-model.md` |
+| 接入包、修构建或运行问题、更新 nixpkgs、删除 patch/pin | [maintain-packages](.agents/skills/maintain-packages/SKILL.md) |
+| 给 nixpkgs 提交修复、处理已有 PR 的 review 或检查是否已被上游覆盖 | [submit-nixpkgs-fix](.agents/skills/submit-nixpkgs-fix/SKILL.md) |
+| 在 Linux ARM64 / macOS ARM64 上构建、运行或复现问题 | [github-actions-arm-debug](.agents/skills/github-actions-arm-debug/SKILL.md) |
+| 修改包选择、manifest schema 或 flake outputs | `lib/`、`flake.nix`，先读[包构建](docs/package-strategies/AGENTS.md) |
+| 修改产物整理、校验与归档 | [cmd/artifact/AGENTS.md](cmd/artifact/AGENTS.md) |
+| 修改安装器 `bm` | [cmd/binman/AGENTS.md](cmd/binman/AGENTS.md) |
+| 修改 Nix cache | [cmd/nixcache/AGENTS.md](cmd/nixcache/AGENTS.md) |
+| 修改 CI、发布或清理 | [发布模型](docs/release-model.md)、对应 workflow |
 
-处理静态构建失败时使用
-[`patch-nixpkgs-standalone`](.trae/skills/patch-nixpkgs-standalone/SKILL.md)。
-把本地定制整理并提交为 nixpkgs 上游 PR 时使用
-[`submit-nixpkgs-fix`](.trae/skills/submit-nixpkgs-fix/SKILL.md)。
-回归本地 patch 或版本 pin 时使用
-[`regress-patched-package-to-upstream`](.trae/skills/regress-patched-package-to-upstream/SKILL.md)，
-并以[回归清单](docs/regression/AGENTS.md)为候选清单。
-
-## 验证
-
-先验证目标，再扩大范围：
-
-```bash
-nix build .#<name>
-nix build .#tarballs.<system>.<name>
-file result/bin/*
-nix flake check
-nix build .#all-fast
-```
-
-Go 组件的专属验证命令见各自 `AGENTS.md`。Wrapper、证书和同级 runtime 不能只靠
-build 成功判断；补充 `--version` 或代表性 smoke test。
-
-不要把 eval、dry-run、lint 或代码审查表述为实际构建通过。完整构建成本过高时，明确
-报告已执行和未执行的验证。
-
-## 探针（probe）
-
-`nix build .#probe.<system>.<channel>.<pkg>` 直接从某 channel 的 `pkgsStatic`
-取任意 nixpkgs 包并走完整 artifact 流程，**绕过 manifest 和 `packages/` 本地
-patch**，用于探测某个包在某 channel 上不打 patch 能否编译过、能否打包。
-
-- `<channel>`：`master`、`unstable`、`2605`、`2511`、`2505`、`2411`、`2405`、`2211`（见
-  `flake.nix` 的 `channels`）。
-- `<pkg>`：任意 nixpkgs 顶层 attr 名；带点的嵌套 attr（如
-  `llvmPackages_18.clang-unwrapped`）因 flake attr 路径限制不支持。
-- 构建变体与正式流程一致：Linux musl cross static，Darwin 原生 static。
-- Probe 仍会应用 artifact 公共 workaround；评估公共 patch 能否删除时，必须按
-  [回归清单](docs/regression/AGENTS.md)的专属步骤绕过该 patch，不能只凭 probe 成功。
-- Probe 使用 raw `pkgsStatic`，不会应用 `packages/static-build-tools.nix` 的正式包公共
-  build-tool 修正或对应 native-input 门禁。
-- 探针是探索入口，不进入包集合、发布或回归清单；非包或不可解析的 attr 在构建时
-  自然报错属预期。定型的包仍须回到 `packages/upstream.nix` 或 `packages/`。
-
-## 文档规则
-
-- 跨模块设计保存在根 `AGENTS.md`；独立组件的设计与协议放在组件目录的
-  `AGENTS.md`。
-- `docs/` 只保留需要独立展开的发布模型、跨包构建策略和回归清单。
-- 仓库内文档使用相对链接；实现参数和包清单以代码为准。
+组件改动按各目录的验证命令执行；无需为普通组件开发另建 skill。

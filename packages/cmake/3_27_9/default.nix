@@ -1,7 +1,7 @@
 # CMake 3.27.9 — versioned musl-static build.
 #
 # Why local:
-# 1. This exact legacy version is a product output and is built from source
+# 1. This exact version is a product output and is built from source
 #    independently of the moving nixpkgs CMake attributes.
 # 2. Its bundled cmcppdap omits `<cstdint>` and fails with current compilers;
 #    inject the include before building.

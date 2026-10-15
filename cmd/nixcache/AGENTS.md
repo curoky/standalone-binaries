@@ -4,39 +4,21 @@
 `index`、`serve`、`probe`、`publication`、`prune` 和 `size`。全局约束见根 [`AGENTS.md`](../../AGENTS.md)，CI
 触发与发布流程见 [`docs/release-model.md`](../../docs/release-model.md)。
 
-## 设计
+## Design
 
-- Nix 通过 `nix copy --to file://...` 生成 closure、NAR 和 narinfo；Go 负责校验、
-  OCI 编排和 HTTP serving。
-- Cache repository、refresh interval 和 media type 固定在代码中；listen address 由
-  `serve --host`、`--port` 设置，默认 `127.0.0.1:37515`。
-- Segment immutable；每次 push 发布独立 tag，matrix job 可并发执行。
-- Snapshot 是原始 `flake.lock` 的 SHA-256。每个 snapshot segment 引用完整 closure，
-  NAR blob 由 registry 按 digest 去重。
-- `packageKey` 是稳定 package identity；`runId` 只用于诊断。
-- 二进制以 `CGO_ENABLED=0` 构建。`push` 依赖宿主 `nix`，其他命令不调用外部程序。
+Nix 用 `nix copy --to file://...` 生成 closure、NAR 和 narinfo，Go 负责校验、OCI 上传和
+HTTP 服务。二进制以 `CGO_ENABLED=0` 构建；只有 `push` 调用宿主 `nix`。
 
-## 核心概念
+| 字段 | 用途 |
+| --- | --- |
+| snapshot | 原始 `flake.lock` 的 SHA-256，用于上传归属和 retention 分组 |
+| segment | 一次 push 的不可变 OCI manifest，包含单包、单平台的完整 closure |
+| packageKey | `push --key` 或 `NIXCACHE_PACKAGE_KEY` 指定的稳定包名，作为 retention 去重键 |
+| runId | 诊断信息，与随机后缀一起保证并发 tag 唯一 |
 
-- **snapshot**：原始 `flake.lock` 的 SHA-256，记录一整套锁定的 nixpkgs channel
-  版本，用于上传归属和 retention 分组，不是 cache 读取边界。同平台不同 snapshot
-  的 segment 可以按确切 store path 复用；lock 改变不应让未改变的 store path 不可见。
-- **segment**：一次 `push` 产出的不可变单元，一个 OCI image manifest，包含某个包在
-  某 snapshot、某 system 下的完整 closure（metadata layer 加若干 NAR layer）。同一包
-  重跑只新增 segment，不覆盖旧的。
-- **packageKey**：稳定的包身份，值为 matrix package 名，由 `push --key` 或
-  `NIXCACHE_PACKAGE_KEY` 传入。它是 retention 去重键；`runId` 不参与 identity。
-
-segment tag 编码了前两者：
-
-```text
-v1-<snapshot前16位>-<system>-<runId>-<random>
-└──────── snapshot 与 system ──────────┘└── 每次 push 唯一 ──┘
-```
-
-`serve` 按 tag 中的 system 筛选所有现存 snapshot，再校验 metadata 的 system 一致；
-它只依赖宿主平台，不读取 checkout 的 `flake.lock`。`runId`+`random` 保证并发 matrix
-job 的 tag 不相撞；tag 发布后不可修改，否则进程内已缓存的 metadata 不会重新读取。
+同平台 segment 按确切 store path 跨 snapshot 复用；NAR 按 digest 去重。
+`serve` 读取宿主平台的全部 segment，不读取 checkout 的 lock；校验 tag 与 metadata 的
+system 一致。重跑新增 segment，已发布 tag 不可修改，否则内存 metadata 缓存会失真。
 
 ## OCI Schema
 
@@ -69,7 +51,7 @@ digest、size、media type 和 annotation 一致。Manifest 和 metadata 正文�
 
 `index <path>` 从 GHCR 加载并校验当前平台全部 segment，将合并后的 narinfo 和 NAR
 descriptor 写入版本化的冻结索引文件。索引不包含 NAR payload；空 cache 也会生成合法文件。
-该文件是同一 workflow run 内的临时 fan-out 数据，不是新的持久 cache schema。
+该文件供同一 workflow run 的 build jobs 共享。
 
 `serve [--host <host>] [--port <port>]` 默认监听 `127.0.0.1:37515`。支持 IPv6
 （例如 `--host ::1`）；port 范围为 0–65535，`--port 0` 自动分配可用端口，日志输出实际

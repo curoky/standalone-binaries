@@ -2,13 +2,16 @@
   system,
   pkgs,
   pkgsStatic,
-  upstreamPackages,
+  pkgsStaticMaster,
 }:
 assert system != "aarch64-linux";
 let
   inherit (pkgs) lib;
   mkClangTools = pkgsStatic.callPackage ./clang-tools { };
   mkPython = pkgsStatic.callPackage ./pythonPackages/python { };
+  conmon = pkgsStaticMaster.conmon;
+  gpgme = pkgsStatic.callPackage ./regression/gpgme { };
+  aardvark-dns = pkgsStatic.callPackage ./regression/aardvark-dns { };
 
   common = {
     # Resource bundles.
@@ -27,7 +30,7 @@ let
     curl = pkgsStatic.callPackage ./curl { };
     eza-ls = pkgsStatic.callPackage ./eza-ls { };
     file = pkgsStatic.callPackage ./file { };
-    ghostscript = pkgsStatic.callPackage ./ghostscript { };
+    ghostscript = pkgsStatic.callPackage ./regression/ghostscript { };
     libtool = pkgsStatic.callPackage ./libtool { };
     makeself = pkgsStatic.callPackage ./makeself { };
     tesseract = pkgsStatic.callPackage ./tesseract { };
@@ -51,17 +54,17 @@ let
     cmake_4_1_2 = pkgsStatic.callPackage ./cmake/4_1_2 { };
     diffutils = pkgsStatic.callPackage ./regression/diffutils { };
     ffmpeg = pkgsStatic.callPackage ./ffmpeg/linux.nix { };
-    fuse = pkgsStatic.callPackage ./fuse { };
+    fuse = pkgsStatic.callPackage ./regression/fuse { };
     graphviz = pkgsStatic.callPackage ./graphviz { };
     gnutar = pkgsStatic.callPackage ./regression/gnutar { };
     go = pkgsStatic.callPackage ./go { go = pkgsStatic.go_latest; };
-    gocryptfs = pkgsStatic.callPackage ./gocryptfs { };
+    gocryptfs = pkgsStatic.callPackage ./regression/gocryptfs { };
     imagemagick = pkgsStatic.callPackage ./regression/imagemagick/linux.nix { };
     openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
     poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql { };
     protobuf_3_9_2 = pkgsStatic.callPackage ./protobuf/3_9_2 { };
-    rizin = pkgsStatic.callPackage ./rizin { };
+    rizin = pkgsStatic.callPackage ./regression/rizin { };
     shadow = pkgsStatic.callPackage ./shadow {
       inherit (pkgs) symlinkJoin;
     };
@@ -138,21 +141,19 @@ let
     };
 
     # Podman / container stack.
-    crun = pkgsStatic.callPackage ./crun { };
-    gpgme = pkgsStatic.callPackage ./gpgme { };
+    crun = pkgsStatic.callPackage ./regression/crun { };
     buildah = pkgsStatic.callPackage ./regression/buildah { };
-    aardvark-dns = pkgsStatic.callPackage ./regression/aardvark-dns { };
     podman5 = pkgsStatic.callPackage ./podman/podman5.nix {
-      conmon = upstreamPackages.conmon;
       inherit
+        conmon
         crun
         gpgme
         aardvark-dns
         ;
     };
     podman6 = pkgsStatic.callPackage ./podman/podman6.nix {
-      conmon = upstreamPackages.conmon;
       inherit
+        conmon
         crun
         gpgme
         aardvark-dns
@@ -183,7 +184,7 @@ let
     # Partial-static C packages.
     ffmpeg = pkgsStatic.callPackage ./ffmpeg/darwin.nix { };
     imagemagick = pkgsStatic.callPackage ./regression/imagemagick/darwin.nix { };
-    krb5 = pkgsStatic.callPackage ./krb5/darwin.nix { };
+    krb5 = pkgsStatic.callPackage ./regression/krb5/darwin.nix { };
     poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql/darwin.nix { };
     pkgconf = pkgsStatic.callPackage ./pkgconf { };

@@ -1,26 +1,13 @@
-# packages/upstream.nix
-#
-# Single declarative manifest of upstream nixpkgs packages.
-# aarch64-linux support is intentionally limited to this manifest: it uses the
-# selected nixpkgs package as-is, without the local package index or package-set
-# overlays. If a stock package fails, disable it on that platform instead of
-# adding an aarch64-linux patch or override.
-#
-# Schema (first-level key = package attr name in nixpkgs):
+# 上游包选择。Key 为 nixpkgs attr，可用点访问嵌套属性。
+# 省略字段使用默认值；平台配置覆盖包级配置。
 #
 #   <pkg> = {
-#     # Optional list of systems this package is built for.
-#     # Omitted => all systems (see `allSystems` in make-manifest-packages.nix).
+#     # 省略 platforms 时启用全部支持平台。
 #     platforms = [ "x86_64-linux" "aarch64-darwin" ];
-#
-#     # Package-level shared config, inherited by every platform:
-#     version  = "unstable";   # which locked nixpkgs env (default "unstable")
-#     isStatic = true;         # pkgsStatic (true, default) or pkgs (false)
-#     output   = [ "out" ];    # derivation outputs to expose (default [ "out" ])
-#     alias    = "name";       # rename exported attribute
-#
-#     # Per-platform overrides. The effective config for a system is
-#     # (package-level shared config) // (platform key config), platform wins.
+#     version  = "unstable";   # flake.nix 中锁定的 channel 或 pin
+#     isStatic = true;         # true 选择 pkgsStatic，false 选择 pkgs
+#     output   = [ "out" ];    # 要发布的 derivation outputs
+#     alias    = "name";       # 导出名，默认与 key 相同
 #     "aarch64-darwin" = { version = "24.11"; };
 #   };
 {
@@ -153,11 +140,26 @@
 
   # rust pkgs
   atuin = { };
-  bat = { };
+  bat = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
+  };
   dprint = { };
-  eza = { };
+  eza = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
+  };
   fd = { };
-  git-absorb = { };
+  git-absorb = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
+  };
   mcfly = { };
   miniserve = { };
   pnpm = {
@@ -184,10 +186,6 @@
 
   catatonit = {
     platforms = [ "x86_64-linux" ];
-  };
-  conmon = {
-    platforms = [ "x86_64-linux" ];
-    version = "master";
   };
   cronie = {
     platforms = [
@@ -332,7 +330,7 @@
     ];
   };
 
-  # protobuf legacy versions
+  # Versioned Protobuf.
   protobuf3_8 = {
     platforms = [
       "x86_64-linux"

@@ -1,21 +1,4 @@
-# make-manifest-packages.nix
-#
-# Build a set of upstream nixpkgs packages from a declarative manifest for a
-# given system.
-#
-# Manifest schema (see packages/upstream.nix for the full reference):
-#   <pkg> = {
-#     platforms = [ "x86_64-linux" "aarch64-darwin" ];  # omitted => allSystems
-#     version  = "unstable";   # which locked nixpkgs env (default "unstable")
-#     isStatic = true;         # pkgsStatic (true, default) or pkgs (false)
-#     output   = [ "out" ];    # outputs to expose (default [ "out" ])
-#     alias    = "name";       # rename the exported attribute
-#     "<system>" = { ... };    # per-platform override of the fields above
-#   };
-#
-# The effective config for `system` is the package-level shared config merged
-# with the matching platform key (platform wins). Packages whose `platforms`
-# list does not contain `system` are skipped.
+# 校验 manifest，合并平台配置并选取上游输出。Schema 见 packages/upstream.nix。
 {
   lib,
   envs,
