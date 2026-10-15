@@ -1,6 +1,7 @@
 # Package support
 
-本表按当前包定义列出平台支持范围，不表示最新 CI 或远端发布状态。
+本表按软件自身支持范围和仓库明确的产品族平台边界分组，并列出当前的平台接线。单纯构建
+失败或尚未接入只在对应平台标为 `—`，不改变分组，也不表示最新 CI 或远端发布状态。
 macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-model.md)。
 
 - ✅：直接使用上游包；`binman`、`nixcache` 是本仓库独立构建的工具。
@@ -12,7 +13,7 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 [安装说明](../cmd/binman/USAGE.md)。`nsight-systems` 使用宿主 glibc；Darwin Rclone
 有已知资源路径缺口，详见[产物边界](package-strategies/special-cases.md)。
 
-## Cross-platform and macOS
+## Cross-platform
 
 | Package | Linux x86_64 | Linux ARM64 | macOS ARM64 |
 | --- | :---: | :---: | :---: |
@@ -33,7 +34,10 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `bzip2` | ✅ | ✅ | ✅ |
 | `cacert` | ✅ | ✅ | ✅ |
 | `cloc` | 🩹 | — | 🩹 |
-| `colima` | — | — | ✅ |
+| `cmake` | ✅ | ✅ | — |
+| `cmake_3_27_9` | 🩹 | — | — |
+| `cmake_4_1_2` | 🩹 | — | — |
+| `codex` | 🩹 | — | — |
 | `connect` | ✅ | ✅ | ✅ |
 | `coreutils` | ✅ | — | ✅ |
 | `croc` | ✅ | ✅ | ✅ |
@@ -56,10 +60,12 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `flex` | ✅ | ✅ | ✅ |
 | `fzf` | ✅ | ✅ | ✅ |
 | `gawk` | ✅ | ✅ | ✅ |
+| `gdb` | ✅ 📌 | ✅ 📌 | — |
 | `gdu` | ✅ | ✅ | ✅ |
 | `gettext` | ✅ | ✅ | ✅ |
 | `gh` | ✅ | ✅ | ✅ |
 | `ghostscript` | 🩹 | — | 🩹 |
+| `git` | 🩹 | — | — |
 | `git-absorb` | ✅ | — | ✅ |
 | `git-extras` | ✅ | ✅ | ✅ |
 | `git-filter-repo` | 🩹 | — | 🩹 |
@@ -71,8 +77,10 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `gnupg` | ✅ | ✅ | ✅ |
 | `gnused` | ✅ | ✅ | ✅ |
 | `gnutar` | 🩹 | — | ✅ |
+| `go` | 🩹 | — | — |
 | `go-task` | ✅ | ✅ | ✅ |
 | `go-tools` | ✅ | ✅ | ✅ |
+| `gocryptfs` | 🩹 | — | — |
 | `gofumpt` | ✅ | ✅ | ✅ |
 | `golangci-lint` | ✅ | ✅ | ✅ |
 | `gomodifytags` | ✅ | ✅ | ✅ |
@@ -80,9 +88,11 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `gost` | ✅ | ✅ | ✅ |
 | `gotests` | ✅ | ✅ | ✅ |
 | `gotools` | ✅ | ✅ | ✅ |
+| `graphviz` | 🩹 | — | — |
 | `gzip` | ✅ | ✅ | ✅ |
 | `imagemagick` | 🩹 | — | 🩹 |
 | `impl` | ✅ | ✅ | ✅ |
+| `indent` | ✅ | ✅ | — |
 | `inetutils` | ✅ | ✅ | ✅ |
 | `jq` | ✅ | ✅ | ✅ |
 | `krb5` | ✅ | ✅ | 🩹 |
@@ -91,20 +101,25 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `less` | ✅ | ✅ | ✅ |
 | `libarchive` | ✅ | ✅ | ✅ |
 | `libtool` | 🩹 | — | 🩹 |
-| `lima` | — | — | ✅ |
 | `lsof` | ✅ | ✅ | ✅ |
+| `lua5_5` | ✅ | ✅ | — |
 | `lxgw-wenkai` | ✅ | ✅ | ✅ |
 | `m4` | ✅ | ✅ | ✅ |
 | `makeself` | 🩹 | — | 🩹 |
+| `man` | ✅ | ✅ | — |
 | `mcfly` | ✅ | ✅ | ✅ |
 | `miniserve` | ✅ | ✅ | ✅ |
+| `mise` | 🩹 | — | — |
 | `ncdu_1` | ✅ | ✅ | ✅ |
 | `nerd-fonts-fira-code` | ✅ | ✅ | ✅ |
 | `nerd-fonts-ubuntu-mono` | ✅ | ✅ | ✅ |
 | `netcat` | ✅ | ✅ | ✅ |
 | `netron` | 🩹 | — | 🩹 |
+| `nil` | ✅ | ✅ | — |
 | `ninja` | ✅ | ✅ | ✅ |
 | `nixcache` | ✅ | ✅ | ✅ |
+| `nixfmt` | ✅ | ✅ | — |
+| `openssh_gssapi` | 🩹 | — | — |
 | `openssl` | ✅ | ✅ | ✅ |
 | `oras` | ✅ | ✅ | ✅ |
 | `parallel` | 🩹 | — | 🩹 |
@@ -116,10 +131,12 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `postgresql` | 🩹 | — | 🩹 |
 | `procs` | ✅ | ✅ | ✅ |
 | `qpdf` | ✅ | ✅ | ✅ |
+| `radare2` | ✅ 📌 | — | — |
 | `rclone` | ✅ | ✅ | ✅ |
 | `revive` | ✅ | ✅ | ✅ |
 | `rime-plugins` | 🩹 | — | 🩹 |
 | `ripgrep` | ✅ | ✅ | ✅ |
+| `rizin` | 🩹 | — | — |
 | `rsync` | ✅ | ✅ | 🩹 |
 | `ruff` | ✅ | ✅ | ✅ |
 | `scc` | ✅ | ✅ | ✅ |
@@ -129,8 +146,10 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `sops` | ✅ | ✅ | ✅ |
 | `sqlite` | ✅ | ✅ | ✅ |
 | `starship` | ✅ | ✅ | ✅ |
+| `sudo` | 🩹 | — | — |
 | `supercronic` | ✅ | ✅ | ✅ |
 | `tesseract` | 🩹 | — | 🩹 |
+| `tmux` | ✅ | ✅ | — |
 | `tmux-plugins` | 🩹 | — | 🩹 |
 | `tokei` | ✅ | ✅ | ✅ |
 | `tree` | ✅ | ✅ | ✅ |
@@ -145,14 +164,13 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `xxd` | ✅ | ✅ | ✅ |
 | `xz` | ✅ | ✅ | ✅ |
 | `yazi` | ✅ | ✅ | ✅ |
+| `zellij` | ✅ | ✅ | — |
 | `zip` | ✅ | ✅ | ✅ |
 | `zsh` | 🩹 | — | 🩹 |
 | `zsh-plugins` | 🩹 | — | 🩹 |
 | `zstd` | ✅ | ✅ | ✅ |
 
 ## Linux only
-
-以下包当前只接入 Linux。
 
 | Package | Linux x86_64 | Linux ARM64 |
 | --- | :---: | :---: |
@@ -169,10 +187,6 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `clang20` | ✅ | ✅ |
 | `clang21` | ✅ | ✅ |
 | `clang22` | ✅ | ✅ |
-| `cmake` | ✅ | ✅ |
-| `cmake_3_27_9` | 🩹 | — |
-| `cmake_4_1_2` | 🩹 | — |
-| `codex` | 🩹 | — |
 | `copyparty` | 🩹 | — |
 | `cronie` | ✅ | ✅ |
 | `dool` | 🩹 | — |
@@ -180,13 +194,7 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `execline` | 🩹 | — |
 | `fuse` | 🩹 | — |
 | `fuse3` | ✅ | ✅ |
-| `gdb` | ✅ 📌 | ✅ 📌 |
-| `git` | 🩹 | — |
 | `glibcLocales` | ✅ | ✅ |
-| `go` | 🩹 | — |
-| `gocryptfs` | 🩹 | — |
-| `graphviz` | 🩹 | — |
-| `indent` | ✅ | ✅ |
 | `iproute2` | ✅ | ✅ |
 | `iptables` | ✅ | ✅ |
 | `iputils` | ✅ | ✅ |
@@ -197,27 +205,19 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `lld_21` | ✅ | ✅ |
 | `lld_22` | ✅ | ✅ |
 | `lsb-release` | ✅ | ✅ |
-| `lua5_5` | ✅ | ✅ |
-| `man` | ✅ | ✅ |
 | `markdownlint-cli2` | 🩹 | — |
-| `mise` | 🩹 | — |
 | `nettools` | ✅ | ✅ |
-| `nil` | ✅ | ✅ |
-| `nixfmt` | ✅ | ✅ |
 | `nodejs-slim24` | 🩹 | — |
 | `nodejs-slim26` | 🩹 | — |
 | `nsight-systems` | 🩹 | — |
 | `numactl` | ✅ | ✅ |
 | `opencommit` | 🩹 | — |
-| `openssh_gssapi` | 🩹 | — |
 | `podman5` | 🩹 | — |
 | `podman5-rootless` | 🩹 | — |
 | `podman6` | 🩹 | — |
 | `podman6-rootless` | 🩹 | — |
 | `prettier` | 🩹 | — |
 | `procps` | ✅ | ✅ |
-| `protobuf3_20` | ✅ 📌 | ✅ 📌 |
-| `protobuf3_21` | ✅ 📌 | ✅ 📌 |
 | `protobuf_23` | ✅ 📌 | ✅ 📌 |
 | `protobuf_24` | ✅ 📌 | ✅ 📌 |
 | `protobuf_25` | ✅ | ✅ |
@@ -227,14 +227,14 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `protobuf_29` | ✅ | ✅ |
 | `protobuf_3_8_0` | ✅ 📌 | ✅ 📌 |
 | `protobuf_3_9_2` | 🩹 | — |
+| `protobuf3_20` | ✅ 📌 | ✅ 📌 |
+| `protobuf3_21` | ✅ 📌 | ✅ 📌 |
 | `python311` | 🩹 | — |
 | `python312` | 🩹 | — |
 | `python313` | 🩹 | — |
 | `python314` | 🩹 | — |
 | `python315` | 🩹 | — |
 | `qemu-user` | ✅ | ✅ |
-| `radare2` | ✅ 📌 | — |
-| `rizin` | 🩹 | — |
 | `s6` | 🩹 | — |
 | `s6-dns` | ✅ | — |
 | `s6-linux-init` | 🩹 | — |
@@ -244,9 +244,13 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `s6-rc` | 🩹 | — |
 | `shadow` | 🩹 | — |
 | `strace` | ✅ | ✅ |
-| `sudo` | 🩹 | — |
-| `tmux` | ✅ | ✅ |
-| `zellij` | ✅ | ✅ |
 
-数据来源：[上游选择](../packages/upstream.nix)、[本地接线](../packages/default.nix)及
-独立工具 workflow。修改包或平台接线时同步本表。
+## macOS only
+
+| Package | macOS ARM64 |
+| --- | :---: |
+| `colima` | ✅ |
+| `lima` | ✅ |
+
+平台接线数据来源：[上游选择](../packages/upstream.nix)、[本地接线](../packages/default.nix)及
+独立工具 workflow。修改包、平台接线或产品族平台边界时同步本表。

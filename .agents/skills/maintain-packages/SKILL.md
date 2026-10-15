@@ -86,8 +86,9 @@ nix build .#tarballs.<system>.<name> --out-link result-archive
 - 更新[定制记录](../../../docs/regression/AGENTS.md)及[支持表](../../../docs/packages.md)。
   平台或包名变化时核对 `.github/release-platforms.json`，删除失效排除项。
   支持表按平台接线标记上游、本地定制和 pin；默认发布排除项不单独标记。
-  当前仅接入 Linux 的包放在独立表格，内部依赖不列入支持表；独立工具以各自
-  workflow 为准。包名可用下面命令读取：
+  表格按软件自身支持范围和明确的产品族平台边界分为跨平台、Linux-only 和 macOS-only；
+  单纯构建失败或尚未接入只在对应平台标记为未接入，不改变分组。内部依赖不列入支持表；
+  独立工具以各自 workflow 为准。包名可用下面命令读取：
 
   ```bash
   nix eval --json .#sources \
