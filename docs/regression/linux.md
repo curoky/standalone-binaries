@@ -34,7 +34,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `cmake_4_1_2` | 📌 源码版本 + 🩹 | 🟡 | 保留 `--no-system-libs`、openssl/curses 关闭、`BUILD_TESTING=false` | 上游支持静态 shared-module test 后删剩余 workaround | b4fd65b198c5 | `packages/cmake/4_1_2/` |
 | `conmon` | 📌 `master`，Podman 内部依赖 | ✅ | 上游修复已合入 master，当前 unstable 仍因 systemd-minimal static badPlatform 无法求值 | unstable 包含修复并完成 musl-static artifact 构建后去掉 pin | 7fd4004d0511 | `packages/default.nix`, `lib/make-system-outputs.nix` |
 | `copyparty` | 📦 本地 | ❌ | 纯 Python + sibling runtime + 功能裁剪 | sibling runtime、依赖裁剪和功能边界属 packaging | — | `packages/pythonPackages/copyparty.nix` |
-| `crun` | 🩹 本地 | 🟡 | feature 禁用（elfutils badPlatform）+ `doCheck=false` + json-c 迁移 | 逐项恢复 features/checks，保持 musl-static | b4fd65b198c5 | `packages/regression/crun/` |
+| `crun` | 🩹 Podman 内部依赖 | 🟡 | feature 禁用（elfutils badPlatform）+ `doCheck=false` + json-c 迁移 | 逐项恢复 features/checks，保持 musl-static | b4fd65b198c5 | `packages/regression/crun/` |
 | `curl` | 📦 本地 | ❌ | 内置 CA bundle 与相对路径 wrapper | 自包含证书定位是 packaging | — | `packages/curl/` |
 | `diffutils` | 🩹 本地 | ✅ | 禁用 checks（6 个 gnulib 多线程/locale 测试失败） | 上游全量 checks 与 musl-static 验证通过 | a7868a727837 | `packages/regression/diffutils/` |
 | `dool` | 📦 本地 | ❌ | Python sibling runtime wrapper，默认追加 `--bytes` | runtime 与产品默认行为必须保留 | — | `packages/pythonPackages/dool.nix` |

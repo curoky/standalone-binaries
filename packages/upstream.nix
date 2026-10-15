@@ -101,9 +101,6 @@
   qpdf = {
     output = [ "bin" ];
   };
-  snappy = {
-    output = [ "bin" ];
-  };
   sqlite = {
     output = [ "bin" ];
   };
@@ -118,12 +115,6 @@
     output = [ "bin" ];
   };
   zip = { };
-  zlib = {
-    output = [ "bin" ];
-  };
-  zlib-ng = {
-    output = [ "bin" ];
-  };
   zstd = {
     output = [ "bin" ];
   };
@@ -184,9 +175,6 @@
 
   ## ---- linux only -------------------------------------------------------
 
-  catatonit = {
-    platforms = [ "x86_64-linux" ];
-  };
   cronie = {
     platforms = [
       "x86_64-linux"
@@ -417,10 +405,6 @@
     platforms = [ "x86_64-linux" ];
     output = [ "bin" ];
   };
-  skalibs = {
-    platforms = [ "x86_64-linux" ];
-  };
-
   # go pkgs
   age = {
     "aarch64-darwin" = {
@@ -580,12 +564,6 @@
     "aarch64-darwin" = {
       isStatic = false;
     };
-  };
-  runc = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
   };
   scc = {
     "aarch64-darwin" = {

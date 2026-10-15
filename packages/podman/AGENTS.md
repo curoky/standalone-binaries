@@ -16,8 +16,9 @@
   路径、隔离外部 override，以及无法写入 TOML 的 `default-mounts-file`。
 - helper 使用 `helper_binaries_dir = ["$BINDIR/../libexec/podman"]`；conmon 和 OCI runtime
   通过仅含同目录的 PATH 解析。新增 helper 时必须保持这条边界。
-- `conmon`、`aardvark-dns` 和 `gpgme` 仅作内部依赖，在 `packages/default.nix` 接线，
-  不独立发布。Conmon 使用锁定的 master；随包 helper 不依赖用户另行安装这些包。
+- `conmon`、`catatonit`、`crun`、`runc`、`aardvark-dns` 和 `gpgme` 仅作内部依赖，
+  不独立发布。需要本地定制或 pin 的依赖在 `packages/default.nix` 接线；Conmon 使用锁定的
+  master。随包 helper 不依赖用户另行安装这些包。
 - 修改 patch 前先证明配置或环境变量能产生完全相同的运行行为。当前源码 patch 只解决
   配置无法表达的行为：固定内置 seccomp、固定 catatonit、registry drop-in 隔离，以及
   Podman 5 的 signature policy 环境变量。

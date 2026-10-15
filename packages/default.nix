@@ -10,6 +10,7 @@ let
   mkClangTools = pkgsStatic.callPackage ./clang-tools { };
   mkPython = pkgsStatic.callPackage ./pythonPackages/python { };
   conmon = pkgsStaticMaster.conmon;
+  crun = pkgsStatic.callPackage ./regression/crun { };
   gpgme = pkgsStatic.callPackage ./regression/gpgme { };
   aardvark-dns = pkgsStatic.callPackage ./regression/aardvark-dns { };
 
@@ -141,7 +142,6 @@ let
     };
 
     # Podman / container stack.
-    crun = pkgsStatic.callPackage ./regression/crun { };
     buildah = pkgsStatic.callPackage ./regression/buildah { };
     podman5 = pkgsStatic.callPackage ./podman/podman5.nix {
       inherit

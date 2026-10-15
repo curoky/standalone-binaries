@@ -126,7 +126,6 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `shellcheck` | ✅ | ✅ | ✅ 📌 |
 | `shfmt` | ✅ | ✅ | ✅ |
 | `smartmontools` | — | — | 🩹 |
-| `snappy` | ✅ | ✅ | ✅ |
 | `sops` | ✅ | ✅ | ✅ |
 | `sqlite` | ✅ | ✅ | ✅ |
 | `starship` | ✅ | ✅ | ✅ |
@@ -147,8 +146,6 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `xz` | ✅ | ✅ | ✅ |
 | `yazi` | ✅ | ✅ | ✅ |
 | `zip` | ✅ | ✅ | ✅ |
-| `zlib` | ✅ | ✅ | ✅ |
-| `zlib-ng` | ✅ | ✅ | ✅ |
 | `zsh` | 🩹 | — | 🩹 |
 | `zsh-plugins` | 🩹 | — | 🩹 |
 | `zstd` | ✅ | ✅ | ✅ |
@@ -161,7 +158,6 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | --- | :---: | :---: |
 | `buildah` | 🩹 | — |
 | `busybox` | 🩹 | — |
-| `catatonit` | ✅ | — |
 | `clang-tools-18` | 🩹 | — |
 | `clang-tools-19` | 🩹 | — |
 | `clang-tools-20` | 🩹 | — |
@@ -179,7 +175,6 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `codex` | 🩹 | — |
 | `copyparty` | 🩹 | — |
 | `cronie` | ✅ | ✅ |
-| `crun` | 🩹 | — |
 | `dool` | 🩹 | — |
 | `ethtool` | ✅ | ✅ |
 | `execline` | 🩹 | — |
@@ -240,7 +235,6 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `qemu-user` | ✅ | ✅ |
 | `radare2` | ✅ 📌 | — |
 | `rizin` | 🩹 | — |
-| `runc` | ✅ | ✅ |
 | `s6` | 🩹 | — |
 | `s6-dns` | ✅ | — |
 | `s6-linux-init` | 🩹 | — |
@@ -249,7 +243,6 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `s6-portable-utils` | ✅ | — |
 | `s6-rc` | 🩹 | — |
 | `shadow` | 🩹 | — |
-| `skalibs` | ✅ | — |
 | `strace` | ✅ | ✅ |
 | `sudo` | 🩹 | — |
 | `tmux` | ✅ | ✅ |
