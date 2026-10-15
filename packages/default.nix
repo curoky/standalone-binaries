@@ -2,6 +2,7 @@
   system,
   pkgs,
   pkgsStatic,
+  upstreamPackages,
 }:
 assert system != "aarch64-linux";
 let
@@ -29,7 +30,6 @@ let
     ghostscript = pkgsStatic.callPackage ./ghostscript { };
     libtool = pkgsStatic.callPackage ./libtool { };
     makeself = pkgsStatic.callPackage ./makeself { };
-    pkgconf = pkgsStatic.callPackage ./pkgconf { };
     tesseract = pkgsStatic.callPackage ./tesseract { };
     vim = pkgsStatic.callPackage ./vim { };
     zsh = pkgsStatic.callPackage ./zsh { };
@@ -56,12 +56,10 @@ let
     gnutar = pkgsStatic.callPackage ./regression/gnutar { };
     go = pkgsStatic.callPackage ./go { go = pkgsStatic.go_latest; };
     gocryptfs = pkgsStatic.callPackage ./gocryptfs { };
-    lua5_5 = pkgsStatic.callPackage ./lua { };
     openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
     poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql { };
     protobuf_3_9_2 = pkgsStatic.callPackage ./protobuf/3_9_2 { };
-    radare2 = pkgsStatic.callPackage ./regression/radare2 { };
     rizin = pkgsStatic.callPackage ./rizin { };
     shadow = pkgsStatic.callPackage ./shadow {
       inherit (pkgs) symlinkJoin;
@@ -139,26 +137,22 @@ let
     };
 
     # Podman / container stack.
-    catatonit = pkgsStatic.callPackage ./regression/catatonit { };
-    conmon = pkgsStatic.callPackage ./regression/conmon { };
     crun = pkgsStatic.callPackage ./crun { };
     gpgme = pkgsStatic.callPackage ./gpgme { };
     buildah = pkgsStatic.callPackage ./regression/buildah { };
     aardvark-dns = pkgsStatic.callPackage ./regression/aardvark-dns { };
     podman5 = pkgsStatic.callPackage ./podman/podman5.nix {
+      conmon = upstreamPackages.conmon;
       inherit
-        catatonit
         crun
-        conmon
         gpgme
         aardvark-dns
         ;
     };
     podman6 = pkgsStatic.callPackage ./podman/podman6.nix {
+      conmon = upstreamPackages.conmon;
       inherit
-        catatonit
         crun
-        conmon
         gpgme
         aardvark-dns
         ;
@@ -190,6 +184,7 @@ let
     krb5 = pkgsStatic.callPackage ./krb5/darwin.nix { };
     poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql/darwin.nix { };
+    pkgconf = pkgsStatic.callPackage ./pkgconf { };
     rsync = pkgsStatic.callPackage ./regression/rsync/darwin.nix {
       inherit (pkgs) libiconv;
       nativeCC = pkgs.stdenv.cc;

@@ -65,7 +65,9 @@ in
       ./registries-conf-dir-v6.patch
     ];
 
-    buildInputs = builtins.filter (dep: lib.getName dep != "systemd") oldAttrs.propagatedBuildInputs;
+    buildInputs = builtins.filter (
+      dep: !lib.hasPrefix "systemd" (lib.getName dep)
+    ) oldAttrs.propagatedBuildInputs;
     propagatedBuildInputs = [ ];
 
     nativeInstallCheckInputs = [

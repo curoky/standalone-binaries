@@ -14,7 +14,7 @@
 #     platforms = [ "x86_64-linux" "aarch64-darwin" ];
 #
 #     # Package-level shared config, inherited by every platform:
-#     version  = "unstable";   # which pinned nixpkgs env (default "unstable")
+#     version  = "unstable";   # which locked nixpkgs env (default "unstable")
 #     isStatic = true;         # pkgsStatic (true, default) or pkgs (false)
 #     output   = [ "out" ];    # derivation outputs to expose (default [ "out" ])
 #     alias    = "name";       # rename exported attribute
@@ -182,6 +182,13 @@
 
   ## ---- linux only -------------------------------------------------------
 
+  catatonit = {
+    platforms = [ "x86_64-linux" ];
+  };
+  conmon = {
+    platforms = [ "x86_64-linux" ];
+    version = "master";
+  };
   cronie = {
     platforms = [
       "x86_64-linux"
@@ -293,11 +300,18 @@
       "aarch64-linux"
     ];
   };
+  pkgconf = {
+    platforms = [ "x86_64-linux" ];
+  };
   qemu-user = {
     platforms = [
       "x86_64-linux"
       "aarch64-linux"
     ];
+  };
+  radare2 = {
+    platforms = [ "x86_64-linux" ];
+    version = "master";
   };
   rsync = {
     platforms = [
@@ -466,9 +480,6 @@
       "x86_64-linux"
       "aarch64-darwin"
     ];
-    "x86_64-linux" = {
-      version = "25.11";
-    };
     "aarch64-darwin" = {
       isStatic = false;
     };

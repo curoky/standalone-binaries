@@ -155,7 +155,7 @@ build 成功判断；补充 `--version` 或代表性 smoke test。
 取任意 nixpkgs 包并走完整 artifact 流程，**绕过 manifest 和 `packages/` 本地
 patch**，用于探测某个包在某 channel 上不打 patch 能否编译过、能否打包。
 
-- `<channel>`：`unstable`、`2605`、`2511`、`2505`、`2411`、`2405`、`2211`（见
+- `<channel>`：`master`、`unstable`、`2605`、`2511`、`2505`、`2411`、`2405`、`2211`（见
   `flake.nix` 的 `channels`）。
 - `<pkg>`：任意 nixpkgs 顶层 attr 名；带点的嵌套 attr（如
   `llvmPackages_18.clang-unwrapped`）因 flake attr 路径限制不支持。

@@ -66,7 +66,12 @@ let
       { }
     else
       import ../packages {
-        inherit system pkgs pkgsStatic;
+        inherit
+          system
+          pkgs
+          pkgsStatic
+          upstreamPackages
+          ;
       };
   sourcePackages = upstreamPackages // localPackages;
 

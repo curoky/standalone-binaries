@@ -22,7 +22,6 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `build-tool-splicing` | 🩹 公共 package-set patch | ✅ | Graphite2、Node 和 Rizin 的 build-only Python、Rizin/Radare2 的 build-only Perl，以及 Mise 的 Git check tool 强制使用 native package set，并门禁错误平台的 native inputs | 各 upstream producer 正确选择 native build tool 后逐项删除 override；门禁保留 | — | `packages/static-build-tools.nix`, `lib/validate-native-build-inputs.nix` |
 | `go-build-tool` | 🩹 公共 package-set patch | ✅ | 默认及版本化 `buildGoModule` 的 native Go 只移除三个 nixpkgs 资源路径 patch，恢复标准 tzdata/MIME/IANA lookup | stock native Go 不再向 consumer 嵌入 store 资源路径 | — | `packages/static-build-tools.nix` |
 | `busybox` | 🩹 + 📦 本地 | 🟡 | udhcpc 与配套脚本改为 sibling 相对定位 | 上游支持可搬运资源定位后删 patch；保留脚本 packaging | b4fd65b198c5 | `packages/busybox/` |
-| `catatonit` | 🩹 本地 | ✅ | 补 build-for-build binutils 让 installCheck 的 readelf 可用 | 上游把 binutils 加进 nativeBuildInputs 后恢复 | b4fd65b198c5 | `packages/regression/catatonit/` |
 | `clang-tools-18` | 📦 本地 | ❌ | 固定 LLVM 18，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-19` | 📦 本地 | ❌ | 固定 LLVM 19，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-20` | 📦 本地 | ❌ | 固定 LLVM 20，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
@@ -33,12 +32,11 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `codex` | 🩹 本地 | 🟡 | CLI-only build、移除 store PATH wrapper、补 OpenSSL build tool | 上游 CLI 不再需要 code-mode-host 或 denoland 出 musl librusty_v8 后回 stock | b4fd65b198c5 | `packages/codex/` |
 | `cmake_3_27_9` | 📌 源码版本 + 🩹 | 🟡 | 保留 cstdint patch、`BUILD_TESTING=false`、openssl/curses 关闭 | 上游修复后删剩余 workaround，保留版本化 output | b4fd65b198c5 | `packages/cmake/3_27_9/` |
 | `cmake_4_1_2` | 📌 源码版本 + 🩹 | 🟡 | 保留 `--no-system-libs`、openssl/curses 关闭、`BUILD_TESTING=false` | 上游支持静态 shared-module test 后删剩余 workaround | b4fd65b198c5 | `packages/cmake/4_1_2/` |
-| `conmon` | 🩹 本地 | ✅ | 清空 propagatedBuildInputs（systemd-minimal isStatic badPlatform） | stock unstable 无需清空即可 musl-static 构建 | b4fd65b198c5 | `packages/regression/conmon/` |
+| `conmon` | 📌 `master` | ✅ | 上游修复已合入 master，当前 unstable 仍因 systemd-minimal static badPlatform 无法求值 | unstable 包含修复并完成 musl-static artifact 构建后去掉 pin | 7fd4004d0511 | `packages/upstream.nix` |
 | `copyparty` | 📦 本地 | ❌ | 纯 Python + sibling runtime + 功能裁剪 | sibling runtime、依赖裁剪和功能边界属 packaging | — | `packages/pythonPackages/copyparty.nix` |
 | `crun` | 🩹 本地 | 🟡 | feature 禁用（elfutils badPlatform）+ `doCheck=false` + json-c 迁移 | 逐项恢复 features/checks，保持 musl-static | b4fd65b198c5 | `packages/crun/` |
 | `curl` | 📦 本地 | ❌ | 内置 CA bundle 与相对路径 wrapper | 自包含证书定位是 packaging | — | `packages/curl/` |
 | `diffutils` | 🩹 本地 | ✅ | 禁用 checks（6 个 gnulib 多线程/locale 测试失败） | 上游全量 checks 与 musl-static 验证通过 | a7868a727837 | `packages/regression/diffutils/` |
-| `dive` | 📌 `25.11` | ✅ | 去 pin 失败（openldap 缺 Cyrus SASL） | Linux 用 unstable 并满足 musl-static portability | b4fd65b198c5 | `packages/upstream.nix` |
 | `dool` | 📦 本地 | ❌ | Python sibling runtime wrapper，默认追加 `--bytes` | runtime 与产品默认行为必须保留 | — | `packages/pythonPackages/dool.nix` |
 | `execline` | 🩹 本地 | 🟡 | 去 baked prefix patch | 输出无 store 路径 | b4fd65b198c5 | `packages/s6Packages/execline.nix` |
 | `exiftool` | 📦 本地 | ❌ | sibling Perl wrapper 与模块 bundling 使 install check 在构建沙箱中不可运行 | runtime packaging 与对应的 check 边界必须保留 | — | `packages/perlPackages/` |
@@ -56,7 +54,6 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `gocryptfs` | 🩹 本地 | 🟡 | 清空 propagatedBuildInputs + 设 PKG_CONFIG_PATH | 上游 pcsclite doc 可构建、cross cgo 自动定位 openssl 后删 | b4fd65b198c5 | `packages/gocryptfs/` |
 | `gpgme` | 🩹 本地 | 🟡 | `gnupgMinimal` + `doCheck=false`；`--disable-gpg-test` 已删除 | 恢复完整 GnuPG 或 checks，保持 musl-static | b4fd65b198c5 | `packages/gpgme/` |
 | `libtool` | 📦 本地 | ❌ | 改写 `libtoolize` 的 baked data paths | 相对资源定位必须保留 | — | `packages/libtool/` |
-| `lua5_5` | 🩹 本地 | ✅ | 恢复 `/usr/local` module paths，避免嵌 store 路径 | stock 默认 module paths 无 store 路径 | b4fd65b198c5 | `packages/lua/` |
 | `makeself` | 📦 本地 | ❌ | wrapper 相对定位 header 资源 | 可搬运资源定位必须保留 | — | `packages/makeself/` |
 | `markdownlint-cli2` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/nodejsPackages/markdownlint-cli2.nix` |
 | `mise` | 🩹 本地 | 🟡 | 修复 static-musl nextest list fixture 竞争、为 FHS 测试注入 native tools + PATH helper | upstream list guard 改用可靠的 phase signal、测试不再硬编码 FHS 路径后逐项删 test workaround；保留 PATH portability patch | b4fd65b198c5 | `packages/mise/` |
@@ -67,14 +64,13 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `opencommit` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/nodejsPackages/opencommit.nix` |
 | `openssh_gssapi` | 🩹 + 📦 本地 | ❌ | 相对定位 helpers + 关预认证 sandbox（QEMU 拒 seccomp） | 可搬运 helper 定位与跨架构 SSH 必须保留 | — | `packages/openssh_gssapi/` |
 | `poppler` | 🩹 + 📦 本地 | 🟡 | 静态依赖裁剪与链接修正；相对字体/数据包装 | 静态构建 workaround 可回归后删除；可搬运资源打包保留 | b4fd65b198c5 | `packages/poppler/` |
-| `pkgconf` | 🩹 本地 | ✅ | 改系统路径，避免二进制残留 store 路径 | stock 二进制不再编译进 store 路径 | b4fd65b198c5 | `packages/pkgconf/` |
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/perlPackages/parallel.nix` |
 | `patchelf` | 📌 `25.05` | ✅ | 历史 pin；unstable check `__TMC_END__` relocation 失败 | Linux 用 unstable 并满足 musl-static portability | b4fd65b198c5 | `packages/upstream.nix` |
 | `perl` | 🩹 + 📦 本地 | 🟡 | 注入 Compress::Raw::Lzma + IO::Compress::Brotli 静态 XS + wrapper | 只删 stock 已覆盖的依赖/link patch | b4fd65b198c5 | `packages/perlPackages/` |
 | `pnpm` | 🩹 本地 | ✅ | Rust 依赖的 host C helper 错误继承全局 `-static`，仅对该 helper 禁用此 flag | stock `pkgsStatic.pnpm` 的完整 artifact 流程通过 | a7868a727837 | `packages/regression/pnpm/linux.nix` |
-| `podman5` | 🩹 + 📦 本地 | 🟡 | 跟随 5.x；packaging 与产品边界见 podman DESIGN.md | 分别回归编译修正；packaging 保留 | b4fd65b198c5 | `packages/podman/DESIGN.md`、`packages/podman/podman5.nix` |
+| `podman5` | 🩹 + 📦 本地 | 🟡 | 去 systemd outputs、恢复静态 runc；packaging 与产品边界见 podman DESIGN.md | 分别回归编译修正；packaging 保留 | 7fd4004d0511 | `packages/podman/DESIGN.md`、`packages/podman/podman5.nix` |
 | `podman5-rootless` | 📦 本地 | ❌ | per-user wrapper、宿主 ID-map 接口、状态与 s6 packaging | 独立 rootless 产品边界必须保留 | — | `packages/podman-rootless/` |
-| `podman6` | 📌 + 🩹 + 📦 本地 | 🟡 | 固定 6.1.0；packaging 与产品边界见 podman DESIGN.md | 分别回归 pin/编译修正；packaging 保留 | b4fd65b198c5 | `packages/podman/DESIGN.md`、`packages/podman/podman6.nix` |
+| `podman6` | 📌 + 🩹 + 📦 本地 | 🟡 | 固定 6.1.0、去 systemd outputs、恢复静态 runc；packaging 与产品边界见 podman DESIGN.md | 分别回归 pin/编译修正；packaging 保留 | 7fd4004d0511 | `packages/podman/DESIGN.md`、`packages/podman/podman6.nix` |
 | `podman6-rootless` | 📦 本地 | ❌ | per-user wrapper、宿主 ID-map 接口、状态与 s6 packaging | 独立 rootless 产品边界必须保留 | — | `packages/podman-rootless/` |
 | `postgresql` | 🩹 + 📦 本地 | 🟡 | `gccAsClang`、关 curl/gss、psql-only 边界 | 逐项删 workaround，保留 psql-only 输出 | b4fd65b198c5 | `packages/postgresql/` |
 | `prettier` | 📦 本地 | ❌ | JS 分发绑定 sibling Node runtime | sibling runtime packaging 必须保留 | — | `packages/nodejsPackages/prettier.nix` |
@@ -91,9 +87,9 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `python313` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/pythonPackages/python/` |
 | `python314` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/pythonPackages/python/` |
 | `python315` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/pythonPackages/python/` |
-| `radare2` | 🩹 本地 | ✅ | sdb `both_libraries`→`library` | 上游 sdb 静态构建不产 `.so` 后删 override | b4fd65b198c5 | `packages/regression/radare2/` |
+| `radare2` | 📌 `master` | ✅ | 上游修复已随 radare2 6.2.4 进入 master，当前 unstable 仍是 6.2.0 | unstable 更新到已修复版本并完成 musl-static artifact 构建后去掉 pin | 7fd4004d0511 | `packages/upstream.nix` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
-| `rizin` | 🩹 本地 | ✅ | tree-sitter 与 cross-static 构建修正 | 上游补齐 native cc/wrap/静态构建后逐项删 | b4fd65b198c5 | `packages/rizin/` |
+| `rizin` | 🩹 本地 | ✅ | tree-sitter 安装、native cc/wrap 与 libdemangle 静态构建修正 | 上游逐项补齐后删除对应 override | 7fd4004d0511 | `packages/rizin/` |
 | `runc` | 📦 native selection | ❌ | Linux 容器运行时，无 macOS 构建目标 | 无 macOS 端可回归空间（平台固有） | — | `packages/upstream.nix` |
 | `s6` | 🩹 本地 | 🟡 | 去 baked prefix patch | 输出无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6.nix` |
 | `s6-linux-init` | 🩹 + 📦 本地 | 🟡 | 去 baked prefix patch + symlinkJoin | 产物与生成脚本无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6-linux-init.nix` |

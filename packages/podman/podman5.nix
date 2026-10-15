@@ -51,7 +51,9 @@ in
 }).overrideAttrs
   (oldAttrs: {
     propagatedBuildInputs = [ ];
-    buildInputs = builtins.filter (dep: lib.getName dep != "systemd") oldAttrs.propagatedBuildInputs;
+    buildInputs = builtins.filter (
+      dep: !lib.hasPrefix "systemd" (lib.getName dep)
+    ) oldAttrs.propagatedBuildInputs;
 
     nativeInstallCheckInputs = [
       coreutils

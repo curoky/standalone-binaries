@@ -6,7 +6,7 @@
 # Manifest schema (see packages/upstream.nix for the full reference):
 #   <pkg> = {
 #     platforms = [ "x86_64-linux" "aarch64-darwin" ];  # omitted => allSystems
-#     version  = "unstable";   # which nixpkgs env (default "unstable")
+#     version  = "unstable";   # which locked nixpkgs env (default "unstable")
 #     isStatic = true;         # pkgsStatic (true, default) or pkgs (false)
 #     output   = [ "out" ];    # outputs to expose (default [ "out" ])
 #     alias    = "name";       # rename the exported attribute

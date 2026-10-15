@@ -2,6 +2,7 @@
   description = "Standalone, portable prebuilt tool binaries built with Nix";
 
   inputs = {
+    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-gcc15-2026-09-07.url = "github:NixOS/nixpkgs/dc5d91f840324650bac8c379428c7037a416959a";
     nixpkgs-2605.url = "github:NixOS/nixpkgs/nixos-26.05";
@@ -22,6 +23,7 @@
         "aarch64-darwin"
       ];
       channels = {
+        master = inputs.nixpkgs-master;
         unstable = inputs.nixpkgs-unstable;
         "26.05" = inputs.nixpkgs-2605;
         "25.11" = inputs.nixpkgs-2511;
