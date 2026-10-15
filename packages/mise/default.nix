@@ -10,6 +10,9 @@
 # 3. The static musl test constructor runs before Rust captures argv, so its
 #    `--list` guard misses nextest's concurrent list processes and they race while
 #    resetting the shared fixture tree. Use nextest's explicit phase marker too.
+# 4. The rustup host-name test uses x86_64 musl as its alternate configured host,
+#    which equals this build's target and is correctly deduplicated. Use an
+#    aarch64 fixture so the test still covers distinct configured/build hosts.
 #
 # The test changes can regress independently; PATH-based helper lookup is
 # permanent portability behavior. The shared native Git check tool remains
@@ -38,6 +41,14 @@ mise.overrideAttrs (oldAttrs: {
       --replace-fail \
         '"/usr/bin:/bin"' \
         '"${lib.makeBinPath [ buildPackages.coreutils ]}"'
+
+    substituteInPlace ./src/plugins/core/rust.rs \
+      --replace-fail \
+        '"x86_64-unknown-linux-musl"' \
+        '"aarch64-unknown-linux-musl"' \
+      --replace-fail \
+        '"stable-x86_64-unknown-linux-musl"' \
+        '"stable-aarch64-unknown-linux-musl"'
 
     patchShebangs --build \
       ./test/data/plugins/**/bin/* \
