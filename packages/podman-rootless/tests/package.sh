@@ -103,7 +103,7 @@ CONTAINERS_CONF_OVERRIDE=/nonexistent STORAGE_DRIVER=vfs STORAGE_OPTS=invalid \
 	"$root/bin/podman-server"
 grep -Fx "HOME=$root/data/home" "$PODMAN_TEST_LOG"
 grep -Fx "XDG_RUNTIME_DIR=$runtime" "$PODMAN_TEST_LOG"
-grep -Fx "TMPDIR=$runtime/tmp" "$PODMAN_TEST_LOG"
+grep -Fx "TMPDIR=$root/data/tmp" "$PODMAN_TEST_LOG"
 grep -Fx "USER=$user" "$PODMAN_TEST_LOG"
 grep -Fx "LOGNAME=$user" "$PODMAN_TEST_LOG"
 grep -Fx "PODMAN_DATA_DIR=$root/data" "$PODMAN_TEST_LOG"
@@ -115,7 +115,9 @@ grep -Fx 'arg=system' "$PODMAN_TEST_LOG"
 grep -Fx 'arg=service' "$PODMAN_TEST_LOG"
 grep -Fx "arg=unix://$runtime/podman.sock" "$PODMAN_TEST_LOG"
 test -d "$root/data/home"
+test -d "$root/data/tmp"
 test -d "$runtime"
+test ! -e "$runtime/tmp"
 
 # The client has a distinct endpoint and must not create server state.
 rm -rf "$root/data" "$runtime"

@@ -43,7 +43,8 @@ CONTAINERS_CONF_OVERRIDE=/nonexistent STORAGE_DRIVER=vfs STORAGE_OPTS=invalid \
 	XDG_CONFIG_HOME=/nonexistent XDG_DATA_HOME=/nonexistent XDG_CACHE_HOME=/nonexistent \
 	SSL_CERT_FILE=/nonexistent SSL_CERT_DIR=/nonexistent \
 	"$root/bin/podman-server"
-test -d "$runtime/tmp"
+test -d "$root/data/tmp"
+test ! -e "$runtime/tmp"
 test ! -e "$root/data/runroot"
 test ! -e "$root/data/tmpdir"
 test ! -e "$root/data/networks"

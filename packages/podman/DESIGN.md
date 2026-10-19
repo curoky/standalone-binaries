@@ -22,15 +22,16 @@ Podman 5 与 6 使用相同 unit 和 socket 名，宿主只能激活其中一版
 | image、container、volume 与数据库 | `$root/data/graphroot` | 持久 |
 | engine HOME 与 registry auth | `$root/data/home`、`$root/data/auth.json` | 持久 |
 | network definitions | `$root/conf/networks` | 持久且可写 |
+| image 临时文件 | `$root/data/tmp` | 临时、磁盘承载 |
 | storage runroot | `/run/podman/storage` | 易失 |
 | libpod tmpdir | `/run/podman/libpod` | 易失 |
-| image 临时文件 | `/run/podman/tmp` | 易失 |
 | API socket | `/run/podman/podman.sock` | 易失 |
 
 systemd 用 `RuntimeDirectory=podman` 创建 `/run/podman`。service 重启时目录可保留，宿主
 重启后 `/run` 被清空并重新创建；持久容器状态仍在 bundle 内。备份或搬迁只需保留 bundle，
-不要复制 `/run/podman`。搬迁后重新运行 installer，使 unit 指向新路径。已有 libpod 数据库
-记录核心路径，因此不要在同一数据目录上随意改变 bundle 或 runtime 布局。
+其中 `data/tmp` 可在服务停止时清理；不要复制 `/run/podman`。搬迁后重新运行 installer，
+使 unit 指向新路径。已有 libpod 数据库记录核心路径，因此不要在同一数据目录上随意改变
+bundle 或 runtime 布局。
 
 ## 配置解析
 
@@ -38,6 +39,8 @@ systemd 用 `RuntimeDirectory=podman` 创建 `/run/podman`。service 重启时�
 `storage.conf` 用 `PODMAN_DATA_DIR` 和 `PODMAN_RUNTIME_DIR` 分别展开 graphroot 与 runroot。
 server wrapper 计算 bundle 的绝对路径并设置这两个变量，同时固定 containers、storage、
 registry、signature policy、CA 与 auth 文件。会影响上述选择的外部 override 被清除。
+镜像复制使用进程级 `TMPDIR=$PODMAN_DATA_DIR/tmp`，使大镜像层使用 graphroot 所在磁盘，
+而不是容量受限的 `/run` tmpfs。
 remote client 固定 API socket，以及 Podman 启动阶段必须解析的 containers/storage 文件；
 registry、policy、TLS、auth、helper 和数据路径只在 server 设置。
 

@@ -1,6 +1,6 @@
 #!/bin/sh
-# Per-user rootless API service. Persistent state follows the relocatable
-# bundle while volatile state stays under /run.
+# Per-user rootless API service. Persistent state and image-copy scratch space
+# follow the relocatable bundle while boot-sensitive state stays under /run.
 set -eu
 
 root=$(readlink -f -- "$0")
@@ -14,7 +14,7 @@ export PODMAN_DATA_DIR="$root/data"
 export PODMAN_RUNTIME_DIR="/run/user/$uid/podman"
 export HOME="$PODMAN_DATA_DIR/home"
 export XDG_RUNTIME_DIR="$PODMAN_RUNTIME_DIR"
-export TMPDIR="$PODMAN_RUNTIME_DIR/tmp"
+export TMPDIR="$PODMAN_DATA_DIR/tmp"
 export CONTAINERS_CONF="$root/conf/containers.conf"
 export CONTAINERS_STORAGE_CONF="$root/conf/storage.conf"
 export CONTAINERS_REGISTRIES_CONF="$root/conf/registries.conf"

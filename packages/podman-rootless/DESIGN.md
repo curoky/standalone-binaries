@@ -24,17 +24,18 @@ socket；`bin/podman` 按调用者 UID 连接。
 | image、container、volume、数据库 | `/opt/podman/data/graphroot` | 持久 |
 | engine HOME、registry auth | `/opt/podman/data/home`、`data/auth.json` | 持久 |
 | network definitions | `/opt/podman/conf/networks` | 持久，初始为空 |
+| image 临时文件 | `/opt/podman/data/tmp` | 临时、磁盘承载 |
 | storage runroot | `/run/user/<uid>/podman/storage` | 易失 |
 | libpod tmpdir | `/run/user/<uid>/podman/libpod` | 易失 |
-| image 临时文件 | `/run/user/<uid>/podman/tmp` | 易失 |
 | API socket | `/run/user/<uid>/podman/podman.sock` | 易失 |
 
 服务停止时，finish script 用本地 engine 入口 `podman-server --stop-all` 停容器，不能
 调用已经无法连接 socket 的 remote client。服务重启复用本次 boot 的运行目录；宿主
 重启清空 `/run`，s6 重新创建运行目录，持久状态从 bundle 恢复。
 
-备份或搬迁完整 bundle，不复制 `/run`。路径或 UID 改变后重装服务；不同用户不共用
-bundle，以免共享数据和网络定义。
+备份或搬迁完整 bundle，其中 `data/tmp` 可在服务停止时清理；不要复制 `/run`。路径或 UID
+改变后重装服务；不同用户不共用 bundle，以免共享数据和网络定义。镜像复制使用进程级
+`TMPDIR=$PODMAN_DATA_DIR/tmp`，避免受 `/run/user` tmpfs 容量限制。
 
 ## Rootful base
 

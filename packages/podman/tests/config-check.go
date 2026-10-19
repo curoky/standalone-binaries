@@ -94,6 +94,9 @@ func check() error {
 		return fmt.Errorf("missing Podman runtime directory")
 	}
 	if len(os.Args) > 1 {
+		if os.Getenv("TMPDIR") != filepath.Join(data, "tmp") {
+			return fmt.Errorf("image temporary directory escaped data storage: %s", os.Getenv("TMPDIR"))
+		}
 		for suffix, get := range map[string]func() (string, error){
 			".config":      homedir.GetConfigHome,
 			".local/share": homedir.GetDataHome,
