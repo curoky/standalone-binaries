@@ -90,7 +90,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `python315` | 📦 本地 | ❌ | 静态 CPython 与内建扩展模块 | 多版本静态 runtime 是产品决策 | — | `packages/pythonPackages/python/` |
 | `radare2` | 📌 `master` | ✅ | 上游修复已随 radare2 6.2.4 进入 master，当前 unstable 仍是 6.2.0 | unstable 更新到已修复版本并完成 musl-static artifact 构建后去掉 pin | 7fd4004d0511 | `packages/upstream.nix` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
-| `rizin` | 🩹 本地 | ✅ | tree-sitter 安装、native cc/wrap 与 libdemangle 静态构建修正 | 上游逐项补齐后删除对应 override | 7fd4004d0511 | `packages/regression/rizin/` |
+| `rizin` | 🩹 本地 | ✅ | native cc/wrap 与 libdemangle 静态构建修正 | 上游逐项补齐后删除对应 override | 7fd4004d0511 | `packages/regression/rizin/` |
 | `s6` | 🩹 本地 | 🟡 | 去 baked prefix patch | 输出无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6.nix` |
 | `s6-linux-init` | 🩹 + 📦 本地 | 🟡 | 去 baked prefix patch + symlinkJoin | 产物与生成脚本无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6-linux-init.nix` |
 | `s6-rc` | 🩹 本地 | 🟡 | 去 baked prefix patch | 产物与生成服务无 store 路径 | b4fd65b198c5 | `packages/s6Packages/s6-rc.nix` |
@@ -99,7 +99,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `sudo` | 🩹 本地 | 🟡 | 去 pam（`--disable-pam`）纯静态；setuid 外部设置 | 上游 pam 可静态化后删 override；setuid 边界保留 | b4fd65b198c5 | `packages/sudo/` |
 | `tesseract` | 📦 本地 | ❌ | 真实二进制与 `tessdata_best` 的 `eng`/`chi_sim`/`chi_tra`/`osd` 使用相对路径 wrapper 共同打包，其他模型由外部 `TESSDATA_PREFIX` 提供 | 可搬运 tessdata 定位和中英文最高精度默认数据必须保留 | e12c65a91594 | `packages/tesseract/` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
-| `tree-sitter` | 🩹 本地 | ✅ | rizin 依赖；精确删 `.so` 安装行（sed range 缺陷） | 上游修正 sed range 或静态不装 `.so` 后删 override | b4fd65b198c5 | `packages/regression/tree-sitter/` |
+| `tree-sitter` | 📌 `staging`，rizin 内部依赖 | ✅ | 静态安装的 [sed range 修复](https://github.com/NixOS/nixpkgs/pull/572638) 尚未进入锁定 unstable；使用 staging 原版包 | unstable 包含修复并通过 Rizin 最终 artifact 的构建、静态链接和搬迁运行后去掉 channel 选择 | 02c087f3fe67 | `packages/default.nix`, `lib/make-system-outputs.nix` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |
 | `wget` | 🩹 + 📦 本地 | 🟡 | `doCheck=false`（fuzzer segfault）+ CA wrapper packaging | 恢复 checks/build tool 后保留 CA packaging | b4fd65b198c5 | `packages/wget/` |

@@ -3,6 +3,7 @@
   pkgs,
   pkgsStatic,
   pkgsStaticMaster,
+  pkgsStaticStaging,
 }:
 assert system != "aarch64-linux";
 let
@@ -65,7 +66,9 @@ let
     poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql { };
     protobuf_3_9_2 = pkgsStatic.callPackage ./protobuf/3_9_2 { };
-    rizin = pkgsStatic.callPackage ./regression/rizin { };
+    rizin = pkgsStatic.callPackage ./regression/rizin {
+      tree-sitter = pkgsStaticStaging.tree-sitter;
+    };
     shadow = pkgsStatic.callPackage ./shadow {
       inherit (pkgs) symlinkJoin;
     };

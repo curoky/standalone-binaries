@@ -72,6 +72,7 @@ let
           pkgsStatic
           ;
         pkgsStaticMaster = envs.master.pkgsStatic;
+        pkgsStaticStaging = envs.staging.pkgsStatic;
       };
   sourcePackages = upstreamPackages // localPackages;
 
