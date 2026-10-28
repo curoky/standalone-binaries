@@ -81,6 +81,9 @@
   };
   less = { };
   libarchive = { };
+  libjpeg = {
+    output = [ "bin" ];
+  };
   lsof = { };
   m4 = { };
   ncdu_1 = { };

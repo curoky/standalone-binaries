@@ -100,6 +100,7 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `lefthook` | ✅ | ✅ | ✅ |
 | `less` | ✅ | ✅ | ✅ |
 | `libarchive` | ✅ | ✅ | ✅ |
+| `libjpeg` | ✅ | ✅ | ✅ |
 | `libtool` | 🩹 | — | 🩹 |
 | `lsof` | ✅ | ✅ | ✅ |
 | `lua5_5` | ✅ | ✅ | — |
