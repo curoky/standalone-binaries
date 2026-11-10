@@ -12,8 +12,8 @@ description: 维护 standalone-binaries 的包；用于接入或停用平台、�
 
 1. 查看工作区差异，保留已有改动。确认包名、目标平台和用户要求的行为。
 2. 在 `packages/upstream.nix` 查 attr、alias、channel、output、平台，再检查
-   `packages/default.nix` 是否有同名覆盖。按最终 derivation 的注释和
-   [定制记录](../../../docs/regression/AGENTS.md) 了解当前修正。
+   `packages/default.nix` 的本地接线与平台范围，确保同一平台的最终导出名只出现一次。
+   按最终 derivation 的注释和[定制记录](../../../docs/regression/AGENTS.md)了解当前修正。
 3. 按任务选择下面的接入/修复或删除定制流程。现有代码与记录冲突时，以代码和当前验证
    更新记录；只有含义不清且会改变产品行为时才询问。
 

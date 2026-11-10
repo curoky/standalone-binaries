@@ -53,5 +53,6 @@
       "probe"
       "sources"
       "cacheRoots"
+      "checks"
     ] (name: lib.mapAttrs (_: outputs: outputs.${name}) perSystemOutputs);
 }

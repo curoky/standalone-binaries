@@ -6,6 +6,7 @@
 assert system != "aarch64-linux";
 let
   inherit (pkgs) lib;
+  mergePackageSets = import ../lib/merge-package-sets.nix { inherit lib; };
   mkClangTools = pkgsStatic.callPackage ./clang-tools { };
   mkPython = pkgsStatic.callPackage ./pythonPackages/python { };
   conmon = pkgsStatic.conmon;
@@ -33,7 +34,6 @@ let
     ghostscript = pkgsStatic.callPackage ./regression/ghostscript { };
     libtool = pkgsStatic.callPackage ./libtool { };
     makeself = pkgsStatic.callPackage ./makeself { };
-    tesseract = pkgsStatic.callPackage ./tesseract { };
     vim = pkgsStatic.callPackage ./vim { };
     zsh = pkgsStatic.callPackage ./zsh { };
 
@@ -68,6 +68,7 @@ let
       inherit (pkgs) symlinkJoin;
     };
     sudo = pkgsStatic.callPackage ./sudo { };
+    tesseract = pkgsStatic.callPackage ./tesseract { };
     wget = pkgsStatic.callPackage ./wget/linux.nix { };
 
     # Rust.
@@ -217,7 +218,9 @@ let
     };
   };
 in
-common
-// lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux linux
-// lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin darwin
-// lib.optionalAttrs (system == "x86_64-linux") x86_64-linux
+mergePackageSets system {
+  inherit common;
+  linux = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux linux;
+  darwin = lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin darwin;
+  x86_64-linux = lib.optionalAttrs (system == "x86_64-linux") x86_64-linux;
+}

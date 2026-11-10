@@ -6,6 +6,7 @@
 }:
 system: manifest:
 let
+  mergePackageSets = import ./merge-package-sets.nix { inherit lib; };
   configFields = [
     "version"
     "isStatic"
@@ -85,39 +86,41 @@ let
     require "<system>" (lib.elem system allSystems) "unsupported system ${builtins.toJSON system}"
       system;
 in
-lib.concatMapAttrs (
-  name: raw:
-  let
-    checkedRaw = validateEntry name raw;
-    platforms = checkedRaw.platforms or allSystems;
-    enabled = lib.elem checkedSystem platforms;
+mergePackageSets checkedSystem (
+  lib.mapAttrs (
+    name: raw:
+    let
+      checkedRaw = validateEntry name raw;
+      platforms = checkedRaw.platforms or allSystems;
+      enabled = lib.elem checkedSystem platforms;
 
-    shared = lib.removeAttrs checkedRaw reserved;
-    perPlatform = checkedRaw.${checkedSystem} or { };
-    conf = shared // perPlatform;
+      shared = lib.removeAttrs checkedRaw reserved;
+      perPlatform = checkedRaw.${checkedSystem} or { };
+      conf = shared // perPlatform;
 
-    targetVer = conf.version or "unstable";
-    env = envs.${targetVer};
-    base = if conf.isStatic or true then env.pkgsStatic else env.pkgs;
+      targetVer = conf.version or "unstable";
+      env = envs.${targetVer};
+      base = if conf.isStatic or true then env.pkgsStatic else env.pkgs;
 
-    rawPkg = lib.getAttrFromPath (lib.splitString "." name) base;
+      rawPkg = lib.getAttrFromPath (lib.splitString "." name) base;
 
-    selectedOutputs = conf.output or [ "out" ];
-    selectedPaths = map (output: lib.getOutput output rawPkg) selectedOutputs;
-    finalName = conf.alias or name;
+      selectedOutputs = conf.output or [ "out" ];
+      selectedPaths = map (output: lib.getOutput output rawPkg) selectedOutputs;
+      finalName = conf.alias or name;
 
-    # A single output is already a complete tree; only pay for an lndir-based
-    # symlinkJoin when multiple outputs actually need to be merged.
-    finalDrv =
-      if lib.length selectedPaths == 1 then
-        lib.head selectedPaths
-      else
-        env.pkgs.symlinkJoin {
-          name = finalName;
-          paths = selectedPaths;
-        };
-  in
-  lib.optionalAttrs enabled {
-    "${finalName}" = finalDrv;
-  }
-) checkedManifest
+      # A single output is already a complete tree; only pay for an lndir-based
+      # symlinkJoin when multiple outputs actually need to be merged.
+      finalDrv =
+        if lib.length selectedPaths == 1 then
+          lib.head selectedPaths
+        else
+          env.pkgs.symlinkJoin {
+            name = finalName;
+            paths = selectedPaths;
+          };
+    in
+    lib.optionalAttrs enabled {
+      "${finalName}" = finalDrv;
+    }
+  ) checkedManifest
+)

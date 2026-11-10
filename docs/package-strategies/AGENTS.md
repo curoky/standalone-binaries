@@ -22,6 +22,19 @@ Manifest schema 见 [`packages/upstream.nix`](../../packages/upstream.nix)，校
 [`lib/make-manifest-packages.nix`](../../lib/make-manifest-packages.nix) 实现。
 未知字段、平台、channel、错误类型以及空或重复 output 必须在 eval 时失败。
 
+每个平台按最终导出名接线，名称在该平台只能对应一个来源。
+[`merge-package-sets.nix`](../../lib/merge-package-sets.nix) 在读取包集合时检查 upstream/local、
+本地分组及 manifest alias 的冲突，并报告平台、名称与来源；`all`、`all-fast` 为保留输出名。
+同名包可以在不同平台选用不同来源。构建期 package-set overlay 与 derivation override
+继续用于修正依赖和构建参数。
+
+包选择与重名门禁检查：
+
+```bash
+nix build .#checks.x86_64-linux.package-selection
+nix flake check --all-systems --no-build
+```
+
 ## Local packages
 
 - 在 `packages/<name>/` 保存定制，通过 `packages/default.nix` 显式接入。

@@ -15,7 +15,8 @@
   stock nixpkgs 包，允许选择 channel、output 和别名；不维护本地 patch、override 或 wrapper。
   stock 构建失败时停用该平台。
 - `packages/upstream.nix` 选择上游包，默认 unstable、静态、`out`；省略默认字段。
-  `packages/default.nix` 显式接入本地包，并覆盖同名上游包。索引只负责选择和接线。
+  `packages/default.nix` 显式接入本地包。每个平台的最终导出名只能有一个来源；
+  upstream、本地分组和 manifest alias 合并时遇到重名即失败。索引只负责选择和接线。
   仅供其他包使用的依赖放在内部 `let`，不单独生成产物。
 - 本地定制复用上游 derivation。文件头写清当前问题、修正及删除条件；资源包装、同级
   runtime、多版本输出等产品行为另说明保留理由。具体构建规则见[包构建](docs/package-strategies/AGENTS.md)。

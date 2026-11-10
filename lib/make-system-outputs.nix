@@ -52,6 +52,7 @@ let
     inherit lib envs;
     allSystems = systems;
   };
+  mergePackageSets = import ./merge-package-sets.nix { inherit lib; };
   makeArtifacts = import ./make-artifacts.nix {
     inherit pkgs artifactTool validateNativeBuildInputs;
   };
@@ -72,7 +73,10 @@ let
           pkgsStatic
           ;
       };
-  sourcePackages = upstreamPackages // localPackages;
+  sourcePackages = mergePackageSets system {
+    upstream = upstreamPackages;
+    local = localPackages;
+  };
 
   artifacts = lib.mapAttrs makeArtifacts sourcePackages;
   standalonePackages = artifacts;
@@ -101,10 +105,14 @@ let
     );
 in
 {
-  packages = standalonePackages // {
-    all = mkAll "all-standalone-tools" (_: true);
-    all-fast = mkAll "all-standalone-tools-fast" (name: !isSlowLLVM name);
+  packages = mergePackageSets system {
+    standalone = standalonePackages;
+    aggregates = {
+      all = mkAll "all-standalone-tools" (_: true);
+      all-fast = mkAll "all-standalone-tools-fast" (name: !isSlowLLVM name);
+    };
   };
+  checks.package-selection = import ./package-selection-tests.nix { inherit lib pkgs; };
   tarballs = tarballPackages;
   cacheRoots = lib.mapAttrs (name: artifact: {
     out = artifact.outPath;

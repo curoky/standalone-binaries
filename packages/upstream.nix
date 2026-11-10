@@ -159,10 +159,7 @@
   };
   procs = { };
   ripgrep = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-darwin"
-    ];
+    platforms = [ "aarch64-darwin" ];
   };
   ruff = { };
   starship = { };
