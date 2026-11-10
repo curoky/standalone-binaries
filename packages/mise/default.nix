@@ -15,8 +15,8 @@
 #    aarch64 fixture so the test still covers distinct configured/build hosts.
 #
 # The test changes can regress independently; PATH-based helper lookup is
-# permanent portability behavior. The shared native Git check tool remains
-# selected by `packages/static-build-tools.nix`.
+# permanent portability behavior. Nixpkgs splices the Git check tool onto the
+# build platform without a local producer override.
 {
   buildPackages,
   lib,

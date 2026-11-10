@@ -2,15 +2,13 @@
   system,
   pkgs,
   pkgsStatic,
-  pkgsStaticMaster,
-  pkgsStaticStaging,
 }:
 assert system != "aarch64-linux";
 let
   inherit (pkgs) lib;
   mkClangTools = pkgsStatic.callPackage ./clang-tools { };
   mkPython = pkgsStatic.callPackage ./pythonPackages/python { };
-  conmon = pkgsStaticMaster.conmon;
+  conmon = pkgsStatic.conmon;
   crun = pkgsStatic.callPackage ./regression/crun { };
   gpgme = pkgsStatic.callPackage ./regression/gpgme { };
   aardvark-dns = pkgsStatic.callPackage ./regression/aardvark-dns { };
@@ -54,9 +52,7 @@ let
     busybox = pkgsStatic.callPackage ./busybox { };
     cmake_3_27_9 = pkgsStatic.callPackage ./cmake/3_27_9 { };
     cmake_4_1_2 = pkgsStatic.callPackage ./cmake/4_1_2 { };
-    diffutils = pkgsStatic.callPackage ./regression/diffutils { };
     ffmpeg = pkgsStatic.callPackage ./ffmpeg/linux.nix { };
-    fuse = pkgsStatic.callPackage ./regression/fuse { };
     graphviz = pkgsStatic.callPackage ./graphviz { };
     gnutar = pkgsStatic.callPackage ./regression/gnutar { };
     go = pkgsStatic.callPackage ./go { go = pkgsStatic.go_latest; };
@@ -66,9 +62,8 @@ let
     poppler = pkgsStatic.callPackage ./poppler { };
     postgresql = pkgsStatic.callPackage ./postgresql { };
     protobuf_3_9_2 = pkgsStatic.callPackage ./protobuf/3_9_2 { };
-    rizin = pkgsStatic.callPackage ./regression/rizin {
-      tree-sitter = pkgsStaticStaging.tree-sitter;
-    };
+    radare2 = pkgsStatic.callPackage ./radare2 { };
+    rizin = pkgsStatic.callPackage ./regression/rizin { };
     shadow = pkgsStatic.callPackage ./shadow {
       inherit (pkgs) symlinkJoin;
     };
@@ -79,6 +74,7 @@ let
     codex = pkgsStatic.callPackage ./codex { };
     mise = pkgsStatic.callPackage ./mise { };
     pnpm = pkgsStatic.callPackage ./regression/pnpm/linux.nix { };
+    ripgrep = pkgsStatic.callPackage ./regression/ripgrep { };
 
     # Perl.
     perl = pkgsStatic.callPackage ./perlPackages/perl/linux.nix { };

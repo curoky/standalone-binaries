@@ -43,8 +43,8 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `croc` | ✅ | ✅ | ✅ |
 | `curl` | 🩹 | — | 🩹 |
 | `delve` | ✅ | ✅ | ✅ |
-| `diffutils` | 🩹 | — | ✅ |
-| `dive` | ✅ | — | ✅ |
+| `diffutils` | ✅ | ✅ | ✅ |
+| `dive` | ✅ | ✅ | ✅ |
 | `docker-buildx` | ✅ | ✅ | ✅ |
 | `docker-compose` | ✅ | ✅ | ✅ |
 | `dprint` | ✅ | ✅ | ✅ |
@@ -132,12 +132,12 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `postgresql` | 🩹 | — | 🩹 |
 | `procs` | ✅ | ✅ | ✅ |
 | `qpdf` | ✅ | ✅ | ✅ |
-| `radare2` | ✅ 📌 | — | — |
+| `radare2` | 🩹 | — | — |
 | `rclone` | ✅ | ✅ | ✅ |
 | `revive` | ✅ | ✅ | ✅ |
 | `rime-plugins` | 🩹 | — | 🩹 |
-| `ripgrep` | ✅ | ✅ | ✅ |
-| `rizin` | 🩹 📌 | — | — |
+| `ripgrep` | 🩹 | — | ✅ |
+| `rizin` | 🩹 | — | — |
 | `rsync` | ✅ | ✅ | 🩹 |
 | `ruff` | ✅ | ✅ | ✅ |
 | `scc` | ✅ | ✅ | ✅ |
@@ -193,7 +193,6 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `dool` | 🩹 | — |
 | `ethtool` | ✅ | ✅ |
 | `execline` | 🩹 | — |
-| `fuse` | 🩹 | — |
 | `fuse3` | ✅ | ✅ |
 | `glibcLocales` | ✅ | ✅ |
 | `iproute2` | ✅ | ✅ |

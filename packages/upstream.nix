@@ -46,9 +46,7 @@
       "aarch64-darwin"
     ];
   };
-  diffutils = {
-    platforms = [ "aarch64-darwin" ];
-  };
+  diffutils = { };
   findutils = { };
   flac = {
     output = [ "bin" ];
@@ -160,7 +158,12 @@
     platforms = [ "aarch64-darwin" ];
   };
   procs = { };
-  ripgrep = { };
+  ripgrep = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
+  };
   ruff = { };
   starship = { };
   tokei = { };
@@ -297,10 +300,6 @@
       "x86_64-linux"
       "aarch64-linux"
     ];
-  };
-  radare2 = {
-    platforms = [ "x86_64-linux" ];
-    version = "master";
   };
   rsync = {
     platforms = [
@@ -461,10 +460,6 @@
     };
   };
   dive = {
-    platforms = [
-      "x86_64-linux"
-      "aarch64-darwin"
-    ];
     "aarch64-darwin" = {
       isStatic = false;
     };
