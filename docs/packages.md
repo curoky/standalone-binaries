@@ -20,7 +20,7 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `7zz` | ✅ 📌 | ✅ 📌 | ✅ |
 | `age` | ✅ | ✅ | ✅ |
 | `aria2` | ✅ | ✅ | ✅ 📌 |
-| `atuin` | ✅ | ✅ | ✅ |
+| `atuin` | 🩹 | — | ✅ |
 | `autoconf` | 🩹 | — | 🩹 |
 | `automake` | 🩹 | — | 🩹 |
 | `bash` | ✅ | — | ✅ |
@@ -61,9 +61,9 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `fzf` | ✅ | ✅ | ✅ |
 | `gawk` | ✅ | ✅ | ✅ |
 | `gdb` | ✅ 📌 | ✅ 📌 | — |
-| `gdu` | ✅ | ✅ | ✅ |
+| `gdu` | ✅ | — | ✅ |
 | `gettext` | ✅ | ✅ | ✅ |
-| `gh` | ✅ | ✅ | ✅ |
+| `gh` | 🩹 | ✅ | ✅ |
 | `ghostscript` | 🩹 | — | 🩹 |
 | `git` | 🩹 | — | — |
 | `git-absorb` | ✅ | — | ✅ |
@@ -87,7 +87,7 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `gopls` | ✅ | ✅ | ✅ |
 | `gost` | ✅ | ✅ | ✅ |
 | `gotests` | ✅ | ✅ | ✅ |
-| `gotools` | ✅ | ✅ | ✅ |
+| `gotools` | ✅ | — | ✅ |
 | `graphviz` | 🩹 | — | — |
 | `gzip` | ✅ | ✅ | ✅ |
 | `imagemagick` | 🩹 | — | 🩹 |
@@ -154,10 +154,10 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 | `tmux-plugins` | 🩹 | — | 🩹 |
 | `tokei` | ✅ | ✅ | ✅ |
 | `tree` | ✅ | ✅ | ✅ |
-| `tzdata` | ✅ | ✅ | ✅ |
+| `tzdata` | ✅ | ✅ | 🩹 |
 | `unzip` | ✅ | ✅ | ✅ |
 | `util-linux` | ✅ | ✅ | ✅ |
-| `uv` | ✅ | ✅ | ✅ |
+| `uv` | ✅ | — | ✅ |
 | `vim` | 🩹 | — | 🩹 |
 | `vim-plugins` | 🩹 | — | 🩹 |
 | `watchexec` | ✅ | ✅ | ✅ |

@@ -16,8 +16,9 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | --- | --- | --- | --- | --- | --- | --- |
 | `7zz` | 📌 `gcc15-pin` | ✅ | unstable 7zip 26.04 + GCC 16 链接 `7z.so` 时命中非 PIC 静态 libstdc++ 重定位错误 | 两个 Linux 架构用 unstable 构建并满足 musl-static portability | f4a03c008967 | `packages/upstream.nix`, `flake.nix` |
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
+| `atuin` | 🩹 本地 | ✅ | SQLx proc macro 的 host pkg-config 误用 musl SQLite/OpenSSL；显式提供原生库与 pkg-config，保留 target 静态依赖 | stock 正确区分 host/target 库且全部 checks、搬迁后的 history 操作通过后删除 | f4a03c008967 | `packages/regression/atuin/` |
 | `aardvark-dns` | 🩹 Podman 内部依赖 | ✅ | musl 无 `close_range` wrapper，patch 改用 raw syscall | 上游改用 musl-safe close_range 后删 patch | f4a03c008967 | `packages/regression/aardvark-dns/` |
-| `aws-lc-build-go` | 🩹 公共 producer override | ✅ | symbol generator 继承 cross Go 默认值找不到 target CC；用 native Go 并对纯 Go 工具设置 `CGO_ENABLED=0`，保留 SSL checks | stock producer 的 symbol generator 与 SSL test runner 使用正确的 build-platform Go/CC 后删除 | f4a03c008967 | `packages/static-build-tools.nix` |
+| `aws-lc-build-go` | 🩹 公共 producer override | ✅ | symbol generator 继承 cross Go 默认值找不到 target CC；用 native Go 并对纯 Go 工具设置 `CGO_ENABLED=0`，保留 SSL checks | stock producer 的 symbol generator 与 SSL test runner 使用正确的 build-platform Go/CC 后删除 | f4a03c008967 | `packages/regression/aws-lc/`, `packages/static-build-tools.nix` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
 | `buildah` | 🩹 本地 | ✅ | 纯 Go OpenPGP 避开完整 GnuPG→OpenLDAP 的 musl-static Cyrus SASL 失败 | stock `buildah-unwrapped` 使用静态兼容的签名 backend 通过完整 artifact 流程 | f4a03c008967 | `packages/regression/buildah/` |
 | `build-tool-splicing` | 🩹 公共 package-set patch | ✅ | Graphite2/Node/Rizin 的 build-only Python 和 Rizin 的 build-only Perl 使用 native package set；门禁错误平台的 native inputs | 各 upstream producer 正确选择 native build tool 后逐项删除 override；门禁保留 | — | `packages/static-build-tools.nix`, `lib/validate-native-build-inputs.nix` |
@@ -30,7 +31,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `clang-tools-22` | 📦 本地 | ❌ | 固定 LLVM 22，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `clang-tools-23` | 📦 本地 | ❌ | 固定 LLVM 23，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `cloc` | 📦 本地 | ❌ | sibling Perl wrapper 使 install check 在无 sibling runtime 的沙箱中不可运行 | runtime packaging 与对应的 check 边界必须保留 | — | `packages/perlPackages/cloc.nix` |
-| `codex` | 🩹 本地 | 🟡 | CLI-only build、移除 store PATH wrapper、补 OpenSSL build tool | 上游 CLI 不再需要 code-mode-host 或 denoland 出 musl librusty_v8 后回 stock | b4fd65b198c5 | `packages/codex/` |
+| `codex` | 🩹 本地 | 🟡 | CLI-only build，移除 daemon store-layout patch 与 postInstall；补原生 Perl/Clang 和系统 Oniguruma、Rust Jemalloc、AWS-LC | 上游 musl CLI 可独立构建且 helper/metadata 不依赖 store 后逐项移除；保留 PATH helper 行为 | b4fd65b198c5 | `packages/codex/` |
 | `cmake_3_27_9` | 📌 源码版本 + 🩹 | 🟡 | 保留 cstdint patch、`BUILD_TESTING=false`、openssl/curses 关闭 | 上游修复后删剩余 workaround，保留版本化 output | b4fd65b198c5 | `packages/cmake/3_27_9/` |
 | `cmake_4_1_2` | 📌 源码版本 + 🩹 | 🟡 | 保留 `--no-system-libs`、openssl/curses 关闭、`BUILD_TESTING=false` | 上游支持静态 shared-module test 后删剩余 workaround | b4fd65b198c5 | `packages/cmake/4_1_2/` |
 | `copyparty` | 📦 本地 | ❌ | 纯 Python + sibling runtime + 功能裁剪 | sibling runtime、依赖裁剪和功能边界属 packaging | — | `packages/pythonPackages/copyparty.nix` |
@@ -43,6 +44,7 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `file` | 🩹 + 📦 本地 | 🟡 | version check 直指真实二进制；wrapper 相对定位 `magic.mgc` | 上游检查可兼容 wrapper 后删除检查修正；资源定位必须保留 | f4a03c008967 | `packages/file/` |
 | `ffmpeg` | 🩹 本地 | 🟡 | 裁剪 static-unsupported 依赖链、libbluray、LAME decoder、x265 multibit；修正 SoXR/libssh/SVT-AV1/x265 静态产物；增大 musl 线程栈以容纳 MPEG-TS PAT parser | 逐 feature 恢复并去掉依赖 override；上游不再在线程栈放置超大 `struct Program` 后删除 stack-size；保持 musl-static、无 store 引用 | — | `packages/ffmpeg/linux.nix` |
 | `gdb` | 📌 `25.11` | ✅ | unstable 的 Expect 错选 target Tcl，正式 native-input 门禁失败，raw probe 仍链接失败于 `tclStubsPtr` | unstable 的 dejagnu/expect 可构建并通过最终 artifact 验证后删除 pin | f4a03c008967 | `packages/upstream.nix` |
+| `gh` | 🩹 本地 | ✅ | token refresh 测试加载 America/New_York；仅在 checks 提供 tzdata 和 ZONEINFO，避免依赖 compiler 内置 store 数据路径 | stock 显式提供测试时区数据且全部 checks/artifact 通过后删除 | f4a03c008967 | `packages/regression/gh/` |
 | `git` | 🩹 本地 | 🟡 | musl install checks 失败 + 静态传递链接 + 相对资源 wrapper | 逐项删构建 workaround，保留 wrapper | f4a03c008967 | `packages/git/` |
 | `git-filter-repo` | 📦 本地 | ❌ | Python sibling runtime | runtime packaging 不会因上游构建修复消失 | — | `packages/pythonPackages/git-filter-repo.nix` |
 | `ghostscript` | 🩹 本地 | ✅ | 改用静态 `gs` target，跳过不存在的 `gsx` check | `pkgsStatic.ghostscript_headless` 直接生成可搬运静态 `gs` 后删除 override | f4a03c008967 | `packages/regression/ghostscript/` |

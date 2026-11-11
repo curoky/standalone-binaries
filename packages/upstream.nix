@@ -131,7 +131,9 @@
   };
 
   # rust pkgs
-  atuin = { };
+  atuin = {
+    platforms = [ "aarch64-darwin" ];
+  };
   bat = {
     platforms = [
       "x86_64-linux"
@@ -467,11 +469,19 @@
     };
   };
   gdu = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
     "aarch64-darwin" = {
       isStatic = false;
     };
   };
   gh = {
+    platforms = [
+      "aarch64-linux"
+      "aarch64-darwin"
+    ];
     "aarch64-darwin" = {
       isStatic = false;
     };
@@ -527,6 +537,10 @@
     };
   };
   gotools = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
     "aarch64-darwin" = {
       isStatic = false;
     };
@@ -661,5 +675,10 @@
       version = "25.11";
     };
   };
-  uv = { };
+  uv = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-darwin"
+    ];
+  };
 }

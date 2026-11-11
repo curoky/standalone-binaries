@@ -56,6 +56,7 @@ let
     graphviz = pkgsStatic.callPackage ./graphviz { };
     gnutar = pkgsStatic.callPackage ./regression/gnutar { };
     go = pkgsStatic.callPackage ./go { go = pkgsStatic.go_latest; };
+    gh = pkgsStatic.callPackage ./regression/gh { tzdata = pkgs.tzdata; };
     gocryptfs = pkgsStatic.callPackage ./regression/gocryptfs { };
     imagemagick = pkgsStatic.callPackage ./regression/imagemagick/linux.nix { };
     openssh_gssapi = pkgsStatic.callPackage ./openssh_gssapi { };
@@ -72,6 +73,7 @@ let
     wget = pkgsStatic.callPackage ./wget/linux.nix { };
 
     # Rust.
+    atuin = pkgsStatic.callPackage ./regression/atuin { nativePkgs = pkgs; };
     codex = pkgsStatic.callPackage ./codex { };
     mise = pkgsStatic.callPackage ./mise { };
     pnpm = pkgsStatic.callPackage ./regression/pnpm/linux.nix { };

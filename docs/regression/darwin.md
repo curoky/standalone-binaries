@@ -14,6 +14,7 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | `aria2` | 📌 `24.11` + 📦 `bin` output | 🟡 | unstable 静态 darwin 缺 iconv 符号链接失败；CLI 位于独立 `bin` output | unstable 静态链接与 artifact 验证通过后删除 pin；保留 `bin` output | 624af665418d | `packages/upstream.nix` |
 | `autoconf` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/autoconf/` |
 | `automake` | 📦 本地 | ❌ | 相对路径 wrappers 定位配套脚本 | 上游入口无需 Nix store 路径时再评估 | — | `packages/automake/` |
+| `aws-lc-build-go` | 🩹 公共 producer override | ✅ | stock static Go bootstrap 缺少 libresolv；symbol generator、SSL test runner 和 vendor fetch 使用 native Go，纯 Go 工具关闭 CGO | stock 正确选择 build-platform Go/CC，UV 与 SSL checks/artifact 通过后删除 | f4a03c008967 | `packages/regression/aws-lc/`, `packages/static-build-tools.nix` |
 | `build-tool-splicing` | 🩹 公共 package-set patch | ✅ | Graphite2/rsync 的 build-only Python 和 wget 的 build-only Perl 强制使用 native package set，并门禁错误平台的 native inputs | 各 upstream producer 正确选择 native interpreter 后逐项删除 override；门禁保留 | — | `packages/static-build-tools.nix`, `lib/validate-native-build-inputs.nix` |
 | `cloc` | 📦 本地 | 🟡 | sibling Perl 与模块 bundling；禁用 install check | 只恢复可运行的 install check | — | `packages/perlPackages/cloc.nix` |
 | `colima` | 📦 native selection | ✅ | Darwin native；Go 资源仍含 store 引用 | 资源路径 portable 后恢复默认；resolver 独立回归 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/normalize.go`, `cmd/artifact/binary.go` |
@@ -47,7 +48,7 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | `parallel` | 📦 本地 | ❌ | 多入口 sibling Perl wrappers | runtime packaging 必须保留 | — | `packages/perlPackages/parallel.nix` |
 | `pango` (imagemagick 内部) | 🩹 内部依赖 | ✅ | Darwin static Meson cross file 使用未知的 `arm64` CPU family 且缺少 `macos` subsystem，Pango 无法完成平台检测；局部补齐标准值 | nixpkgs cross file 直接生成标准 CPU family/subsystem，且 ImageMagick 完整 artifact 通过后删除 override | 7fd4004d0511 | `packages/regression/imagemagick/darwin.nix` |
 | `perl` | 🩹 + 📦 本地 | 🟡 | 静态依赖、相对 install name 与 wrapper | 只删除 stock 已覆盖的依赖/link patch | — | `packages/perlPackages/` |
-| `postgresql` | 🩹 + 📦 本地 | 🟡 | 基于 `pkgsStatic.libpq` 追加 psql，改系统 OpenSSL 目录 | `pkgsStatic.libpq` 上游提供 psql 且不嵌依赖路径 | dc5d91f84032 | `packages/postgresql/` |
+| `postgresql` | 🩹 + 📦 本地 | 🟡 | 基于 `pkgsStatic.libpq` 追加 psql；OpenSSL 使用 macOS 系统目录，移除上游 Linux CA 路径与 Nix profile fallback patch | `pkgsStatic.libpq` 上游提供 psql，且 OpenSSL 的证书与资源默认路径均不依赖 store | dc5d91f84032 | `packages/postgresql/` |
 | `radare2` | ⏸️ 停用 darwin | ❌ | 产品不要求 macOS 支持；仅在 Linux 包集合接入 | 产品边界，不作为上游回归目标 | — | `packages/upstream.nix` |
 | `rclone` | 📦 native selection | ✅ | Darwin native；保留三项 Go 资源 store 引用 | 资源路径 portable 后关闭；resolver 独立回归 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/binary.go`, `docs/package-strategies/go.md` |
 | `rime-plugins` | 📦 本地 | ❌ | 聚合多个 Rime 词库与转换结果 | 数据 bundle 是产品 | — | `packages/rime-plugins/` |
@@ -59,6 +60,7 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | `supercronic` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/binary.go` |
 | `tesseract` | 🩹 + 📦 本地 | 🟡 | 去 training-only Pango 避免 static GLib 配置失败；同时链接 GNU/Apple iconv ABI 时仅隐藏 Apple archive 内重复的 `__libiconv_version`；相对路径 runtime 内置 `tessdata_best` 的 `eng`/`chi_sim`/`chi_tra`/`osd`，其他模型由外部 `TESSDATA_PREFIX` 提供 | static GLib/Pango 可构建且 iconv ABI 冲突消失后删 override；保留 Darwin runtime packaging | e12c65a91594 | `packages/tesseract/darwin.nix`, `packages/default.nix` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
+| `tzdata` | 🩹 公共 package-set override | ✅ | now.ck 用墙上时钟校验发布时的 zonenow.tab，DST 切换后组会合并；用 SOURCE_DATE_EPOCH 固定检查时刻，保留全部 checks | stock 默认用源码发布时间运行 now.ck，TZ 数据、JQ 与 Starship 的完整 artifact 验证通过后删除 | f4a03c008967 | `packages/regression/tzdata/`, `packages/static-build-tools.nix` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |
 | `wget` | 🩹 + 📦 本地 | 🟡 | 公共 native Perl build tool override + CA wrapper | upstream 正确选择 native Perl 后删公共 override；保留 CA packaging | — | `packages/static-build-tools.nix`, `packages/wget/` |

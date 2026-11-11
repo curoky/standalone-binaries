@@ -6,6 +6,7 @@
 # - Wget、Rizin 将生成工具放进 target 依赖；注入 native Perl。
 # - AWS-LC 的 Go symbol generator 继承 cross compiler 默认值；注入原生 Go，
 #   对纯 Go 构建工具禁用 CGO，避免 SSL test runner 混用 native runtime 与 target CC。
+# - Darwin 的 tzdata now.ck 使用发布时刻，避免 DST 切换后同一源码检查失效。
 # - Skaware scope 在正常 splicing 前解析 pkg-config；在 scope 内注入 native 工具。
 # - Go compiler 的三项资源 patch 将 tzdata/MIME/IANA store 路径嵌入 consumer；
 #   仅移除这些 patch，保留其余 compiler 行为。
@@ -54,12 +55,16 @@ lib.optionalAttrs prev.stdenv.hostPlatform.isStatic (
   // lib.optionalAttrs (prev ? graphite2) (
     useNativeBuildTools "graphite2" { python3 = nativePkgs.python3; }
   )
-  // lib.optionalAttrs (prev.stdenv.hostPlatform.isLinux && prev ? aws-lc) {
-    aws-lc = (prev.aws-lc.override { go = nativePkgs.go; }).overrideAttrs (old: {
-      env = (old.env or { }) // {
-        CGO_ENABLED = "0";
-      };
-    });
+  // lib.optionalAttrs (prev ? aws-lc) {
+    aws-lc = import ./regression/aws-lc {
+      aws-lc = prev.aws-lc;
+      go = nativePkgs.go;
+      buildGoModule =
+        if prev.stdenv.hostPlatform.isDarwin then nativePkgs.buildGoModule else prev.buildGoModule;
+    };
+  }
+  // lib.optionalAttrs (prev.stdenv.hostPlatform.isDarwin && prev ? tzdata) {
+    tzdata = import ./regression/tzdata { tzdata = prev.tzdata; };
   }
   // lib.optionalAttrs (prev.stdenv.hostPlatform.isLinux && prev ? nodejs-slim_24) (
     useNativeBuildTools "nodejs-slim_24" { python3 = nativePkgs.python3; }

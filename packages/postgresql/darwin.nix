@@ -17,13 +17,16 @@
 }:
 let
   portableOpenSSL = openssl.overrideAttrs (old: {
+    # 上游使用 Linux CA 路径，并在缺失时回退到 Nix profile；macOS 的
+    # OPENSSLDIR=/etc/ssl 已使原始 X509_CERT_FILE 指向 /etc/ssl/cert.pem。
+    patches = builtins.filter (
+      patch: builtins.baseNameOf (toString patch) != "use-etc-ssl-certs.patch"
+    ) old.patches;
     postPatch = (old.postPatch or "") + ''
       substituteInPlace Configurations/unix-Makefile.tmpl \
         --replace-fail 'OPENSSLDIR="\"$(OPENSSLDIR)\""' 'OPENSSLDIR="\"/etc/ssl\""' \
         --replace-fail 'ENGINESDIR="\"$(ENGINESDIR)\""' 'ENGINESDIR="\"/usr/lib/engines\""' \
         --replace-fail 'MODULESDIR="\"$(MODULESDIR)\""' 'MODULESDIR="\"/usr/lib/ossl-modules\""'
-      substituteInPlace include/internal/common.h \
-        --replace-fail "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt" "/etc/ssl/cert.pem"
     '';
   });
 in

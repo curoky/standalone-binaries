@@ -10,17 +10,22 @@
 # 3. Nixpkgs resolves clang/libclang from the static target set even though they
 #    are build tools for BoringSSL and bindgen. Use cached build-platform tools
 #    so the target remains musl-static without rebuilding LLVM for musl.
-# 4. Stock `postFixup` wraps rg/bwrap with absolute store paths. Drop it so
-#    runtime helpers resolve from the deployed environment instead.
+# 4. Stock daemon-layout patch and `postInstall` package rg/bwrap/ps through
+#    absolute store paths. The CLI uses PATH helpers; omit daemon packaging
+#    and its patch so unused stock Ripgrep does not block the CLI build.
+# 5. The CLI's onig_sys, tikv-jemalloc-sys and aws-lc-sys crates need system
+#    libraries under the Cargo hook's no-vendoring policy.
 #
 # Regress these independently when upstream can build the full musl CLI output
-# without V8 archives, missing build tools or store-path wrappers.
+# without V8 archives, missing build tools/libraries or store-path packaging.
 {
   lib,
-  stdenv,
   codex,
   emptyFile,
   perl,
+  oniguruma,
+  rust-jemalloc-sys,
+  aws-lc,
   buildPackages,
 }:
 
@@ -31,6 +36,9 @@
   libclang = buildPackages.libclang;
 }).overrideAttrs
   (old: {
+    patches = builtins.filter (
+      patch: !(lib.hasSuffix "nix-package-layout.patch" (toString patch))
+    ) old.patches;
     cargoBuildFlags = [
       "--package"
       "codex-cli"
@@ -44,6 +52,11 @@
     # so openssl-src compiles OpenSSL from source and needs perl on the build
     # machine.
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ perl ];
+    buildInputs = old.buildInputs ++ [
+      oniguruma
+      rust-jemalloc-sys
+      aws-lc
+    ];
 
     env =
       builtins.removeAttrs (old.env or { }) [
@@ -56,8 +69,5 @@
         LIBCLANG_PATH = "${lib.getLib buildPackages.libclang}/lib";
       };
 
-    # Upstream shell-completion generation and the wrapProgram PATH injection
-    # both bake nixpkgs store paths into the output; neither is compatible with
-    # our relocatable, no-store-reference outputs. rg / bwrap come from PATH.
-    postFixup = "";
+    postInstall = "";
   })
