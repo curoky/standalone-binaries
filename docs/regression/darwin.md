@@ -60,7 +60,7 @@ Go/CGO 公共 resolver workaround 的原因、门禁和回归步骤由
 | `supercronic` | 📦 native selection | ✅ | native；resolver 由 artifact 修正 | `pkgsStatic` 可构建并 portable 后恢复默认 | dc5d91f84032 | `packages/upstream.nix`, `cmd/artifact/binary.go` |
 | `tesseract` | 🩹 + 📦 本地 | 🟡 | 去 training-only Pango 避免 static GLib 配置失败；同时链接 GNU/Apple iconv ABI 时仅隐藏 Apple archive 内重复的 `__libiconv_version`；相对路径 runtime 内置 `tessdata_best` 的 `eng`/`chi_sim`/`chi_tra`/`osd`，其他模型由外部 `TESSDATA_PREFIX` 提供 | static GLib/Pango 可构建且 iconv ABI 冲突消失后删 override；保留 Darwin runtime packaging | e12c65a91594 | `packages/tesseract/darwin.nix`, `packages/default.nix` |
 | `tmux-plugins` | 📦 本地 | ❌ | 独立发布 `.tmux.conf` 数据 | 数据 bundle 是产品 | — | `packages/tmux-plugins/` |
-| `tzdata` | 🩹 公共 package-set override | ✅ | now.ck 用墙上时钟校验发布时的 zonenow.tab，DST 切换后组会合并；用 SOURCE_DATE_EPOCH 固定检查时刻，保留全部 checks | stock 默认用源码发布时间运行 now.ck，TZ 数据、JQ 与 Starship 的完整 artifact 验证通过后删除 | f4a03c008967 | `packages/regression/tzdata/`, `packages/static-build-tools.nix` |
+| `tzdata` | 🩹 公共 package-set override | ✅ | now.ck 用墙上时钟校验发布时的 zonenow.tab，DST 切换后组会合并；sourceRoot 为 `.` 时，并行构建还会使 Nix 把生成的 `.attrs` 文件时间误作 SOURCE_DATE_EPOCH；从源码 `version` 的 mtime 固定检查时刻，保留全部 checks | stock 稳定地用源码发布时间运行 now.ck，TZ 数据、JQ、Starship 与 PostgreSQL 的完整 artifact 验证通过后删除 | f4a03c008967 | `packages/regression/tzdata/`, `packages/static-build-tools.nix` |
 | `vim` | 📦 本地 | ❌ | wrapper 相对设置 `VIMRUNTIME` | 可搬运 runtime 定位必须保留 | — | `packages/vim/` |
 | `vim-plugins` | 📦 本地 | ❌ | 聚合固定 Vim plugins | plugin bundle 是产品 | — | `packages/vim-plugins/` |
 | `wget` | 🩹 + 📦 本地 | 🟡 | 公共 native Perl build tool override + CA wrapper | upstream 正确选择 native Perl 后删公共 override；保留 CA packaging | — | `packages/static-build-tools.nix`, `packages/wget/` |
