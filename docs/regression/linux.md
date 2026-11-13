@@ -24,12 +24,12 @@ Podman 的 rootful systemd 与 rootless s6 packaging 产品边界分别见
 | `build-tool-splicing` | 🩹 公共 package-set patch | ✅ | Graphite2/Node/Rizin 的 build-only Python 和 Rizin 的 build-only Perl 使用 native package set；门禁错误平台的 native inputs | 各 upstream producer 正确选择 native build tool 后逐项删除 override；门禁保留 | — | `packages/static-build-tools.nix`, `lib/validate-native-build-inputs.nix` |
 | `go-build-tool` | 🩹 公共 package-set patch | ✅ | 默认及版本化 `buildGoModule` 的 native Go 移除三个资源路径 patch；未移除时 Age 最终二进制仍嵌入失效的 tzdata/IANA store 路径 | stock native Go 不再向 consumer 嵌入 store 资源路径 | f4a03c008967 | `packages/static-build-tools.nix` |
 | `busybox` | 🩹 + 📦 本地 | 🟡 | udhcpc 与配套脚本改为 sibling 相对定位 | 上游支持可搬运资源定位后删 patch；保留脚本 packaging | b4fd65b198c5 | `packages/busybox/` |
-| `clang-tools-18` | 📦 本地 | ❌ | 固定 LLVM 18，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `clang-tools-19` | 📦 本地 | ❌ | 固定 LLVM 19，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `clang-tools-20` | 📦 本地 | ❌ | 固定 LLVM 20，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `clang-tools-21` | 📦 本地 | ❌ | 固定 LLVM 21，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `clang-tools-22` | 📦 本地 | ❌ | 固定 LLVM 22，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
-| `clang-tools-23` | 📦 本地 | ❌ | 固定 LLVM 23，只提取瘦身 `clang-format` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-18` | 📦 本地 | ❌ | 固定 LLVM 18，只提取瘦身 `clang-format-18` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-19` | 📦 本地 | ❌ | 固定 LLVM 19，只提取瘦身 `clang-format-19` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-20` | 📦 本地 | ❌ | 固定 LLVM 20，只提取瘦身 `clang-format-20` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-21` | 📦 本地 | ❌ | 固定 LLVM 21，只提取瘦身 `clang-format-21` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-22` | 📦 本地 | ❌ | 固定 LLVM 22，只提取瘦身 `clang-format-22` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
+| `clang-tools-23` | 📦 本地 | ❌ | 固定 LLVM 23，只提取瘦身 `clang-format-23` | 多版本单工具发布是产品决策 | — | `packages/clang-tools/` |
 | `cloc` | 📦 本地 | ❌ | sibling Perl wrapper 使 install check 在无 sibling runtime 的沙箱中不可运行 | runtime packaging 与对应的 check 边界必须保留 | — | `packages/perlPackages/cloc.nix` |
 | `codex` | 🩹 本地 | 🟡 | CLI-only build，移除 daemon store-layout patch 与 postInstall；补原生 Perl/Clang 和系统 Oniguruma、Rust Jemalloc、AWS-LC | 上游 musl CLI 可独立构建且 helper/metadata 不依赖 store 后逐项移除；保留 PATH helper 行为 | b4fd65b198c5 | `packages/codex/` |
 | `cmake_3_27_9` | 📌 源码版本 + 🩹 | 🟡 | 保留 cstdint patch、`BUILD_TESTING=false`、openssl/curses 关闭 | 上游修复后删剩余 workaround，保留版本化 output | b4fd65b198c5 | `packages/cmake/3_27_9/` |

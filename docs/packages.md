@@ -173,6 +173,8 @@ macOS 仅支持 Apple Silicon；具体发布策略见[发布模型](release-mode
 
 ## Linux only
 
+`clang-tools-<major>` 提供 `clang-format-<major>`，可同时安装多个版本。
+
 | Package | Linux x86_64 | Linux ARM64 |
 | --- | :---: | :---: |
 | `buildah` | 🩹 | — |

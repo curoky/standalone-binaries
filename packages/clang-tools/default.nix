@@ -2,14 +2,16 @@
 #
 # Why local:
 # 1. The nixpkgs LLVM package publishes the complete compiler and tool suite,
-#    while this product exposes only `clang-format` for each selected major.
+#    while this product exposes only `clang-format-<major>` for each selected major.
 # 2. Rebuild clang with size-oriented flags, section garbage collection and
 #    mold, then copy only the requested executable into the final output.
-# 3. The version is supplied by the caller so multiple LLVM majors can coexist
-#    without inheriting the moving default toolchain.
+# 3. The version is supplied by the caller and included in the executable name
+#    so multiple LLVM majors can coexist without inheriting the moving default
+#    toolchain or overwriting each other's executable.
 #
 # This is intentional output shaping, not an upstream build workaround.
 {
+  lib,
   stdenv,
   mold,
 }:
@@ -41,6 +43,6 @@ stdenv.mkDerivation {
 
   installPhase = ''
     mkdir -p $out/bin
-    cp ${clang}/bin/clang-format $out/bin/
+    cp ${clang}/bin/clang-format $out/bin/clang-format-${lib.versions.major version}
   '';
 }

@@ -8,8 +8,8 @@
 - FFmpeg 发布 headless 工具；恢复 codec、filter、采集或加速 feature 时重新验证完整
   静态依赖闭包和实际功能。
 - PostgreSQL 发布 `psql` client；不恢复 server、扩展或无关开发工具。
-- `clang-tools-*` 只提取 `clang-format`。多版本工具、runtime、插件和数据包按各自输出
-  发布，不能因为上游构建已修好就删除产品包装。
+- `clang-tools-*` 只提取 `clang-format`，按主版本命名为 `clang-format-<major>`。
+  多版本工具、runtime、插件和数据包按各自输出发布，不能因为上游构建已修好就删除产品包装。
 
 ## Dynamic libraries
 
